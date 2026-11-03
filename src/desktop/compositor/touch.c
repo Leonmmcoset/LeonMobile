@@ -33,6 +33,7 @@ static void touch_up(struct wl_listener *listener, void *data) {
         return;
     wlr_seat_pointer_notify_button(server->seat, event->time_msec, BTN_LEFT,
                                    WL_POINTER_BUTTON_STATE_RELEASED);
+    process_cursor_motion(server, event->time_msec);
     wlr_seat_pointer_notify_frame(server->seat);
 }
 void leon_touch_init(struct leon_server *server) {

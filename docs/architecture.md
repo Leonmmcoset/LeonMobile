@@ -66,6 +66,16 @@ The shell owns session state and navigation separately from status, lock,
 home/apps, task, quick-settings and notification views. LMUI separates its public
 types, canvas, widgets and application API from its private Wayland backend.
 
+The notification shade is an overlay independent of the underlying desktop or
+active app. Its private gesture model follows pointer movement, snaps to compact
+or expanded positions and animates settling over 180 ms. Expanded controls use
+the existing peer-authorized settings/audio/power operations. Closing the shade
+restores the active app's input region and keyboard focus; the compositor keeps
+pressed-pointer motion in its original surface coordinates across input-region
+boundaries. Notifications can be scrolled and opened under their known app
+identity. Network/power status reflects the reference platform; the panel does
+not add radio or brightness hardware support.
+
 ## Distribution build units
 
 | Buildroot package | Payload | Principal dependencies |

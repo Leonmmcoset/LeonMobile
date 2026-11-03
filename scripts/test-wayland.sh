@@ -27,4 +27,9 @@ for application in settings calculator gallery files editor terminal images cloc
 done
 LMUI_CAPTURE_FRAME="$repo/build/screenshots/lock.png" LMUI_QUIT_AFTER_FRAME=1 \
     timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-shell"
-echo 'Wayland smoke: all eight apps and shell rendered successfully'
+for stage in compact expanded; do
+    LEON_SHELL_CAPTURE_SHADE="$stage" LMUI_CAPTURE_FRAME="$repo/build/screenshots/shade-$stage.png" \
+        LMUI_QUIT_AFTER_FRAME=1 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-shell"
+    test -s "$repo/build/screenshots/shade-$stage.png"
+done
+echo 'Wayland smoke: all eight apps, shell and both shade stages rendered successfully'

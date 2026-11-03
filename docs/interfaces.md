@@ -46,6 +46,15 @@ The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `
 
 Applications include `<lmui/lmui.hpp>` and link through `pkg-config lmui` with C++20. `Application` owns the Wayland connection, window, input processing and event loop. Applications supply `paint`, `pointer`, `scroll`, `key` and `tick` callbacks. `redraw()` schedules a fresh frame; `quit()` ends the loop. A maximum of three live shared-memory buffers bounds frame allocation.
 
+`on_pointer_motion(callback)` optionally registers continuous surface-local
+coordinates for pointer and touch motion. Button/contact transitions still use
+`pointer(x, y, down)`; motion does not synthesize additional presses. Register an
+empty callback to unsubscribe. A client tracks press state when it needs a drag.
+The callback is stored privately, preserving the public `Application` object
+layout and LMUI generation 1. `redraw()` called inside `paint` requests another
+frame; the current event loop polls at approximately 16 ms and does not promise
+display-synchronized animation timing.
+
 The umbrella header remains available. Public interfaces may also be included
 individually as `<lmui/types.hpp>`, `<lmui/canvas.hpp>`, `<lmui/widgets.hpp>` and
 `<lmui/application.hpp>`. Wayland connection, buffer, rendering and input
@@ -61,3 +70,7 @@ installed as public SDK interfaces.
 `Canvas` provides shapes, clipped drawing, Pango text and image rendering. `Widget` provides retained component trees, rows/columns, labels, buttons, fields, toggles, sliders, layout and hit testing. Application callbacks own state. Components do not implement a declarative language or bind arbitrary borrowed application objects.
 
 The reference SDK example is `examples/hello`. Debug-only environment conventions `LMUI_CAPTURE_FRAME` and `LMUI_QUIT_AFTER_FRAME` capture a rendered PNG and terminate after the first frame, respectively; normal launch sanitizes inherited environment variables.
+
+For independent shell rendering, `LEON_SHELL_CAPTURE_SHADE=compact` or `expanded`
+selects a settled shade stage only when `LMUI_CAPTURE_FRAME` is also set. This
+capture convention does not open the shade during normal startup.

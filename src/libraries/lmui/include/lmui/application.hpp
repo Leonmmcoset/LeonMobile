@@ -28,6 +28,7 @@ class Application {
     void redraw();
     void quit();
     void input_region(const std::vector<Rect> &rectangles);
+    void on_pointer_motion(std::function<void(double, double)> callback);
     int width() const;
     int height() const;
 

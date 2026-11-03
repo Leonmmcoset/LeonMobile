@@ -25,6 +25,7 @@ void Application::Impl::draw() {
         opacity = 1;
     if (opacity < 1)
         cairo_push_group(cr);
+    dirty = false;
     if (app->paint)
         app->paint(canvas);
     if (opacity < 1) {
@@ -46,6 +47,6 @@ void Application::Impl::draw() {
     wl_surface_damage(surface, 0, 0, w, h);
     wl_surface_commit(surface);
     b->busy = true;
-    dirty = opacity < 1;
+    dirty = dirty || opacity < 1;
 }
 } // namespace lmui

@@ -14,6 +14,9 @@ int Application::run() {
 }
 void Application::redraw() { impl->dirty = true; }
 void Application::quit() { impl->running = false; }
+void Application::on_pointer_motion(std::function<void(double, double)> callback) {
+    impl->motion = std::move(callback);
+}
 void Application::input_region(const std::vector<Rect> &rectangles) {
     if (!impl->surface)
         return;

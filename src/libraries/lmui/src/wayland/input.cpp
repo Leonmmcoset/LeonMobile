@@ -7,6 +7,14 @@ void Application::Impl::notify_pointer(bool down) {
         app->pointer(px, py, down);
     dirty = true;
 }
+void Application::Impl::notify_motion(double x, double y) {
+    px = x;
+    py = y;
+    if (motion) {
+        motion(px, py);
+        dirty = true;
+    }
+}
 void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
     auto &s = *static_cast<Impl *>(data);
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !s.pointer) {
@@ -20,8 +28,7 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
             [](void *, wl_pointer *, uint32_t, wl_surface *) {},
             [](void *d, wl_pointer *, uint32_t, wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
-                s.px = wl_fixed_to_double(x);
-                s.py = wl_fixed_to_double(y);
+                s.notify_motion(wl_fixed_to_double(x), wl_fixed_to_double(y));
             },
             [](void *d, wl_pointer *, uint32_t, uint32_t, uint32_t, uint32_t state) {
                 static_cast<Impl *>(d)->notify_pointer(state == WL_POINTER_BUTTON_STATE_PRESSED);
@@ -110,8 +117,7 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
             },
             [](void *d, wl_touch *, uint32_t, int32_t, wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
-                s.px = wl_fixed_to_double(x);
-                s.py = wl_fixed_to_double(y);
+                s.notify_motion(wl_fixed_to_double(x), wl_fixed_to_double(y));
             },
             [](void *, wl_touch *) {},
             [](void *d, wl_touch *) { static_cast<Impl *>(d)->notify_pointer(false); },

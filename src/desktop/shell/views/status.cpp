@@ -1,4 +1,3 @@
-#include "../control.hpp"
 #include "../shell.hpp"
 #include <fstream>
 using namespace mobile;
@@ -15,17 +14,6 @@ void Shell::paint_status(Canvas &c, const std::string &time) {
     state >> net;
     connected = net == "up";
     c.text(connected ? "ETH  ·  AC" : "—  ·  AC", {w - 180, 4, 156, 32}, 12, t.muted, false, 2);
-    click(hits, {0, 0, w / 2, 42}, [&] {
-        if (page != Page::lock) {
-            page = Page::notifications;
-            control("shell");
-        }
-    });
-    click(hits, {w / 2, 0, w / 2, 42}, [&] {
-        if (page != Page::lock) {
-            page = Page::quick;
-            control("shell");
-        }
-    });
+    click(hits, {0, 0, w, 42}, [this] { open_shade(Shade::Level::compact); });
 }
 } // namespace leon::shell
