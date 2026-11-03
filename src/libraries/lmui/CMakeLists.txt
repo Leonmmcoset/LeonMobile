@@ -4,7 +4,10 @@ pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
 set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
 add_custom_command(OUTPUT xdg-shell-client-protocol.h COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} xdg-shell-client-protocol.h DEPENDS ${XDG_SHELL_XML})
 add_custom_command(OUTPUT xdg-shell-protocol.c COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} xdg-shell-protocol.c DEPENDS ${XDG_SHELL_XML})
-add_library(lmui SHARED canvas.cpp wayland.cpp xdg-shell-protocol.c xdg-shell-client-protocol.h)
+add_library(lmui SHARED src/theme.cpp src/canvas.cpp src/widgets.cpp src/application.cpp
+            src/wayland/connection.cpp src/wayland/input.cpp
+            src/wayland/buffers.cpp src/wayland/render.cpp
+            xdg-shell-protocol.c xdg-shell-client-protocol.h)
 target_include_directories(lmui PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include> PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(lmui PUBLIC PkgConfig::LMUI_DEPS)
 set_target_properties(lmui PROPERTIES VERSION 1.0.0 SOVERSION 1)

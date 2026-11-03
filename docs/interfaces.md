@@ -46,6 +46,11 @@ The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `
 
 Applications include `<lmui/lmui.hpp>` and link through `pkg-config lmui` with C++20. `Application` owns the Wayland connection, window, input processing and event loop. Applications supply `paint`, `pointer`, `scroll`, `key` and `tick` callbacks. `redraw()` schedules a fresh frame; `quit()` ends the loop. A maximum of three live shared-memory buffers bounds frame allocation.
 
+The umbrella header remains available. Public interfaces may also be included
+individually as `<lmui/types.hpp>`, `<lmui/canvas.hpp>`, `<lmui/widgets.hpp>` and
+`<lmui/application.hpp>`. Wayland connection, buffer, rendering and input
+implementation headers are private to the shared library and are not SDK APIs.
+
 `Canvas` provides shapes, clipped drawing, Pango text and image rendering. `Widget` provides retained component trees, rows/columns, labels, buttons, fields, toggles, sliders, layout and hit testing. Application callbacks own state. Components do not implement a declarative language or bind arbitrary borrowed application objects.
 
 The reference SDK example is `examples/hello`. Debug-only environment conventions `LMUI_CAPTURE_FRAME` and `LMUI_QUIT_AFTER_FRAME` capture a rendered PNG and terminate after the first frame, respectively; normal launch sanitizes inherited environment variables.

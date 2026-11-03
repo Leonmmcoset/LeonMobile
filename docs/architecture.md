@@ -57,6 +57,15 @@ executable paths and the version 1 service protocols do not depend on the
 repository layout. Buildroot remains the distribution assembly layer; these
 source boundaries do not imply verified production phone support.
 
+The compositor's private modules own output configuration, keyboard input,
+pointer routing, single-contact touch, XDG windows, focus and the trusted shell
+control socket. Initialization registers listeners per subsystem; shutdown
+detaches listeners before destroying scene and input objects. The fixed mobile
+window policy has no desktop-style interactive move/resize implementation.
+The shell owns session state and navigation separately from status, lock,
+home/apps, task, quick-settings and notification views. LMUI separates its public
+types, canvas, widgets and application API from its private Wayland backend.
+
 ## Boot and storage
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
