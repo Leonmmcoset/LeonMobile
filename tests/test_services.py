@@ -4,6 +4,7 @@ from pathlib import Path
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -14,6 +15,51 @@ BIN = Path(os.environ.get("LEON_TEST_BIN", REPO / "build/host"))
 
 @unittest.skipUnless(os.geteuid() == 0, "supervisor uses root service credentials")
 class SupervisorTests(unittest.TestCase):
+    def test_dependency_remains_available_during_client_shutdown(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)
+            helper = path / "service.py"
+            helper.write_text(
+                "import pathlib,signal,sys,time\n"
+                "root=pathlib.Path(sys.argv[1]); role=sys.argv[2]\n"
+                "def shutdown(sig,frame):\n"
+                "    if role == 'client':\n"
+                "        time.sleep(.3)\n"
+                "        result='client:' + ('available' if (root/'provider.ready').exists() else 'lost')\n"
+                "    else:\n"
+                "        (root/'provider.ready').unlink()\n"
+                "        result='provider'\n"
+                "    with (root/'stops').open('a') as stream: stream.write(result+'\\n')\n"
+                "    sys.exit(0)\n"
+                "signal.signal(signal.SIGTERM,shutdown)\n"
+                "(root/(role+'.ready')).touch()\n"
+                "while True: time.sleep(1)\n")
+            for role in ("provider", "client"):
+                command = json.dumps([sys.executable, str(helper), str(path), role])
+                dependency = 'after=["provider"]\n' if role == "client" else ""
+                (path / (role + ".toml")).write_text(
+                    f'name="{role}"\ncommand={command}\n' + dependency)
+            proc = subprocess.Popen([BIN / "src/system/leond", "--config", path,
+                                     "--socket", path / "s.sock", "--log-dir", path / "logs"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    if all((path / (role + ".ready")).exists() for role in ("provider", "client")):
+                        break
+                    time.sleep(.02)
+                else:
+                    self.fail("Services did not become ready")
+                proc.send_signal(signal.SIGTERM)
+                proc.communicate(timeout=5)
+                self.assertEqual(proc.returncode, 0)
+                self.assertEqual((path / "stops").read_text().splitlines(),
+                                 ["client:available", "provider"])
+            finally:
+                if proc.poll() is None:
+                    proc.send_signal(signal.SIGTERM)
+                    proc.communicate(timeout=5)
+
     def test_oneshot_order_restart_limit_and_status(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp)

@@ -162,6 +162,17 @@ static void stop(struct service *s) {
         s->state = STOPPED;
 }
 
+static int has_live_dependents(const struct service *s) {
+    for (int i = 0; i < count; ++i) {
+        if (!services[i].pid)
+            continue;
+        for (int j = 0; services[i].after[j]; ++j)
+            if (!strcmp(services[i].after[j], s->name))
+                return 1;
+    }
+    return 0;
+}
+
 static void handle(int server) {
     int fd = accept4(server, NULL, NULL, SOCK_CLOEXEC | SOCK_NONBLOCK);
     if (fd < 0)
@@ -294,14 +305,27 @@ int main(int argc, char **argv) {
                     shutting_down = 1;
         }
     }
-    for (int n = count - 1; n >= 0; --n)
-        stop(&services[order[n]]);
-    long long deadline = now_ms() + 3000;
+    /* A dependency must remain alive while its clients complete shutdown.
+     * Independent leaves can stop together, with the usual per-service grace. */
+    int stopping[LM_MAX_SERVICES] = {0};
+    for (int i = 0; i < count; ++i)
+        services[i].wanted = 0;
+    long long deadline = now_ms() + 30000;
     while (now_ms() < deadline) {
         reap();
         int live = 0;
-        for (int i = 0; i < count; ++i)
-            live += services[i].pid > 0;
+        for (int n = count - 1; n >= 0; --n) {
+            int i = order[n];
+            struct service *s = &services[i];
+            if (!s->pid)
+                continue;
+            ++live;
+            if (!stopping[i] && !has_live_dependents(s)) {
+                stop(s);
+                stopping[i] = 1;
+            } else if (stopping[i] && now_ms() > s->next_ms)
+                kill(-s->pid, SIGKILL);
+        }
         if (!live)
             break;
         usleep(10000);

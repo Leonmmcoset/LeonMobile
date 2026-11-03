@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
     int how = (action == SIGINT || action == SIGUSR2) ? RB_AUTOBOOT : RB_POWER_OFF;
     if (manager > 0)
         kill(manager, SIGTERM);
-    for (int i = 0; i < 60; ++i) {
+    for (int i = 0; i < 350; ++i) {
         int status;
         if (waitpid(manager, &status, WNOHANG) == manager)
             break;
