@@ -61,7 +61,7 @@ void SettingsApplication::save_preference(const std::string &key, Json value) {
     prefs = rpc({{"op", "set"}, {"key", key}, {"value", std::move(value)}}).at("settings");
     en = prefs.value("language", "zh-CN") == "en";
     app.dark = prefs.value("dark", false);
-    app.reduce_motion = prefs.value("reduce_motion", false);
+    app.reduce_motion(prefs.value("reduce_motion", false));
     app.redraw();
 }
 std::string SettingsApplication::title(Page page) const {

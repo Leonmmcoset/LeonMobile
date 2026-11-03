@@ -28,8 +28,10 @@ struct Application::Impl {
     int w{480}, h{960};
     double px{}, py{};
     int32_t touch_id{-1};
-    bool pointer_down{}, force_reduced{};
+    bool pointer_down{}, force_reduced{}, reduce_motion{};
     MotionContext motion;
+    std::function<void(double, double)> motion_callback;
+    std::function<void(const PointerEvent &)> event_callback;
     bool running{true}, configured{}, dirty{true};
     std::chrono::steady_clock::time_point opened{};
     struct Buffer {
@@ -45,6 +47,7 @@ struct Application::Impl {
         : app(a), id(std::move(i)), title(std::move(t)) {}
     ~Impl();
     void notify_pointer(PointerPhase phase);
+    void notify_motion(double x, double y);
     static void global(void *data, wl_registry *registry, uint32_t name, const char *interface,
                        uint32_t version);
     static void capabilities(void *data, wl_seat *seat, uint32_t caps);

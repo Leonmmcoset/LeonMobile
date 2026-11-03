@@ -27,10 +27,11 @@ canvas.circle(24 + position * 400, 200, 10, canvas.theme.primary);
 The first sample starts at the target unless an explicit initial value is
 provided as the fourth argument. Keys must identify the same control across
 frames; use separate prefixes for pages and repeated rows. Entries disappear
-after a frame in which they are not painted. `Widget::motion_id` optionally
-supplies an explicit identity; otherwise the tree path identifies it. Toggle
-thumbs and tracks animate state changes. Set a slider's `interacting` flag
-while dragging so it follows the contact immediately.
+after a frame in which they are not painted. `Widget::draw(canvas, identity)`
+supplies a root identity; child paths identify its controls. Paint reordered
+rows with their own stable identity. Toggle thumbs and tracks animate state
+changes. Pass `true` as the third draw argument while dragging a slider so it
+follows the contact immediately.
 
 The Wayland backend uses surface frame callbacks, a monotonic clock and at
 most three shared-memory buffers. Active motion requests the next frame;
@@ -53,7 +54,7 @@ page; snapshots are bounded rather than retained per page.
 
 ## Input and visual feedback
 
-`Application::pointer_event` receives `PointerEvent {x, y, phase}` with
+`Application::on_pointer_event` receives `PointerEvent {x, y, phase}` with
 `PointerPhase::{down, move, up, cancel}`. Mouse input uses the primary button;
 touch uses one captured contact and ignores additional contacts. Pointer leave,
 seat capability loss and touch cancellation cancel the capture. The older
@@ -62,7 +63,7 @@ Applications should use one dispatch path to avoid duplicate actions.
 
 `TouchInput::handle(event, targets)` accepts a list of `TouchTarget` records
 (rectangle, action, optional position action, continuous flag, prominent flag,
-corner radius). The last matching target wins. It copies the selected target
+corner radius and optional feedback flag). The last matching target wins. It copies the selected target
 and callbacks, so rebuilding a tree cannot invalidate a held contact. Buttons
 activate on release inside their target; moving more than 12 logical pixels,
 leaving the target, or cancellation prevents activation. A continuous position
@@ -73,9 +74,9 @@ outside the track, so expensive changes can be committed once per drag.
 
 ```cpp
 lmui::TouchInput touch;
-app.pointer_event = [&](const lmui::PointerEvent &event) {
+app.on_pointer_event([&](const lmui::PointerEvent &event) {
     touch.handle(event, tree);
-};
+});
 app.paint = [&](lmui::Canvas &canvas) {
     tree.layout({24, 24, 432, 600});
     tree.draw(canvas);
@@ -87,15 +88,20 @@ Call `draw` after the controls to paint a rounded, clipped state layer and
 contact-origin ripple. Short taps retain at least 100 ms of feedback before
 the 180 ms release fade. A held, fully expanded ripple stops repainting.
 The feedback is visual; no physical vibration support is claimed.
+Consume-only panel and backdrop targets can set `feedback = false` while
+retaining capture, so dragging a shade does not ripple across its entire panel.
 
 ## Reduced motion and verification
 
-`Application::reduce_motion` finishes transitions immediately. A process-level
+`Application::reduce_motion(true)` finishes transitions immediately. A process-level
 `LMUI_REDUCE_MOTION=1` override forces the same policy even if application
 settings change. Held controls still display a static state layer; there is
 no expanding ripple, spatial movement or delayed release fade. Debug
 `LMUI_CAPTURE_FRAME` / `LMUI_QUIT_AFTER_FRAME` render settled state for stable
 screenshots. These environment options do not add manifest permissions.
+The original Application, Canvas and Widget layouts and entry points remain
+compatible with generation 1 SDK binaries. New application callbacks and the
+reduced-motion policy use setter methods backed by private state.
 
 Built-in applications read the persisted boolean `reduce_motion` preference.
 Settings exposes it under Display → Reduce motion. All eight built-ins share
@@ -111,6 +117,11 @@ unlocking; a deliberate upward swipe or tap unlocks the prototype. The gesture
 bar changes size while held, and remaining recent-task rows settle into the
 space left by a dismissed task. Hit regions follow presented coordinates.
 Transparent application regions remain available to the underlying client.
+The two-stage notification shade follows direct manipulation and uses the
+shared emphasized/exit tokens when settling. Quick-setting selections, volume
+thumb response and the power-dialog entrance share the same reduced-motion
+policy. The older `on_pointer_motion` SDK callback remains available; the shell
+uses the complete `on_pointer_event` path to cancel interrupted contacts safely.
 
 `lmui-motion-and-touch` covers bounded curves, interruption, stale-key removal,
 release/cancel/drag behavior and rendered transition continuity. The independent

@@ -72,10 +72,10 @@ void Widget::layout(Rect r) {
     }
 }
 void Widget::draw(Canvas &c) const { draw(c, "widget/root"); }
-void Widget::draw(Canvas &c, const std::string &identity) const {
+void Widget::draw(Canvas &c, const std::string &identity, bool interacting) const {
     auto t = c.theme;
     auto r = bounds;
-    auto path = motion_id.empty() ? identity : "widget/" + motion_id;
+    const auto &path = identity;
     if (kind == Kind::button) {
         c.rounded(r, filled ? t.primary : t.container, 26);
         c.text(text, r, 16, filled ? t.on_primary : t.primary, true, 1);
@@ -107,7 +107,7 @@ void Widget::draw(Canvas &c, const std::string &identity) const {
     if (kind == Kind::scroll)
         c.clip(r);
     for (size_t i = 0; i < children.size(); ++i)
-        children[i].draw(c, path + "/" + std::to_string(i));
+        children[i].draw(c, path + "/" + std::to_string(i), interacting);
     c.restore();
 }
 const Widget *Widget::hit(double x, double y) const {

@@ -14,6 +14,6 @@ int main() {
         tree.draw(c);
         touch.draw(c);
     };
-    app.pointer_event = [&](const lmui::PointerEvent &event) { touch.handle(event, tree); };
+    app.on_pointer_event([&](const lmui::PointerEvent &event) { touch.handle(event, tree); });
     return app.run();
 }

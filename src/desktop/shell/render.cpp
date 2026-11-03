@@ -1,8 +1,15 @@
+#include "control.hpp"
 #include "shell.hpp"
 #include <ctime>
 using namespace mobile;
 namespace leon::shell {
 void Shell::paint(Canvas &c) {
+    shade.advance(Shade::Clock::now(), c.reduced_motion());
+    if (!shade.visible() && shade_focused && !pressed) {
+        shade_focused = false;
+        if (page == Page::active && !active_id.empty())
+            control("focus " + active_id);
+    }
     hits.clear();
     double w = c.width, h = c.height;
     auto t = c.theme;
@@ -11,7 +18,6 @@ void Shell::paint(Canvas &c) {
         double dx = page == Page::tasks ? 32 : 0;
         double dy = page == Page::active                                 ? 0
                     : page == Page::home && presented_page == Page::apps ? -48
-                    : page == Page::quick || page == Page::notifications ? -56
                                                                          : 48;
         page_transition.start(dx, dy);
         presented_page = page;
@@ -41,12 +47,6 @@ void Shell::paint(Canvas &c) {
     case Page::tasks:
         paint_tasks(c);
         break;
-    case Page::quick:
-        paint_quick(c);
-        break;
-    case Page::notifications:
-        paint_notifications(c);
-        break;
     case Page::active:
         break;
     }
@@ -56,11 +56,21 @@ void Shell::paint(Canvas &c) {
     c.restore();
     if (page != Page::lock)
         paint_navigation(c);
-    if (!error.empty() && overlay)
+    if (shade.visible()) {
+        hits.clear();
+        paint_shade(c, time);
+        paint_navigation(c);
+        if (power_menu)
+            paint_power_menu(c);
+    }
+    if (!error.empty() && overlay && !shade.visible())
         c.text(tr(en, "系统服务暂未就绪", "System services are starting"),
                {20, h - 200, w - 40, 44}, 13, t.muted);
     touch_feedback.draw(c);
-    app.input_region(overlay ? std::vector<Rect>{{0, 0, w, h}}
-                             : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});
+    app.input_region(overlay || shade.visible()
+                         ? std::vector<Rect>{{0, 0, w, h}}
+                         : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});
+    if (shade.animating())
+        c.request_frame();
 }
 } // namespace leon::shell

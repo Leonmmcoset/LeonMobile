@@ -7,11 +7,20 @@ void Application::Impl::notify_pointer(PointerPhase phase) {
     if (phase == PointerPhase::move && !pointer_down)
         return;
     pointer_down = phase == PointerPhase::down || (phase == PointerPhase::move && pointer_down);
-    if (app->pointer_event)
-        app->pointer_event({px, py, phase});
+    if (event_callback)
+        event_callback({px, py, phase});
     if (app->pointer && (phase == PointerPhase::down || phase == PointerPhase::up))
         app->pointer(px, py, phase == PointerPhase::down);
     dirty = true;
+}
+void Application::Impl::notify_motion(double x, double y) {
+    px = x;
+    py = y;
+    if (motion_callback) {
+        motion_callback(px, py);
+        dirty = true;
+    }
+    notify_pointer(PointerPhase::move);
 }
 void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
     auto &s = *static_cast<Impl *>(data);
@@ -41,10 +50,8 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
             },
             [](void *d, wl_pointer *, uint32_t, wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
-                s.px = wl_fixed_to_double(x);
-                s.py = wl_fixed_to_double(y);
                 if (s.touch_id < 0)
-                    s.notify_pointer(PointerPhase::move);
+                    s.notify_motion(wl_fixed_to_double(x), wl_fixed_to_double(y));
             },
             [](void *d, wl_pointer *, uint32_t, uint32_t, uint32_t button, uint32_t state) {
                 auto &s = *static_cast<Impl *>(d);
@@ -146,9 +153,7 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
                 auto &s = *static_cast<Impl *>(d);
                 if (id != s.touch_id)
                     return;
-                s.px = wl_fixed_to_double(x);
-                s.py = wl_fixed_to_double(y);
-                s.notify_pointer(PointerPhase::move);
+                s.notify_motion(wl_fixed_to_double(x), wl_fixed_to_double(y));
             },
             [](void *, wl_touch *) {},
             [](void *d, wl_touch *) {

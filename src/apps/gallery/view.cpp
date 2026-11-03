@@ -30,8 +30,7 @@ void GalleryApplication::paint_content(Canvas &c, double) {
                     },
                     false)});
     tree.layout({24, 142, w - 48, 340});
-    tree.children[3].interacting = touch_.continuous();
-    tree.draw(c);
+    tree.draw(c, "gallery/components", touch_.continuous());
     for (const auto &child : tree.children) {
         auto a = child.activate;
         auto change = child.change;

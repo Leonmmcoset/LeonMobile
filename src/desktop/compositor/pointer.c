@@ -29,10 +29,19 @@ static void seat_pointer_focus_change(struct wl_listener *listener, void *data) 
 }
 
 void process_cursor_motion(struct leon_server *server, uint32_t time) {
-    /* If the mode is non-passthrough, delegate to those functions. */
-    /* Otherwise, find the toplevel under the pointer and send the event along. */
-    double sx, sy;
     struct wlr_seat *seat = server->seat;
+    double dx = server->cursor->x - server->pointer_last_x;
+    double dy = server->cursor->y - server->pointer_last_y;
+    server->pointer_last_x = server->cursor->x;
+    server->pointer_last_y = server->cursor->y;
+    /* Keep an implicit grab in the pressed surface's coordinate space. The
+     * shell's status strip and an app have different origins/input regions. */
+    if (seat->pointer_state.button_count && seat->pointer_state.focused_surface) {
+        wlr_seat_pointer_notify_motion(seat, time, seat->pointer_state.sx + dx,
+                                       seat->pointer_state.sy + dy);
+        return;
+    }
+    double sx, sy;
     struct wlr_surface *surface = NULL;
     struct leon_toplevel *toplevel =
         desktop_toplevel_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
@@ -104,7 +113,8 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
         struct leon_toplevel *toplevel =
             desktop_toplevel_at(server, server->cursor->x, server->cursor->y, &surface, &sx, &sy);
         focus_toplevel(toplevel);
-    }
+    } else
+        process_cursor_motion(server, event->time_msec);
 }
 
 static void server_cursor_axis(struct wl_listener *listener, void *data) {

@@ -67,6 +67,7 @@ struct leon_server {
     struct wl_listener cursor_frame;
 
     struct wlr_seat *seat;
+    double pointer_last_x, pointer_last_y;
     struct wl_listener new_input;
     struct wl_listener request_cursor;
     struct wl_listener pointer_focus_change;

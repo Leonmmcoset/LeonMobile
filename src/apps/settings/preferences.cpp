@@ -41,9 +41,9 @@ void SettingsApplication::paint_preferences(Canvas &c) {
         c.text(tr(en, "减少动态效果", "Reduce motion"), {40, 642, w - 148, 32}, 19, t.text);
         c.text(tr(en, "保留即时触控反馈", "Keep immediate touch feedback"), {40, 678, w - 148, 28},
                13, t.muted);
-        settings::toggle(c, {w - 96, 663, 52, 30}, app.reduce_motion, "settings/reduce-motion");
+        settings::toggle(c, {w - 96, 663, 52, 30}, app.reduced_motion(), "settings/reduce-motion");
         content_hit({20, 628, w - 40, 100}, [this](double, double) {
-            save_preference("reduce_motion", !app.reduce_motion);
+            save_preference("reduce_motion", !app.reduced_motion());
         });
     } else if (page_ == Page::sound) {
         if (!touch_.continuous())

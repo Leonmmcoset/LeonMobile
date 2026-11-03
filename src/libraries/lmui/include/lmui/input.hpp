@@ -16,6 +16,7 @@ struct TouchTarget {
     std::function<void(double, double)> position_action;
     bool continuous{}, prominent{};
     double radius{24};
+    bool feedback{true};
 };
 // Single-contact capture. Actions run on release; continuous controls track motion.
 // Targets/callbacks are copied at press, never borrowed from a transient widget tree.

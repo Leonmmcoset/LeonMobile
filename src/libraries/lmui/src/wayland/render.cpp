@@ -13,7 +13,7 @@ void Application::Impl::draw() {
                                                       CAIRO_FORMAT_ARGB32, w, h, w * 4);
     auto *cr = cairo_create(image);
     bool capture = getenv("LMUI_CAPTURE_FRAME") || getenv("LMUI_QUIT_AFTER_FRAME");
-    motion.begin_frame(motion_time(), app->reduce_motion || force_reduced || capture);
+    motion.begin_frame(motion_time(), app->reduced_motion() || capture);
     Canvas canvas(cr, w, h, Theme::material(app->dark), &motion);
     if (app->transparent) {
         cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);

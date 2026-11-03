@@ -14,6 +14,19 @@ int Application::run() {
 }
 void Application::redraw() { impl->dirty = true; }
 void Application::quit() { impl->running = false; }
+void Application::on_pointer_motion(std::function<void(double, double)> callback) {
+    impl->motion_callback = std::move(callback);
+}
+void Application::on_pointer_event(std::function<void(const PointerEvent &)> callback) {
+    impl->event_callback = std::move(callback);
+}
+void Application::reduce_motion(bool enabled) {
+    if (impl->reduce_motion != enabled) {
+        impl->reduce_motion = enabled;
+        redraw();
+    }
+}
+bool Application::reduced_motion() const { return impl->reduce_motion || impl->force_reduced; }
 void Application::input_region(const std::vector<Rect> &rectangles) {
     if (!impl->surface)
         return;

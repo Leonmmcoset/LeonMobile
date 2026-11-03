@@ -27,7 +27,7 @@ ApplicationWindow::ApplicationWindow(std::string id, std::string chinese, std::s
         scroll = std::max(0.0, scroll + delta);
         app.redraw();
     };
-    app.pointer_event = [this](const PointerEvent &event) { pointer(event); };
+    app.on_pointer_event([this](const PointerEvent &event) { pointer(event); });
     app.paint = [this](Canvas &c) { paint(c); };
 }
 int ApplicationWindow::run() { return app.run(); }
@@ -47,7 +47,7 @@ void ApplicationWindow::poll_preferences() {
         en = prefs["language"] == "en";
         if (!theme_override)
             app.dark = prefs.value("dark", false);
-        app.reduce_motion = prefs.value("reduce_motion", false);
+        app.reduce_motion(prefs.value("reduce_motion", false));
         if (prefs != previous)
             app.redraw();
     } catch (...) {

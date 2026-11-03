@@ -3,8 +3,15 @@
 #include <lmui/canvas.hpp>
 #include <pango/pangocairo.h>
 namespace lmui {
+static cairo_user_data_key_t motion_key;
+static MotionContext *motion_context(cairo_t *cr) {
+    return static_cast<MotionContext *>(cairo_get_user_data(cr, &motion_key));
+}
+Canvas::Canvas(cairo_t *ctx, int w, int h, Theme t) : Canvas(ctx, w, h, t, nullptr) {}
 Canvas::Canvas(cairo_t *ctx, int w, int h, Theme t, MotionContext *motion)
-    : cr(ctx), width(w), height(h), theme(t), motion_(motion) {}
+    : cr(ctx), width(w), height(h), theme(t) {
+    cairo_set_user_data(cr, &motion_key, motion, nullptr);
+}
 static void source(cairo_t *cr, Color c) { cairo_set_source_rgba(cr, c.r, c.g, c.b, c.a); }
 void Canvas::clear(Color c) {
     source(cr, c);
@@ -87,12 +94,19 @@ void Canvas::clip_rounded(Rect b, double r) {
 }
 double Canvas::animate(const std::string &key, double target, MotionSpec spec,
                        std::optional<double> initial) {
-    return motion_ ? motion_->animate(key, target, spec, initial) : target;
+    auto *state = motion_context(cr);
+    return state ? state->animate(key, target, spec, initial) : target;
 }
-double Canvas::frame_time() const { return motion_ ? motion_->time() : motion_time(); }
-bool Canvas::reduced_motion() const { return !motion_ || motion_->reduced(); }
+double Canvas::frame_time() const {
+    auto *state = motion_context(cr);
+    return state ? state->time() : motion_time();
+}
+bool Canvas::reduced_motion() const {
+    auto *state = motion_context(cr);
+    return !state || state->reduced();
+}
 void Canvas::request_frame() {
-    if (motion_)
-        motion_->request_frame();
+    if (auto *state = motion_context(cr))
+        state->request_frame();
 }
 } // namespace lmui

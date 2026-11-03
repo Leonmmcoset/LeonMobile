@@ -77,6 +77,32 @@ pages report kernel interface data and `statvfs` usage without adding device
 control APIs. Built-ins may override the internal window header while retaining
 the shared input, preference polling, keyboard and error handling.
 
+The shell's private `Shade` model owns drag thresholds, compact/expanded snap
+positions and settling time independently of rendering. Its views own controls,
+notification clipping/scrolling and the power menu. LMUI's `on_pointer_event`
+callback supplies down/move/up/cancel phases through one captured path; the
+older `pointer` and `on_pointer_motion` callbacks remain available. Test
+gesture reversal and reduced motion with the native shade check,
+then check the shell against Weston and exercise the real compositor/input
+boundary with the QEMU target test.
+
+For target notification scroll/activation coverage, compile the test-only probe
+with the reference toolchain and pass it to the target check:
+
+```sh
+output/host/bin/aarch64-linux-gcc -std=c17 -Wall -Wextra -Os \
+  tests/target/notifications.c -o build/notifications-probe
+python3 scripts/test-qemu.py --notification-probe build/notifications-probe \
+  --package build/hello/org.example.hello-1.0.0.lmpkg
+```
+
+The probe runs from the terminal under its established app UID and submits
+twelve notifications through the public broker operation. It is never installed
+in the system image. The target check also verifies shade drag/snap, theme,
+volume/mute restoration, app preservation and input recovery, settings launch,
+power-menu cancellation, screen locking and final power-off. The lock screen
+remains an unauthenticated developer convenience.
+
 Run `make test` and the independent Weston check after client changes. Runtime
 or image integration changes also require the QEMU test. Native integration
 checks stage runtime and development payloads in a temporary directory and

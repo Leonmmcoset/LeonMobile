@@ -85,7 +85,7 @@ bool TouchInput::handle(const PointerEvent &e, const Widget &tree) {
     return handle(e, targets);
 }
 void TouchInput::draw(Canvas &c) const {
-    if (!visible_)
+    if (!visible_ || !target_.feedback)
         return;
     if (c.reduced_motion()) {
         if (held_) {

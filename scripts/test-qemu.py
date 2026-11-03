@@ -56,6 +56,16 @@ class Guest:
         if digest != hashlib.sha256(path.read_bytes()).hexdigest():
             raise RuntimeError("Guest payload transfer checksum mismatch")
 
+    def wait_setting(self, key, expected):
+        deadline = time.monotonic() + 10
+        actual = None
+        while time.monotonic() < deadline:
+            actual = json.loads(self.run("cat /data/leon/settings.json")).get(key)
+            if actual == expected:
+                return
+            time.sleep(.2)
+        raise RuntimeError(f"Setting {key} did not reach {expected!r}; observed {actual!r}")
+
 
 class QMP:
     def __init__(self, path):
@@ -87,6 +97,7 @@ class QMP:
         self.command("input-send-event", {"events": [
             {"type": "abs", "data": {"axis": "x", "value": int(x/480*32767)}},
             {"type": "abs", "data": {"axis": "y", "value": int(y/960*32767)}}]})
+
     def button(self, down):
         self.command("input-send-event", {"events": [
             {"type": "btn", "data": {"down": down, "button": "left"}}]})
@@ -97,6 +108,19 @@ class QMP:
         self.button(True)
         time.sleep(.1)
         self.button(False)
+
+    def drag(self, x1, y1, x2, y2, held_frame=None):
+        self.move(x1, y1)
+        time.sleep(.05)
+        self.button(True)
+        for step in range(1, 13):
+            self.move(x1 + (x2 - x1) * step / 12, y1 + (y2 - y1) * step / 12)
+            time.sleep(.06)
+        time.sleep(.3)
+        frame = self.capture(held_frame) if held_frame else None
+        self.button(False)
+        time.sleep(.5)
+        return frame
 
     def key(self, code):
         for down in (True, False):
@@ -119,6 +143,15 @@ class QMP:
             raise RuntimeError("QEMU display is blank")
         return pixels
 
+    def wait_frame(self, path, predicate, description):
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            frame = self.capture(path)
+            if predicate(frame):
+                return frame
+            time.sleep(.15)
+        raise RuntimeError(description)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -126,9 +159,13 @@ def main():
     parser.add_argument("--images", type=Path, default=REPO / "output/images",
                         help="image directory, including an assembled local release")
     parser.add_argument("--package", type=Path, help="also install, launch and remove the SDK hello package")
+    parser.add_argument("--notification-probe", type=Path,
+                        help="AArch64 tests/target/notifications.c executable for live notification checks")
     args = parser.parse_args()
     if args.package and not args.package.is_file():
         parser.error("--package must name a compiled SDK hello package")
+    if args.notification_probe and not args.notification_probe.is_file():
+        parser.error("--notification-probe must name a compiled AArch64 probe")
     images = args.images.resolve()
     artifacts = REPO / "build/qemu-test"
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -218,6 +255,31 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                notification_terminal = None
+                if args.notification_probe:
+                    guest.upload(args.notification_probe, "/tmp/shade-notify")
+                    guest.run("chmod 755 /tmp/shade-notify")
+                    qmp.click(240, 838)  # All apps
+                    time.sleep(.5)
+                    qmp.click(240, 426)  # Terminal
+                    for attempt in range(40):
+                        terminal = qmp.capture(artifacts / "shade-notification-terminal.ppm")
+                        point = (180 * 480 + 24) * 3
+                        if terminal[point:point + 3] == bytes.fromhex("19151f"):
+                            break
+                        time.sleep(.25)
+                    else:
+                        raise RuntimeError("Terminal did not render for notification probe")
+                    for code in "/tmp/shade-notify":
+                        qmp.key({"/": "slash", "-": "minus"}.get(code, code))
+                    qmp.key("ret")
+                    time.sleep(1)
+                    result = guest.run("cat /tmp/shade-notify.result")
+                    if "12 notifications submitted" not in result:
+                        raise RuntimeError("Notification probe failed")
+                    notification_terminal = qmp.capture(artifacts / "shade-notification-terminal.ppm")
+                    qmp.click(240, 940)
+                    time.sleep(.5)
                 qmp.click(96, 410)
                 time.sleep(2)
                 qmp.capture(artifacts / "calculator.ppm")
@@ -228,17 +290,90 @@ def main():
                     qmp.click(x, y)
                     time.sleep(.1)
                 time.sleep(.3)
-                qmp.capture(artifacts / "calculator-result.ppm")
+                calculator = qmp.capture(artifacts / "calculator-result.ppm")
+                calculator_pid = running["org.leon.calculator"]
+                # Hold the pointer across the status/app input boundary. The
+                # shade must follow before release, then snap to stage 1.
+                held = qmp.drag(240, 20, 240, 300, artifacts / "shade-dragging.ppm")
+                compact = qmp.capture(artifacts / "shade-compact.ppm")
+                point = (380 * 480 + 8) * 3
+                if (held[point:point + 3] == bytes.fromhex("fff8ff") or
+                        compact[point:point + 3] != bytes.fromhex("fff8ff")):
+                    raise RuntimeError("Shade did not follow the drag and settle to compact")
+                qmp.drag(240, 110, 240, 450)
+                expanded = qmp.capture(artifacts / "shade-expanded.ppm")
+                point = (820 * 480 + 8) * 3
+                if (compact[point:point + 3] == bytes.fromhex("fff8ff") or
+                        expanded[point:point + 3] != bytes.fromhex("fff8ff")):
+                    raise RuntimeError("Second pull did not expand the shade")
+                if notification_terminal:
+                    qmp.drag(280, 726, 280, 520)
+                    scrolled = qmp.capture(artifacts / "shade-notifications-scrolled.ppm")
+                    def notification_region(frame):
+                        return b"".join(frame[(y * 480 + 40) * 3:(y * 480 + 420) * 3]
+                                        for y in range(520, 760))
+                    if notification_region(expanded) == notification_region(scrolled):
+                        raise RuntimeError("Notification drag did not scroll the list")
+                    qmp.drag(280, 520, 280, 800)
+                    qmp.click(180, 540)
+                    time.sleep(1)
+                    opened = qmp.capture(artifacts / "shade-notification-open.ppm")
+                    def app_header(frame):
+                        return b"".join(frame[(y * 480 + 24) * 3:(y * 480 + 350) * 3]
+                                        for y in range(60, 110))
+                    if app_header(opened) != app_header(notification_terminal):
+                        raise RuntimeError("Notification tap did not open its owning app")
+                    print("Target notifications: 12 live notifications, drag scroll and app activation passed")
+                    qmp.click(240, 940)
+                    time.sleep(.5)
+                    qmp.click(96, 410)
+                    time.sleep(.5)
+                    qmp.drag(240, 20, 240, 300)
+                    qmp.drag(240, 110, 240, 450)
+                qmp.click(350, 200)  # Theme tile
+                time.sleep(.5)
+                if not json.loads(guest.run("cat /data/leon/settings.json"))["dark"]:
+                    raise RuntimeError("Shade theme tile did not update system settings")
+                qmp.capture(artifacts / "shade-expanded-dark.ppm")
+                qmp.click(350, 200)
+                time.sleep(.5)
+                qmp.drag(280, 394, 170, 394, artifacts / "shade-volume-drag.ppm")
+                guest.wait_setting("volume", 25)
+                qmp.click(120, 292)  # Mute
+                time.sleep(.3)
+                guest.wait_setting("volume", 0)
+                qmp.click(120, 292)  # Restore the previous volume
+                time.sleep(.3)
+                guest.wait_setting("volume", 25)
+                qmp.click(432, 824)  # Power menu
+                time.sleep(.3)
+                qmp.capture(artifacts / "shade-power.ppm")
+                qmp.click(240, 586)  # Cancel
+                time.sleep(.3)
+                qmp.drag(240, 880, 240, 100)  # Close and restore the app
+                restored = qmp.capture(artifacts / "shade-restored-app.ppm")
+                def result_region(frame):
+                    return b"".join(frame[(y * 480 + 320) * 3:(y * 480 + 444) * 3]
+                                    for y in range(160, 220))
+                if result_region(calculator) != result_region(restored):
+                    raise RuntimeError("Closing the shade did not preserve calculator contents")
+                processes = json.loads(guest.run("lmpkg running"))
+                if processes.get("org.leon.calculator") != calculator_pid:
+                    raise RuntimeError("Shade changed the underlying application process")
+                qmp.click(72, 384)  # Input reaches the restored calculator
+                time.sleep(.3)
+                if result_region(qmp.capture(artifacts / "shade-restored-input.ppm")) == result_region(restored):
+                    raise RuntimeError("Shade closure did not restore application pointer input")
                 qmp.click(240, 940)
                 time.sleep(.5)
-                qmp.click(240, 838)
+                qmp.click(400, 22)
                 time.sleep(.5)
-                qmp.click(96, 426)
+                qmp.click(372, 628)  # Settings shortcut in compact shade
                 # Mapping a new process and populating its first font cache can
                 # take several seconds under software CPU emulation.
                 for attempt in range(30):
                     frame = qmp.capture(artifacts / "settings-light.ppm")
-                    point = (206 * 480 + 440) * 3
+                    point = (196 * 480 + 80) * 3
                     row = (380 * 480 + 430) * 3
                     if (frame[point:point + 3] == bytes.fromhex("eaddff") and
                             frame[row:row + 3] == bytes.fromhex("fffbff")):
@@ -398,10 +533,61 @@ def main():
                     raise RuntimeError("Recent task rows did not settle into the dismissed row")
                 if "org.leon.calculator" in json.loads(guest.run("lmpkg running")):
                     raise RuntimeError("Recent tasks dismissal did not stop the selected app")
+                background = bytes.fromhex("15121b" if preferences.get("dark") else "fff8ff")
+                primary = bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
+                outline = bytes.fromhex("4a4258" if preferences.get("dark") else "d5cadd")
+
+                def pixel(frame, x, y):
+                    return frame[(y * 480 + x) * 3:(y * 480 + x) * 3 + 3]
+
+                def wait_shade_stage(name, bottom):
+                    return qmp.wait_frame(
+                        artifacts / name,
+                        lambda frame: (pixel(frame, 240, bottom - 17) == background and
+                                       pixel(frame, 240, bottom - 15) == outline),
+                        "Notification shade did not settle to " + str(bottom))
+
                 qmp.click(400, 22)
-                time.sleep(.5)
-                qmp.capture(artifacts / "quick-poweroff.ppm")
-                qmp.click(240, 526)
+                wait_shade_stage("shade-before-lock-compact.ppm", 700)
+                qmp.click(400, 22)  # Expand the shade
+                wait_shade_stage("shade-before-lock-expanded.ppm", 896)
+                qmp.click(350, 292)  # Lock screen tile
+                def lock_header(frame):
+                    return b"".join(frame[(y * 480 + 24) * 3:(y * 480 + 200) * 3]
+                                    for y in range(60, 150))
+
+                # The lock tile changes pages with a spatial transition. Wait
+                # for the observed lock geometry before testing blocked input;
+                # a fixed delay can still capture the tasks page under TCG.
+                locked = qmp.wait_frame(
+                    artifacts / "shade-locked.ppm",
+                    lambda frame: (lock_header(frame) == background * (176 * 90) and
+                                   pixel(frame, 240, 200) == container),
+                    "Lock tile did not reach the settled lock screen")
+                qmp.click(400, 22)  # Locked session cannot expose the shade
+                time.sleep(.4)
+                still_locked = qmp.capture(artifacts / "shade-locked-top.ppm")
+                if lock_header(locked) != lock_header(still_locked):
+                    raise RuntimeError("Locked session exposed the notification shade")
+                qmp.drag(240, 20, 240, 300)
+                if lock_header(qmp.capture(artifacts / "shade-locked-pull.ppm")) != lock_header(locked):
+                    raise RuntimeError("Pulling the locked status bar changed the session")
+                qmp.click(240, 790)
+                unlocked = qmp.wait_frame(
+                    artifacts / "shade-unlocked-home.ppm",
+                    lambda frame: pixel(frame, 240, 210) == primary,
+                    "Unlock did not finish the home-page entrance")
+                qmp.click(400, 22)
+                wait_shade_stage("shade-before-backdrop.ppm", 700)
+                qmp.click(8, 810)  # Dismiss through the backdrop
+                qmp.wait_frame(artifacts / "shade-backdrop-dismissed.ppm",
+                               lambda frame: lock_header(frame) == lock_header(unlocked),
+                               "Shade backdrop did not return to the home screen")
+                qmp.click(400, 22)
+                wait_shade_stage("shade-before-poweroff.ppm", 700)
+                qmp.click(432, 628)
+                time.sleep(.3)
+                qmp.click(240, 426)  # Explicit power-off choice
                 try:
                     proc.wait(timeout=20)
                 except subprocess.TimeoutExpired as error:
@@ -412,7 +598,7 @@ def main():
                 if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
                     raise RuntimeError("Compositor did not shut down cleanly")
                 passed = True
-                print("QEMU boot, native apps, settings categories/search/preferences and clean UI poweroff passed")
+                print("QEMU boot, native apps, shade drag/controls/focus, settings and clean UI poweroff passed")
                 print("Artifacts:", artifacts)
             finally:
                 if proc.poll() is None:

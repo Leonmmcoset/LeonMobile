@@ -6,7 +6,8 @@
 namespace lmui {
 class Canvas {
   public:
-    Canvas(cairo_t *context, int width, int height, Theme theme, MotionContext *motion = nullptr);
+    Canvas(cairo_t *context, int width, int height, Theme theme);
+    Canvas(cairo_t *context, int width, int height, Theme theme, MotionContext *motion);
     cairo_t *cr;
     int width, height;
     Theme theme;
@@ -26,9 +27,6 @@ class Canvas {
     double frame_time() const;
     bool reduced_motion() const;
     void request_frame();
-
-  private:
-    MotionContext *motion_{};
 };
 
 // Captures the last presentation for interruption-safe page changes. Hit rectangles
