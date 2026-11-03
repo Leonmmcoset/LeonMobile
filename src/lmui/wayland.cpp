@@ -36,6 +36,7 @@ struct Application::Impl {
     int w{480}, h{960};
     double px{}, py{};
     bool running{true}, configured{}, dirty{true};
+    std::chrono::steady_clock::time_point opened{};
     struct Buffer {
         Impl *owner;
         wl_buffer *buffer{};
@@ -277,8 +278,18 @@ struct Application::Impl {
             cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
         } else
             canvas.clear(canvas.theme.background);
+        auto age = std::chrono::duration<double>(std::chrono::steady_clock::now() - opened).count();
+        double opacity = std::clamp(age / .18, 0.0, 1.0);
+        if (getenv("LMUI_CAPTURE_FRAME") || getenv("LMUI_QUIT_AFTER_FRAME"))
+            opacity = 1;
+        if (opacity < 1)
+            cairo_push_group(cr);
         if (app->paint)
             app->paint(canvas);
+        if (opacity < 1) {
+            cairo_pop_group_to_source(cr);
+            cairo_paint_with_alpha(cr, opacity);
+        }
         cairo_destroy(cr);
         cairo_surface_flush(image);
         if (const char *capture = getenv("LMUI_CAPTURE_FRAME")) {
@@ -294,7 +305,7 @@ struct Application::Impl {
         wl_surface_damage(surface, 0, 0, w, h);
         wl_surface_commit(surface);
         b->busy = true;
-        dirty = false;
+        dirty = opacity < 1;
     }
     int run() {
         display = wl_display_connect(nullptr);
@@ -312,6 +323,8 @@ struct Application::Impl {
             [](void *d, xdg_surface *surface, uint32_t serial) {
                 auto &s = *static_cast<Impl *>(d);
                 xdg_surface_ack_configure(surface, serial);
+                if (!s.configured)
+                    s.opened = std::chrono::steady_clock::now();
                 s.configured = true;
                 s.dirty = true;
             }};
