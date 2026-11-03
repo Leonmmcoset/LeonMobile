@@ -27,4 +27,7 @@ for application in settings calculator gallery files editor terminal images cloc
 done
 LMUI_CAPTURE_FRAME="$repo/build/screenshots/lock.png" LMUI_QUIT_AFTER_FRAME=1 \
     timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-shell"
+LMUI_MOTION_EVIDENCE_DIR="$repo/build/screenshots" \
+    timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/lmui-wayland-motion-test"
+LMUI_REDUCE_MOTION=1 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/lmui-wayland-motion-test"
 echo 'Wayland smoke: all eight apps and shell rendered successfully'

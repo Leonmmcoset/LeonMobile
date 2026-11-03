@@ -1,12 +1,15 @@
 #include "backend.hpp"
 #include <algorithm>
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <poll.h>
 #include <stdexcept>
 #include <unistd.h>
 namespace lmui {
 Application::Impl::~Impl() {
+    if (frame_callback)
+        wl_callback_destroy(frame_callback);
     for (auto &b : buffers) {
         if (b->buffer)
             wl_buffer_destroy(b->buffer);
@@ -66,6 +69,8 @@ void Application::Impl::global(void *data, wl_registry *reg, uint32_t name, cons
     }
 }
 int Application::Impl::run() {
+    const char *reduced = getenv("LMUI_REDUCE_MOTION");
+    force_reduced = reduced && !strcmp(reduced, "1");
     display = wl_display_connect(nullptr);
     if (!display)
         throw std::runtime_error("cannot connect to Wayland display");
@@ -124,7 +129,11 @@ int Application::Impl::run() {
         if (wl_display_flush(display) < 0 && errno != EAGAIN)
             break;
         pollfd p{wl_display_get_fd(display), POLLIN, 0};
-        int rc = poll(&p, 1, 16);
+        // Frame callbacks wake animations; idle clients only wake for their tick.
+        int timeout = std::max(0, 200 - int(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                std::chrono::steady_clock::now() - last)
+                                                .count()));
+        int rc = poll(&p, 1, timeout);
         if (rc < 0 && errno != EINTR)
             break;
         if (rc > 0) {

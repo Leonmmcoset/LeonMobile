@@ -6,6 +6,7 @@ set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
 add_custom_command(OUTPUT xdg-shell-client-protocol.h COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} xdg-shell-client-protocol.h DEPENDS ${XDG_SHELL_XML})
 add_custom_command(OUTPUT xdg-shell-protocol.c COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} xdg-shell-protocol.c DEPENDS ${XDG_SHELL_XML})
 add_library(lmui SHARED src/theme.cpp src/canvas.cpp src/widgets.cpp src/application.cpp
+            src/motion.cpp src/touch.cpp src/transition.cpp
             src/wayland/connection.cpp src/wayland/input.cpp
             src/wayland/buffers.cpp src/wayland/render.cpp
             xdg-shell-protocol.c xdg-shell-client-protocol.h)
@@ -34,4 +35,9 @@ if(BUILD_TESTING)
   add_executable(lmui-test ${PROJECT_SOURCE_DIR}/tests/lmui.cpp)
   target_link_libraries(lmui-test PRIVATE lmui)
   add_test(NAME lmui-layout-and-hit-test COMMAND lmui-test)
+  add_executable(lmui-motion-test ${PROJECT_SOURCE_DIR}/tests/motion.cpp)
+  target_link_libraries(lmui-motion-test PRIVATE lmui)
+  add_test(NAME lmui-motion-and-touch COMMAND lmui-motion-test)
+  add_executable(lmui-wayland-motion-test ${PROJECT_SOURCE_DIR}/tests/wayland_motion.cpp)
+  target_link_libraries(lmui-wayland-motion-test PRIVATE lmui)
 endif()

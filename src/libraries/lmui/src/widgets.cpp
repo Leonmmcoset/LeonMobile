@@ -71,9 +71,11 @@ void Widget::layout(Rect r) {
         pos += n + gap;
     }
 }
-void Widget::draw(Canvas &c) const {
+void Widget::draw(Canvas &c) const { draw(c, "widget/root"); }
+void Widget::draw(Canvas &c, const std::string &identity) const {
     auto t = c.theme;
     auto r = bounds;
+    auto path = motion_id.empty() ? identity : "widget/" + motion_id;
     if (kind == Kind::button) {
         c.rounded(r, filled ? t.primary : t.container, 26);
         c.text(text, r, 16, filled ? t.on_primary : t.primary, true, 1);
@@ -85,24 +87,27 @@ void Widget::draw(Canvas &c) const {
         c.text(text, {r.x + 16, r.y, r.w - 32, r.h}, 16, t.text);
     }
     if (kind == Kind::toggle) {
+        double state = c.animate(path + "/checked", checked ? 1 : 0, motion::settle);
         c.text(text, {r.x, r.y, r.w - 72, r.h}, 16, t.text);
-        c.rounded({r.x + r.w - 60, r.y + (r.h - 32) / 2, 56, 32}, checked ? t.primary : t.outline,
+        c.rounded({r.x + r.w - 60, r.y + (r.h - 32) / 2, 56, 32}, mix(t.outline, t.primary, state),
                   16);
-        c.circle(r.x + r.w - (checked ? 20 : 40), r.y + r.h / 2, 12,
-                 checked ? t.on_primary : t.surface);
+        c.circle(r.x + r.w - 40 + 20 * state, r.y + r.h / 2, 10 + 2 * state,
+                 mix(t.surface, t.on_primary, state));
     }
     if (kind == Kind::slider) {
+        double position =
+            c.animate(path + "/value", value, interacting ? MotionSpec{0} : motion::settle);
         c.rounded({r.x, r.y + r.h / 2 - 3, r.w, 6}, t.container, 3);
-        c.rounded({r.x, r.y + r.h / 2 - 3, r.w * value, 6}, t.primary, 3);
-        c.circle(r.x + r.w * value, r.y + r.h / 2, 10, t.primary);
+        c.rounded({r.x, r.y + r.h / 2 - 3, r.w * position, 6}, t.primary, 3);
+        c.circle(r.x + r.w * position, r.y + r.h / 2, interacting ? 12 : 10, t.primary);
     }
     if (kind == Kind::dialog)
         c.rounded(r, t.surface, 28);
     c.save();
     if (kind == Kind::scroll)
         c.clip(r);
-    for (const auto &child : children)
-        child.draw(c);
+    for (size_t i = 0; i < children.size(); ++i)
+        children[i].draw(c, path + "/" + std::to_string(i));
     c.restore();
 }
 const Widget *Widget::hit(double x, double y) const {

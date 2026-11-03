@@ -60,4 +60,13 @@ installed as public SDK interfaces.
 
 `Canvas` provides shapes, clipped drawing, Pango text and image rendering. `Widget` provides retained component trees, rows/columns, labels, buttons, fields, toggles, sliders, layout and hit testing. Application callbacks own state. Components do not implement a declarative language or bind arbitrary borrowed application objects.
 
-The reference SDK example is `examples/hello`. Debug-only environment conventions `LMUI_CAPTURE_FRAME` and `LMUI_QUIT_AFTER_FRAME` capture a rendered PNG and terminate after the first frame, respectively; normal launch sanitizes inherited environment variables.
+`motion.hpp` and `input.hpp` add Material motion tokens, interruptible animations,
+stable keyed canvas animation, content transitions and captured touch input.
+`Application::pointer_event` reports down/move/up/cancel phases. `TouchInput`
+provides release activation, drag tracking and clipped visual ripples; the
+older pointer callback remains available. Surface frame callbacks pace active
+motion and repainting stops when it settles. `Application::reduce_motion` or
+`LMUI_REDUCE_MOTION=1` disables spatial motion while retaining static held-state
+feedback. See [motion.md](motion.md) for timing, lifetime and SDK examples.
+
+The reference SDK example is `examples/hello`. Debug-only environment conventions `LMUI_CAPTURE_FRAME` and `LMUI_QUIT_AFTER_FRAME` capture a settled rendered PNG and terminate after the first frame, respectively; normal launch sanitizes inherited environment variables.

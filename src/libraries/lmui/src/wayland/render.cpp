@@ -4,7 +4,7 @@
 #include <iostream>
 namespace lmui {
 void Application::Impl::draw() {
-    if (!configured || !dirty)
+    if (!configured || !dirty || frame_callback)
         return;
     auto *b = buffer();
     if (!b)
@@ -12,7 +12,9 @@ void Application::Impl::draw() {
     auto *image = cairo_image_surface_create_for_data(static_cast<unsigned char *>(b->data),
                                                       CAIRO_FORMAT_ARGB32, w, h, w * 4);
     auto *cr = cairo_create(image);
-    Canvas canvas(cr, w, h, Theme::material(app->dark));
+    bool capture = getenv("LMUI_CAPTURE_FRAME") || getenv("LMUI_QUIT_AFTER_FRAME");
+    motion.begin_frame(motion_time(), app->reduce_motion || force_reduced || capture);
+    Canvas canvas(cr, w, h, Theme::material(app->dark), &motion);
     if (app->transparent) {
         cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
         canvas.clear({0, 0, 0, 0});
@@ -20,9 +22,8 @@ void Application::Impl::draw() {
     } else
         canvas.clear(canvas.theme.background);
     auto age = std::chrono::duration<double>(std::chrono::steady_clock::now() - opened).count();
-    double opacity = std::clamp(age / .18, 0.0, 1.0);
-    if (getenv("LMUI_CAPTURE_FRAME") || getenv("LMUI_QUIT_AFTER_FRAME"))
-        opacity = 1;
+    double opacity = app->transparent || motion.reduced() ? 1 : ease(Easing::enter, age / .22);
+    dirty = false;
     if (opacity < 1)
         cairo_push_group(cr);
     if (app->paint)
@@ -44,8 +45,16 @@ void Application::Impl::draw() {
     cairo_surface_destroy(image);
     wl_surface_attach(surface, b->buffer, 0, 0);
     wl_surface_damage(surface, 0, 0, w, h);
+    frame_callback = wl_surface_frame(surface);
+    static const wl_callback_listener frame_events = {
+        [](void *data, wl_callback *callback, uint32_t) {
+            auto &s = *static_cast<Impl *>(data);
+            wl_callback_destroy(callback);
+            s.frame_callback = nullptr;
+        }};
+    wl_callback_add_listener(frame_callback, &frame_events, this);
     wl_surface_commit(surface);
     b->busy = true;
-    dirty = opacity < 1;
+    dirty |= opacity < 1 || motion.active();
 }
 } // namespace lmui

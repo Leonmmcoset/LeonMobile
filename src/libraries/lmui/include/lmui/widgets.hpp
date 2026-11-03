@@ -10,13 +10,15 @@ struct Widget {
     Kind kind{Kind::column};
     Rect bounds;
     std::string text;
+    std::string motion_id;
     double extent{}, gap{12}, padding{0}, value{};
-    bool checked{}, filled{true};
+    bool checked{}, filled{true}, interacting{};
     std::vector<Widget> children;
     std::function<void()> activate;
     std::function<void(double)> change;
     void layout(Rect available);
     void draw(Canvas &canvas) const;
+    void draw(Canvas &canvas, const std::string &identity) const;
     const Widget *hit(double x, double y) const;
 };
 Widget Column(std::vector<Widget> children, double gap = 12);

@@ -3,22 +3,26 @@
 #include <lmui/canvas.hpp>
 #include <pango/pangocairo.h>
 namespace lmui {
-Canvas::Canvas(cairo_t *ctx, int w, int h, Theme t) : cr(ctx), width(w), height(h), theme(t) {}
+Canvas::Canvas(cairo_t *ctx, int w, int h, Theme t, MotionContext *motion)
+    : cr(ctx), width(w), height(h), theme(t), motion_(motion) {}
 static void source(cairo_t *cr, Color c) { cairo_set_source_rgba(cr, c.r, c.g, c.b, c.a); }
 void Canvas::clear(Color c) {
     source(cr, c);
     cairo_paint(cr);
 }
-void Canvas::rounded(Rect b, Color color, double r) {
-    r = std::min({r, b.w / 2, b.h / 2});
-    if (b.w <= 0 || b.h <= 0)
-        return;
+static void rounded_path(cairo_t *cr, Rect b, double r) {
+    r = std::max(0.0, std::min({r, b.w / 2, b.h / 2}));
     cairo_new_sub_path(cr);
     cairo_arc(cr, b.x + b.w - r, b.y + r, r, -M_PI / 2, 0);
     cairo_arc(cr, b.x + b.w - r, b.y + b.h - r, r, 0, M_PI / 2);
     cairo_arc(cr, b.x + r, b.y + b.h - r, r, M_PI / 2, M_PI);
     cairo_arc(cr, b.x + r, b.y + r, r, M_PI, M_PI * 1.5);
     cairo_close_path(cr);
+}
+void Canvas::rounded(Rect b, Color color, double r) {
+    if (b.w <= 0 || b.h <= 0)
+        return;
+    rounded_path(cr, b, r);
     source(cr, color);
     cairo_fill(cr);
 }
@@ -76,5 +80,19 @@ void Canvas::restore() { cairo_restore(cr); }
 void Canvas::clip(Rect b) {
     cairo_rectangle(cr, b.x, b.y, b.w, b.h);
     cairo_clip(cr);
+}
+void Canvas::clip_rounded(Rect b, double r) {
+    rounded_path(cr, b, r);
+    cairo_clip(cr);
+}
+double Canvas::animate(const std::string &key, double target, MotionSpec spec,
+                       std::optional<double> initial) {
+    return motion_ ? motion_->animate(key, target, spec, initial) : target;
+}
+double Canvas::frame_time() const { return motion_ ? motion_->time() : motion_time(); }
+bool Canvas::reduced_motion() const { return !motion_ || motion_->reduced(); }
+void Canvas::request_frame() {
+    if (motion_)
+        motion_->request_frame();
 }
 } // namespace lmui

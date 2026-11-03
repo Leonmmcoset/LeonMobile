@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <lmui/input.hpp>
 #include <lmui/types.hpp>
 #include <memory>
 #include <string>
@@ -19,11 +20,13 @@ class Application {
     Application &operator=(const Application &) = delete;
     std::function<void(Canvas &)> paint;
     std::function<void(double, double, bool)> pointer;
+    std::function<void(const PointerEvent &)> pointer_event;
     std::function<void(double)> scroll;
     std::function<void(const KeyEvent &)> key;
     std::function<void()> tick;
     bool dark{};
     bool transparent{};
+    bool reduce_motion{};
     int run();
     void redraw();
     void quit();

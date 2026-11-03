@@ -1,14 +1,31 @@
 #include "backend.hpp"
 #include <cstring>
+#include <linux/input-event-codes.h>
 #include <unistd.h>
 namespace lmui {
-void Application::Impl::notify_pointer(bool down) {
-    if (app->pointer)
-        app->pointer(px, py, down);
+void Application::Impl::notify_pointer(PointerPhase phase) {
+    if (phase == PointerPhase::move && !pointer_down)
+        return;
+    pointer_down = phase == PointerPhase::down || (phase == PointerPhase::move && pointer_down);
+    if (app->pointer_event)
+        app->pointer_event({px, py, phase});
+    if (app->pointer && (phase == PointerPhase::down || phase == PointerPhase::up))
+        app->pointer(px, py, phase == PointerPhase::down);
     dirty = true;
 }
 void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
     auto &s = *static_cast<Impl *>(data);
+    if (!(caps & WL_SEAT_CAPABILITY_POINTER) && s.pointer) {
+        s.notify_pointer(PointerPhase::cancel);
+        wl_pointer_destroy(s.pointer);
+        s.pointer = nullptr;
+    }
+    if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && s.touch) {
+        s.notify_pointer(PointerPhase::cancel);
+        s.touch_id = -1;
+        wl_touch_destroy(s.touch);
+        s.touch = nullptr;
+    }
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !s.pointer) {
         s.pointer = wl_seat_get_pointer(seat);
         static const wl_pointer_listener events = {
@@ -17,14 +34,23 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
                 s.px = wl_fixed_to_double(x);
                 s.py = wl_fixed_to_double(y);
             },
-            [](void *, wl_pointer *, uint32_t, wl_surface *) {},
+            [](void *d, wl_pointer *, uint32_t, wl_surface *) {
+                auto &s = *static_cast<Impl *>(d);
+                if (s.touch_id < 0)
+                    s.notify_pointer(PointerPhase::cancel);
+            },
             [](void *d, wl_pointer *, uint32_t, wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
                 s.px = wl_fixed_to_double(x);
                 s.py = wl_fixed_to_double(y);
+                if (s.touch_id < 0)
+                    s.notify_pointer(PointerPhase::move);
             },
-            [](void *d, wl_pointer *, uint32_t, uint32_t, uint32_t, uint32_t state) {
-                static_cast<Impl *>(d)->notify_pointer(state == WL_POINTER_BUTTON_STATE_PRESSED);
+            [](void *d, wl_pointer *, uint32_t, uint32_t, uint32_t button, uint32_t state) {
+                auto &s = *static_cast<Impl *>(d);
+                if (button == BTN_LEFT && s.touch_id < 0)
+                    s.notify_pointer(state == WL_POINTER_BUTTON_STATE_PRESSED ? PointerPhase::down
+                                                                              : PointerPhase::up);
             },
             [](void *d, wl_pointer *, uint32_t, uint32_t axis, wl_fixed_t value) {
                 auto &s = *static_cast<Impl *>(d);
@@ -98,23 +124,38 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
     if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !s.touch) {
         s.touch = wl_seat_get_touch(seat);
         static const wl_touch_listener events = {
-            [](void *d, wl_touch *, uint32_t, uint32_t, wl_surface *, int32_t, wl_fixed_t x,
+            [](void *d, wl_touch *, uint32_t, uint32_t, wl_surface *, int32_t id, wl_fixed_t x,
                wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
+                if (s.touch_id >= 0)
+                    return;
+                s.notify_pointer(PointerPhase::cancel);
+                s.touch_id = id;
                 s.px = wl_fixed_to_double(x);
                 s.py = wl_fixed_to_double(y);
-                s.notify_pointer(true);
+                s.notify_pointer(PointerPhase::down);
             },
-            [](void *d, wl_touch *, uint32_t, uint32_t, int32_t) {
-                static_cast<Impl *>(d)->notify_pointer(false);
-            },
-            [](void *d, wl_touch *, uint32_t, int32_t, wl_fixed_t x, wl_fixed_t y) {
+            [](void *d, wl_touch *, uint32_t, uint32_t, int32_t id) {
                 auto &s = *static_cast<Impl *>(d);
+                if (id == s.touch_id) {
+                    s.notify_pointer(PointerPhase::up);
+                    s.touch_id = -1;
+                }
+            },
+            [](void *d, wl_touch *, uint32_t, int32_t id, wl_fixed_t x, wl_fixed_t y) {
+                auto &s = *static_cast<Impl *>(d);
+                if (id != s.touch_id)
+                    return;
                 s.px = wl_fixed_to_double(x);
                 s.py = wl_fixed_to_double(y);
+                s.notify_pointer(PointerPhase::move);
             },
             [](void *, wl_touch *) {},
-            [](void *d, wl_touch *) { static_cast<Impl *>(d)->notify_pointer(false); },
+            [](void *d, wl_touch *) {
+                auto &s = *static_cast<Impl *>(d);
+                s.notify_pointer(PointerPhase::cancel);
+                s.touch_id = -1;
+            },
             [](void *, wl_touch *, int32_t, wl_fixed_t, wl_fixed_t) {},
             [](void *, wl_touch *, int32_t, wl_fixed_t) {}};
         wl_touch_add_listener(s.touch, &events, &s);
