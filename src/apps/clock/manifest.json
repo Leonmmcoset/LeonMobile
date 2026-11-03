@@ -3,10 +3,7 @@
   "id": "org.leon.clock",
   "version": "1.0.0",
   "arch": "aarch64",
-  "entry": "/usr/bin/leon-app",
-  "args": [
-    "clock"
-  ],
+  "entry": "/usr/bin/leon-clock",
   "name": "时钟",
   "name_en": "Clock",
   "lmui": 1,

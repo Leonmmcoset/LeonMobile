@@ -3,10 +3,7 @@
   "id": "org.leon.terminal",
   "version": "1.0.0",
   "arch": "aarch64",
-  "entry": "/usr/bin/leon-app",
-  "args": [
-    "terminal"
-  ],
+  "entry": "/usr/bin/leon-terminal",
   "name": "终端",
   "name_en": "Terminal",
   "lmui": 1,

@@ -17,6 +17,16 @@ LeonMobile is a developer graphics prototype for QEMU ARM64, structured as a sta
 
 The compositor is derived from the CC0 tinywl reference implementation, then adapted for fixed mobile window geometry, a privileged shell overlay, pointer and single-contact touch input. The trusted C++ shell runs as a separate Wayland client to isolate shell failures from the wlroots event loop. LMUI uses the same theme and rendering code for shell and applications. wlroots remains a C integration boundary rather than exposing unstable C headers to C++ applications.
 
+Each built-in application owns a CMake target, manifest, entry point, state and
+view under `src/apps/NAME/`. Calculation, document I/O, directory operations,
+image decoding, terminal emulation and stopwatch state belong to their respective
+application, rather than a shared mode dispatcher. Only the terminal links
+libvterm; only the image viewer links libjpeg. Internal `leon-app-support` owns
+the common window chrome, preferences, hit handling and on-screen keyboard.
+The `leon-ipc` client library implements the local JSON transport without linking
+the privileged package installer, OpenSSL or libarchive into applications.
+Native build executables live in `build/host/bin/`, independent of source paths.
+
 ## Boot and storage
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.

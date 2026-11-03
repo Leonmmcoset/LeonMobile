@@ -22,9 +22,9 @@ for attempt in $(seq 1 100); do
 done
 for application in settings calculator gallery files editor terminal images clock; do
     HOME="$runtime/$application" LMUI_CAPTURE_FRAME="$repo/build/screenshots/$application.png" \
-        LMUI_QUIT_AFTER_FRAME=1 timeout 15 "$repo/build/host/src/apps/leon-app" "$application"
+        LMUI_QUIT_AFTER_FRAME=1 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-$application"
     test -s "$repo/build/screenshots/$application.png"
 done
 LMUI_CAPTURE_FRAME="$repo/build/screenshots/lock.png" LMUI_QUIT_AFTER_FRAME=1 \
-    timeout 15 "$repo/build/host/src/apps/leon-shell"
+    timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-shell"
 echo 'Wayland smoke: all eight apps and shell rendered successfully'

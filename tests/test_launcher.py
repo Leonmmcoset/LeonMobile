@@ -48,7 +48,7 @@ class LauncherTests(unittest.TestCase):
             m.write_text(json.dumps(manifest))
             m.chmod(0o644)
             endpoint = str(path / "apps.sock")
-            proc = subprocess.Popen([BIN / "src/pkg/leon-launchd", "--root", root,
+            proc = subprocess.Popen([BIN / "bin/leon-launchd", "--root", root,
                                      "--builtin", builtin, "--socket", endpoint,
                                      "--runtime-dir", runtime], stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE)

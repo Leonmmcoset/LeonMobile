@@ -3,10 +3,7 @@
   "id": "org.leon.settings",
   "version": "1.0.0",
   "arch": "aarch64",
-  "entry": "/usr/bin/leon-app",
-  "args": [
-    "settings"
-  ],
+  "entry": "/usr/bin/leon-settings",
   "name": "设置",
   "name_en": "Settings",
   "lmui": 1,

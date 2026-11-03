@@ -3,10 +3,7 @@
   "id": "org.leon.images",
   "version": "1.0.0",
   "arch": "aarch64",
-  "entry": "/usr/bin/leon-app",
-  "args": [
-    "images"
-  ],
+  "entry": "/usr/bin/leon-images",
   "name": "图片",
   "name_en": "Images",
   "lmui": 1,

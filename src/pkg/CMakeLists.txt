@@ -1,7 +1,7 @@
 find_package(OpenSSL REQUIRED)
 find_package(LibArchive REQUIRED)
 add_library(leon-package STATIC package.cpp)
-target_link_libraries(leon-package PUBLIC OpenSSL::Crypto LibArchive::LibArchive)
+target_link_libraries(leon-package PUBLIC leon-ipc OpenSSL::Crypto LibArchive::LibArchive)
 target_include_directories(leon-package PUBLIC .)
 add_executable(lmpkg main.cpp)
 target_link_libraries(lmpkg PRIVATE leon-package)

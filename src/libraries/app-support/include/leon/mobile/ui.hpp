@@ -1,12 +1,14 @@
 #pragma once
-#include "package.hpp"
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <functional>
+#include <leon/ipc.hpp>
 #include <lmui/lmui.hpp>
 #include <string>
 #include <vector>
 namespace mobile {
+namespace fs = std::filesystem;
 using namespace lmui;
 using leon::Json;
 struct Hit {

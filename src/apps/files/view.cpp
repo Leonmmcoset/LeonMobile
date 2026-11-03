@@ -1,0 +1,47 @@
+#include "application.hpp"
+#include <fstream>
+using namespace mobile;
+namespace leon::apps {
+FilesApplication::FilesApplication() : ApplicationWindow("org.leon.files", "文件", "Files") {
+    directory.path = user_home();
+}
+void FilesApplication::text_input(const std::string &text) { edit(file_input, text); }
+void FilesApplication::paint_content(Canvas &c, double bottom) {
+    auto t = c.theme;
+    double w = c.width;
+    c.text(directory.path.string(), {24, 78, w - 48, 40}, 13, t.muted);
+    button(c, hits, {20, 126, 72, 44}, "↑", [&] {
+        directory.path = directory.path.parent_path();
+        scroll = 0;
+    });
+    button(c, hits, {100, 126, w - 120, 44}, file_input, [&] { keyboard = true; });
+    button(c, hits, {20, 180, (w - 48) / 2, 44}, tr(en, "新建文件", "New file"),
+           [&] { perform([&] { directory.create(file_input, false); }); });
+    button(c, hits, {28 + (w - 48) / 2, 180, (w - 48) / 2, 44}, tr(en, "新建目录", "New folder"),
+           [&] { perform([&] { directory.create(file_input, true); }); });
+    auto entries = directory.entries();
+    std::error_code ec;
+    double y = 242 - scroll;
+    for (auto &entry : entries) {
+        if (y >= 230 && y + 54 < bottom) {
+            auto p = entry.path();
+            bool dir = entry.is_directory(ec);
+            button(c, hits, {20, y, w - 94, 48}, (dir ? "▣  " : "·  ") + p.filename().string(),
+                   [&, p, dir] {
+                       if (dir) {
+                           directory.path = p;
+                           scroll = 0;
+                       } else {
+                           std::ifstream f(p);
+                           std::string data(512, 0);
+                           f.read(data.data(), data.size());
+                           data.resize(size_t(f.gcount()));
+                           error = data;
+                       }
+                   });
+            button(c, hits, {w - 66, y, 46, 48}, "×", [&, p] { perform([&] { fs::remove(p); }); });
+        }
+        y += 60;
+    }
+}
+} // namespace leon::apps

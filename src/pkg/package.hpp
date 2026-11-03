@@ -1,10 +1,9 @@
 #pragma once
 #include <filesystem>
-#include <nlohmann/json.hpp>
+#include <leon/ipc.hpp>
 #include <string>
 namespace leon {
 namespace fs = std::filesystem;
-using Json = nlohmann::json;
 bool valid_id(const std::string &id);
 Json read_json(const fs::path &path);
 void atomic_json(const fs::path &path, const Json &data);
@@ -20,5 +19,4 @@ class Packages {
     fs::path root;
     fs::path builtin;
 };
-std::string request(const std::string &socket, const Json &message);
 } // namespace leon

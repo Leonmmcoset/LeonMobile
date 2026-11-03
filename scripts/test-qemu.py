@@ -167,6 +167,14 @@ def main():
                 apps = json.loads(guest.run("lmpkg list"))
                 if len(apps) != 8 or any(app["arch"] != "aarch64" for app in apps):
                     raise RuntimeError("Native system application manifest checks failed")
+                entries = {app["entry"] for app in apps}
+                expected = {f"/usr/bin/leon-{name}" for name in (
+                    "settings", "calculator", "gallery", "files", "editor",
+                    "terminal", "images", "clock")}
+                if entries != expected or any(app.get("args") for app in apps):
+                    raise RuntimeError("Built-in apps must have independent ELF entry points")
+                guest.run(" && ".join(f"test -x {shlex.quote(entry)}" for entry in sorted(entries)))
+                guest.run("test ! -e /usr/bin/leon-app")
                 while time.monotonic() < deadline:
                     try:
                         frame = qmp.capture(artifacts / "lock.ppm")

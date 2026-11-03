@@ -22,7 +22,7 @@ class PackageTests(unittest.TestCase):
         self.root = self.path / "root"
 
     def command(self, *args, success=True):
-        result = subprocess.run([BIN / "src/pkg/lmpkg", "--root", self.root, *args],
+        result = subprocess.run([BIN / "bin/lmpkg", "--root", self.root, *args],
                                 text=True, capture_output=True)
         if success:
             self.assertEqual(result.returncode, 0, result.stderr)

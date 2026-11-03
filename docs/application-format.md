@@ -29,6 +29,13 @@ resources/...
 
 `id` is a lowercase dotted identifier, maximum 96 bytes. Versions are three numeric components, without leading zeros, each at most six digits. `entry` is relative to the package root and must identify a regular little-endian AArch64 ELF executable. Optional `args` is an array of at most 16 strings. `name_en` and `icon` are optional presentation metadata. Built-in manifests are installed separately and use `/usr/bin/` executable paths and stable built-in identities.
 
+Each built-in has its own ELF entry (`/usr/bin/leon-settings`, `leon-calculator`,
+`leon-gallery`, `leon-files`, `leon-editor`, `leon-terminal`, `leon-images`,
+`leon-clock`). The former `leon-app MODE` dispatcher is retired. Built-in IDs,
+UIDs and private data paths are unchanged. Each application's manifest is owned
+alongside its implementation in `src/apps/NAME/manifest.json` and installed as
+`/usr/share/leon/apps/NAME.json`.
+
 `checksums.json` maps every regular archive file except itself to its lowercase SHA-256 digest. Missing or extra coverage, duplicate files, absolute paths, parent/dot path components, backslashes, links and special files are rejected. Archives are limited to 4096 regular files, 128 MiB per file and 256 MiB total extracted regular data. These are integrity checks; packages are unsigned in 1.0.0.
 
 `scripts/make-package.py MANIFEST PAYLOAD OUTPUT` creates a deterministic archive with normalized tar/gzip metadata. Payload directories must contain only files and directories, excluding the reserved metadata filenames. Non-system shared libraries may be included, but the application must link them with a suitable relative RPATH such as `$ORIGIN/../lib`. The installer does not solve dependencies or synthesize a library search path.

@@ -307,28 +307,4 @@ void Packages::remove(const std::string &id, bool purge) {
     if (purge)
         fs::remove_all(root / "data" / id);
 }
-std::string request(const std::string &socket_path, const Json &message) {
-    Fd fd(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0));
-    timeval timeout{message.value("op", "") == "install" ? 60 : 3, 0};
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
-    sockaddr_un address{};
-    address.sun_family = AF_UNIX;
-    require(socket_path.size() < sizeof(address.sun_path), "socket path too long");
-    strcpy(address.sun_path, socket_path.c_str());
-    require(!connect(fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)),
-            "service unavailable: " + socket_path);
-    auto text = message.dump() + "\n";
-    write_all(fd, text.data(), text.size());
-    shutdown(fd, SHUT_WR);
-    std::string result;
-    std::array<char, 4096> buf;
-    ssize_t n;
-    while ((n = read(fd, buf.data(), buf.size())) > 0) {
-        result.append(buf.data(), size_t(n));
-        require(result.size() < 1024 * 1024, "response too large");
-    }
-    require(n == 0, "service response timed out");
-    return result;
-}
 } // namespace leon
