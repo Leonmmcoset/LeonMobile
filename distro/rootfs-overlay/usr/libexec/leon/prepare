@@ -3,6 +3,7 @@ set -eu
 mkdir -p /data/leon/apps /data/leon/staging /data/leon/data /data/home/leon /var/log/leon /var/cache/fontconfig /var/lib/dbus /run/dbus /run/leon/wayland /run/user/1000
 chmod 0755 /data /data/leon /data/leon/apps /data/leon/data /run/leon
 chown 1000:1000 /data/home/leon /run/user/1000 /run/leon/wayland
+chmod 0700 /data/home/leon
 chmod 0700 /run/user/1000
 chmod 0755 /run/leon/wayland
 # Only the trusted desktop session can create the compositor control socket.
