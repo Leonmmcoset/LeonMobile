@@ -43,6 +43,7 @@ App data is `/data/leon/data/ID`, owned by that app's UID with mode 0700. Normal
 
 ```sh
 lmpkg list
+lmpkg running
 lmpkg install ./org.example.hello-1.0.0.lmpkg
 lmpkg launch org.example.hello
 lmpkg remove org.example.hello
