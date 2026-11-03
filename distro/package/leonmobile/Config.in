@@ -1,0 +1,13 @@
+config BR2_PACKAGE_LEONMOBILE
+	bool "LeonMobile system, desktop, LMUI and applications"
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	select BR2_PACKAGE_JSON_FOR_MODERN_CPP
+	select BR2_PACKAGE_LIBARCHIVE
+	select BR2_PACKAGE_OPENSSL
+	help
+	  LeonMobile 1.0.0 native system components.
+
+config BR2_PACKAGE_LIBVTERM_LEON
+	bool "libvterm (LeonMobile terminal dependency)"
+	select BR2_PACKAGE_LIBICONV if !BR2_ENABLE_LOCALE

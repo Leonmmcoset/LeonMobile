@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_LEON_PATH/package/leonmobile/Config.in"
