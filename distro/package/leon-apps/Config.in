@@ -1,0 +1,14 @@
+config BR2_PACKAGE_LEON_APPS
+	bool "LeonMobile native built-in applications"
+	depends on BR2_TOOLCHAIN_GCC_AT_LEAST_10
+	depends on BR2_USE_WCHAR
+	depends on !BR2_STATIC_LIBS
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	depends on BR2_USE_MMU
+	depends on BR2_TOOLCHAIN_HAS_SYNC_4
+	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_4_14
+	select BR2_PACKAGE_LMUI
+	select BR2_PACKAGE_JSON_FOR_MODERN_CPP
+	select BR2_PACKAGE_LIBVTERM_LEON
+	select BR2_PACKAGE_JPEG

@@ -1,4 +1,6 @@
-add_subdirectory(shell)
+if(LEON_SHELL)
+  add_subdirectory(shell)
+endif()
 if(LEON_COMPOSITOR)
   add_subdirectory(compositor)
 endif()

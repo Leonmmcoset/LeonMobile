@@ -1,18 +1,20 @@
+################################################################################
+#
+# leonmobile
+#
+################################################################################
+
+# Product aggregation owns no executable or SDK files.
 LEONMOBILE_VERSION = 1.0.0
-LEONMOBILE_SITE = $(BR2_EXTERNAL_LEON_PATH)/..
-LEONMOBILE_SITE_METHOD = local
-LEONMOBILE_LICENSE = Apache-2.0, CC0-1.0 (compositor foundation)
-LEONMOBILE_LICENSE_FILES = LICENSE third_party/tinywl-LICENSE
-LEONMOBILE_INSTALL_STAGING = YES
-LEONMOBILE_DEPENDENCIES = host-pkgconf host-wayland wlroots wayland wayland-protocols cairo pango json-for-modern-cpp libarchive openssl libvterm-leon jpeg
-LEONMOBILE_CONF_OPTS = -DBUILD_TESTING=OFF
-LEONMOBILE_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = --exclude .cache --exclude build --exclude output --exclude dist --exclude .git
+LEONMOBILE_SOURCE =
+LEONMOBILE_LICENSE = N/A
+LEONMOBILE_DEPENDENCIES = leon-core lmui leon-desktop leon-apps
 
-# wlroots 0.20 builds its pixman renderer and headless backend unconditionally;
-# the upstream recipe additionally enables the DRM/libinput and GLES paths.
+# Preserve the established developer command while rebuilding every local unit.
+.PHONY: leonmobile-rebuild leonmobile-reconfigure
+leonmobile-rebuild: leon-core-rebuild lmui-rebuild .WAIT leon-desktop-rebuild leon-apps-rebuild
+leonmobile-reconfigure: leon-core-reconfigure lmui-reconfigure .WAIT leon-desktop-reconfigure leon-apps-reconfigure
 
-$(eval $(cmake-package))
-
-# Buildroot's local-source legal archive uses a separate rsync invocation.
-# Apply the same exclusions there: the build output lives inside our source tree.
-leonmobile-legal-info: RSYNC_VCS_EXCLUSIONS += $(LEONMOBILE_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS)
+# Expand the product targets after the component prerequisites. Otherwise the
+# aggregator could visit components before their rebuild stamps are cleared.
+$(eval $(generic-package))

@@ -51,6 +51,13 @@ individually as `<lmui/types.hpp>`, `<lmui/canvas.hpp>`, `<lmui/widgets.hpp>` an
 `<lmui/application.hpp>`. Wayland connection, buffer, rendering and input
 implementation headers are private to the shared library and are not SDK APIs.
 
+CMake consumers can use `find_package(LMUI 1 CONFIG REQUIRED)` and link
+`LMUI::LMUI`; this target declares C++20 and the public Cairo include/link
+requirements. `pkg-config lmui` remains supported. LMUI's SONAME and API
+generation remain 1. `Development` adds SDK files to a `Runtime` installation;
+internal package, IPC and built-in application-support headers are not
+installed as public SDK interfaces.
+
 `Canvas` provides shapes, clipped drawing, Pango text and image rendering. `Widget` provides retained component trees, rows/columns, labels, buttons, fields, toggles, sliders, layout and hit testing. Application callbacks own state. Components do not implement a declarative language or bind arbitrary borrowed application objects.
 
 The reference SDK example is `examples/hello`. Debug-only environment conventions `LMUI_CAPTURE_FRAME` and `LMUI_QUIT_AFTER_FRAME` capture a rendered PNG and terminate after the first frame, respectively; normal launch sanitizes inherited environment variables.

@@ -1,14 +1,33 @@
 config BR2_PACKAGE_LEONMOBILE
-	bool "LeonMobile system, desktop, LMUI and applications"
+	bool "LeonMobile reference distribution"
+	depends on BR2_TOOLCHAIN_GCC_AT_LEAST_10
+	depends on BR2_USE_WCHAR
+	depends on !BR2_STATIC_LIBS
+	depends on BR2_PACKAGE_HAS_UDEV
+	depends on BR2_PACKAGE_HAS_LIBGBM
+	depends on BR2_aarch64
+	depends on BR2_TOOLCHAIN_USES_MUSL
 	depends on BR2_INSTALL_LIBSTDCPP
 	depends on BR2_TOOLCHAIN_HAS_THREADS
-	select BR2_PACKAGE_JSON_FOR_MODERN_CPP
-	select BR2_PACKAGE_LIBARCHIVE
-	select BR2_PACKAGE_OPENSSL
-	select BR2_PACKAGE_JPEG
-	select BR2_PACKAGE_XKEYBOARD_CONFIG
+	depends on BR2_USE_MMU
+	depends on BR2_TOOLCHAIN_HAS_ATOMIC
+	depends on BR2_PACKAGE_HAS_LIBEGL
+	depends on BR2_PACKAGE_HAS_LIBGLES
+	depends on BR2_TOOLCHAIN_HAS_SYNC_4
+	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_4_14
+	select BR2_PACKAGE_LEON_CORE
+	select BR2_PACKAGE_LMUI
+	select BR2_PACKAGE_LEON_DESKTOP
+	select BR2_PACKAGE_LEON_APPS
 	help
-	  LeonMobile 1.0.0 native system components.
+	  LeonMobile 1.0.0 QEMU developer graphics prototype.
+	  Selects independently built core, UI runtime, desktop
+	  and built-in application packages.
+
+source "$BR2_EXTERNAL_LEON_PATH/package/leon-core/Config.in"
+source "$BR2_EXTERNAL_LEON_PATH/package/lmui/Config.in"
+source "$BR2_EXTERNAL_LEON_PATH/package/leon-desktop/Config.in"
+source "$BR2_EXTERNAL_LEON_PATH/package/leon-apps/Config.in"
 
 config BR2_PACKAGE_LIBVTERM_LEON
 	bool "libvterm (LeonMobile terminal dependency)"

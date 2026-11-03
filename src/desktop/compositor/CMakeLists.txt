@@ -4,4 +4,4 @@ add_executable(leon-compositor main.c input.c keyboard.c pointer.c touch.c
 target_compile_definitions(leon-compositor PRIVATE WLR_USE_UNSTABLE _GNU_SOURCE)
 target_compile_options(leon-compositor PRIVATE -Wno-unused-parameter)
 target_link_libraries(leon-compositor PRIVATE PkgConfig::WLR)
-install(TARGETS leon-compositor RUNTIME DESTINATION bin)
+install(TARGETS leon-compositor RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)

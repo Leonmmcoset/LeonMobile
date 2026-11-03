@@ -33,7 +33,7 @@ python3 scripts/test-qemu.py   # 目标系统启动与图形交互验收
 make release                  # 汇集镜像、清单、许可证和校验和
 ```
 
-详细说明见 [构建与运行](docs/building.md)、[系统架构](docs/architecture.md)、[服务及 LMUI 接口](docs/interfaces.md)和[应用包规范](docs/application-format.md)。
+详细说明见 [构建与运行](docs/building.md)、[系统架构](docs/architecture.md)、[组件开发](docs/development.md)、[服务及 LMUI 接口](docs/interfaces.md)和[应用包规范](docs/application-format.md)。
 
 已完成完整 ARM64 镜像构建、原生组件及集成测试、独立 Wayland 渲染和 QEMU 图形交互验收，包括示例应用包的安装、运行、卸载及界面关机。具体范围见[验收记录](docs/validation.md)。本地发行物位于 `dist/leonmobile-1.0.0-qemu-aarch64/`，可在该目录执行 `./run.sh` 启动。
 

@@ -238,6 +238,25 @@ def main():
                 if "Volume: 0.25" not in volume:
                     raise RuntimeError("PipeWire sink volume does not match the UI setting")
                 (artifacts / "audio.txt").write_text(audio + "\n" + volume + "\n")
+                # Refactored built-ins must launch the ELF named in their
+                # own manifest and retain their established Unix identity.
+                for app in apps:
+                    app_id = app["id"]
+                    guest.run("lmpkg launch " + shlex.quote(app_id))
+                    time.sleep(.3)
+                    processes = json.loads(guest.run("lmpkg running"))
+                    if app_id not in processes:
+                        raise RuntimeError("Built-in exited after launch: " + app_id)
+                    pid = processes[app_id]
+                    # The non-root console cannot dereference another UID's
+                    # /proc/PID/exe; comm and status are public process data.
+                    actual = guest.run(f"cat /proc/{pid}/comm")
+                    if actual != Path(app["entry"]).name[:15]:
+                        raise RuntimeError(f"{app_id} launched unexpected command {actual}")
+                    identity = guest.run(f"cat /proc/{pid}/status")
+                    uid = re.search(r"^Uid:\s+(\d+)", identity, re.M)
+                    if not uid or int(uid[1]) != app["uid"]:
+                        raise RuntimeError("Built-in identity changed: " + app_id)
                 if args.package:
                     path = "/data/home/leon/hello.lmpkg"
                     guest.upload(args.package, path)

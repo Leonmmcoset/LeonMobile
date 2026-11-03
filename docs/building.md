@@ -37,6 +37,20 @@ make run
 
 Buildroot does not automatically rebuild already-built packages after changes to their configuration or local source. For local component changes use `./scripts/build.sh leonmobile-rebuild` followed by `make image`. A clean output tree is required when changing toolchains or incompatible foundational configuration. The download cache can be retained.
 
+The `leonmobile` selection aggregates four source packages: `leon-core`, `lmui`,
+`leon-desktop`, and `leon-apps`. Each package configures only its own CMake
+targets. Desktop and applications consume LMUI from the installed staging SDK.
+Use `./scripts/build.sh leon-apps-rebuild` (or the corresponding component name)
+for a focused rebuild. Use `leonmobile-reconfigure` when changing the shared
+CMake configuration; `leonmobile-rebuild` remains a convenience target for all
+four packages. After migrating an existing output tree to these packages,
+regenerate the reference defconfig once before building.
+
+Target installation uses the `Runtime` component. LMUI headers, its link-time
+library symlink, pkg-config file and CMake package belong to `Development` and
+are installed into Buildroot's staging sysroot. See [development.md](development.md)
+for component ownership, native build options and SDK consumption.
+
 The relevant outputs in `output/images` are `Image`, `leon-initramfs.cpio.gz`, `rootfs.ext4`, `data.ext4`, and `leonmobile-qemu-aarch64.img`. `make run` creates a separate writable disk at `build/leonmobile-user.img` on first use. Repeated runs reuse that disk, preserving data. `LEON_DISK` selects another writable image. The generated reference image is never used as a writable runtime disk by the launcher.
 
 The desktop is 480×960 portrait. Click the lock screen or swipe up to unlock. The status bar opens notifications on the left and quick settings on the right. Bottom gestures navigate home and tasks; three-button navigation can be selected in settings. Mouse clicks and drags act as single-touch input. The developer serial console automatically logs in as the non-root `leon` user.
@@ -77,7 +91,7 @@ The launcher creates a separate persistent `leonmobile-user.img` next to the rel
 
 ## Target validation
 
-`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight manifests, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; logs are in that disk's data partition under `/var/log/leon/`. Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
+`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight distinct ELF manifests, launch/process identity for every built-in, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; logs are in that disk's data partition under `/var/log/leon/`. Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
 
 Include the cross-compiled example to exercise package transfer, checksum validation, install, launch and removal:
 

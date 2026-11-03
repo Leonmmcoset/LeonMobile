@@ -66,6 +66,23 @@ The shell owns session state and navigation separately from status, lock,
 home/apps, task, quick-settings and notification views. LMUI separates its public
 types, canvas, widgets and application API from its private Wayland backend.
 
+## Distribution build units
+
+| Buildroot package | Payload | Principal dependencies |
+| --- | --- | --- |
+| `leon-core` | PID 1, service manager, application broker and administration tools | JSON, libarchive, OpenSSL |
+| `lmui` | Shared LMUI runtime; public SDK in staging | Wayland, Cairo/Pango, xkbcommon |
+| `leon-desktop` | Compositor and mobile shell | Installed LMUI SDK, wlroots, JSON |
+| `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG |
+| `leonmobile` | Product dependency selection; no executable payload | All four components |
+
+Each unit uses the shared pinned source/version and keeps its own source list,
+dependency declaration, legal metadata and build directory. Runtime installation
+contains executable/library/manifest files; SDK installation contains public
+headers and CMake/pkg-config metadata. Buildroot assembles the read-only system
+and writable data partitions from those units and the board policy. Splitting
+build units does not introduce an on-device package repository or OTA service.
+
 ## Boot and storage
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
