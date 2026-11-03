@@ -19,7 +19,7 @@ The compositor is derived from the CC0 tinywl reference implementation, then ada
 
 ## Boot and storage
 
-QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run` and `/tmp` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`.
+QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
 
 The GPT disk contains `system` (768 MiB ext4, mounted read-only) and `data` (512 MiB ext4, mounted read/write). System software, configuration and built-in apps live in the system image. Installed apps, application-private data, settings and logs live under `/data`. Runtime sockets and device/session state live under `/run`.
 
@@ -41,4 +41,4 @@ The developer serial console logs in automatically as the non-root `leon` user, 
 
 The distribution target is 1.0.0; development commits are not release certification. LMUI exposes API/SONAME generation 1, manifest format 1 and the v1 service schemas. C++ ABI compatibility across future LMUI releases is not guaranteed. Applications must be rebuilt when the SDK ABI changes.
 
-Buildroot and its package recipes pin dependency versions and hashes. LeonMobile additionally pins the Buildroot archive, Linux archive and external libvterm package. Downloads, build trees and disk images are kept outside version control. `legal-info` preserves third-party license notices and available source archives; its warnings must be reviewed before redistribution. The Bootlin toolchain requires its own corresponding-source/license review.
+Buildroot and its package recipes pin dependency versions and hashes. LeonMobile additionally pins the Buildroot archive, Linux archive and external libvterm package. Downloads, build trees and disk images are kept outside version control. `legal-info` preserves third-party license notices and available source archives. Release assembly supplements that output with the Buildroot source archive, musl 1.2.5 and GCC 14.3.0 runtime sources, Bootlin GCC patches, license notices and the toolchain reproduction metadata. The supplementary files are checksum-pinned in `distro/toolchain/legal-sources.json`. The complete external host toolchain is not part of the release. Full disk image byte-for-byte reproducibility has not been certified.

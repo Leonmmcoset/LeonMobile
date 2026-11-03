@@ -32,6 +32,8 @@ make release                  # 汇集镜像、清单、许可证和校验和
 
 详细说明见 [构建与运行](docs/building.md)、[系统架构](docs/architecture.md)、[服务及 LMUI 接口](docs/interfaces.md)和[应用包规范](docs/application-format.md)。
 
+已完成完整 ARM64 镜像构建、原生组件及集成测试、独立 Wayland 渲染和 QEMU 图形交互验收，包括示例应用包的安装、运行、卸载及界面关机。具体范围见[验收记录](docs/validation.md)。本地发行物位于 `dist/leonmobile-1.0.0-qemu-aarch64/`，可在该目录执行 `./run.sh` 启动。
+
 首版包括锁屏、主屏、应用列表、任务切换、状态栏、通知、快捷设置、屏幕键盘，以及设置、计算器、LMUI 展示、文件、文本编辑、终端、图片和时钟应用。采用固定 Material 风格配色，可切换深浅主题、中文/英文和手势/三键导航。
 
 当前边界：仅 QEMU；滑动锁屏无身份认证；应用隔离基于 Unix UID；软件包未签名；系统通过离线替换镜像更新；尚无实体手机、动态壁纸取色、Android 兼容、应用商店或 OTA。

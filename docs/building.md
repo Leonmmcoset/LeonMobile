@@ -41,7 +41,7 @@ The relevant outputs in `output/images` are `Image`, `leon-initramfs.cpio.gz`, `
 
 The desktop is 480×960 portrait. Click the lock screen or swipe up to unlock. The status bar opens notifications on the left and quick settings on the right. Bottom gestures navigate home and tasks; three-button navigation can be selected in settings. Mouse clicks and drags act as single-touch input. The developer serial console automatically logs in as the non-root `leon` user.
 
-`LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks.
+`LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks. `LEON_IMAGES` selects a directory containing the kernel, initramfs and reference disk.
 
 ## Install and update
 
@@ -61,8 +61,29 @@ python3 scripts/update-image.py build/leonmobile-user.img output/images/rootfs.e
 
 The tool validates GPT checksums/layout and ext4 magic and acquires a POSIX lock before writing the system partition. Back up important development data separately. This replacement process preserves the data partition but is not an atomic OTA update. Kernel and initramfs are loaded from the current build outputs on the next run.
 
-`make legal-info` gathers dependency license materials. `make release` assembles images, build provenance, a software manifest, documentation, legal materials and SHA-256 checksums under `dist/`. Release assembly does not sign images, create a Git tag, publish externally or certify production readiness.
+`make legal-info` gathers dependency license materials. `make release` assembles images, build provenance, a software manifest, documentation, legal materials and SHA-256 checksums under `dist/leonmobile-1.0.0-qemu-aarch64/`. The first assembly additionally downloads about 100 MiB of pinned musl/GCC runtime source and license material, cached under `.cache/toolchain-legal`. It supplements Buildroot's legal output with those files and the Buildroot source archive; the original Buildroot warnings remain in its README. The external host toolchain is documented through its README, manifest and build configuration. Release assembly does not sign images, create a Git tag, publish externally or certify production readiness.
+
+Each assembly uses a fresh staging directory. When replacing an existing local assembly, it preserves that directory as `dist/.previous-*`. `build-info.json` records the Git commit and whether the source tree contained changes. Commit completed work before assembling the final candidate.
+
+The assembled directory can be copied to another Linux host with QEMU installed:
+
+```sh
+cd dist/leonmobile-1.0.0-qemu-aarch64
+sha256sum --check SHA256SUMS
+./run.sh
+```
+
+The launcher creates a separate persistent `leonmobile-user.img` next to the release files. Use the same `LEON_DISK`, `LEON_DISPLAY` and `LEON_AUDIO` settings as the repository launcher. The included `scripts/update-image.py` can replace a stopped runtime disk's system partition.
 
 ## Target validation
 
-`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64, checks guest version/application listing, captures actual QEMU display frames and performs UI input and poweroff. It writes evidence to `build/qemu-test`. On failure inspect `serial.log` and the guest's persistent `/var/log/leon/*.log` files. CI runs native checks on every change; the full image/QEMU job is available through workflow dispatch.
+`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight manifests, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; logs are in that disk's data partition under `/var/log/leon/`. Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
+
+Include the cross-compiled example to exercise package transfer, checksum validation, install, launch and removal:
+
+```sh
+./scripts/build-example.sh
+python3 scripts/test-qemu.py --package build/hello/org.example.hello-1.0.0.lmpkg
+```
+
+`--images dist/leonmobile-1.0.0-qemu-aarch64` validates an assembled release. CI runs native checks on every change; the full image/QEMU job is available through workflow dispatch. See [validation evidence](validation.md) for the tested scope and limits.
