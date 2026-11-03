@@ -10,7 +10,7 @@ rm -rf "$GENIMAGE_TMP"
 early="$BUILD_DIR/leon-initramfs"
 rm -rf "$early"
 mkdir -p "$early"/{bin,sbin,lib,dev,proc,sys,newroot}
-cp "$TARGET_DIR/sbin/leon-init" "$early/init"
+cp "$TARGET_DIR/usr/sbin/leon-init" "$early/init"
 cp "$TARGET_DIR/bin/busybox" "$early/bin/busybox"
 cp -L "$TARGET_DIR/lib/ld-musl-aarch64.so.1" "$early/lib/ld-musl-aarch64.so.1"
 ln -s ld-musl-aarch64.so.1 "$early/lib/libc.so"
