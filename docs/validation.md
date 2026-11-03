@@ -92,9 +92,10 @@ shutdown. Display → Reduce motion was enabled and disabled through the UI;
 both boolean values were checked in the persisted settings store. Evidence
 includes `settings-reduced-motion.ppm` and `quick-poweroff.ppm`. An initial
 run timed out at shutdown; a rerun with the shutdown-screen capture passed.
-This validates the changed clients and settings service in the reference
-image, without asserting a fresh full distribution rebuild or physical touch
-and vibration hardware support.
+This initial private-image check validated the changed clients and settings
+service without rebuilding the distribution. The final distribution rebuild
+and checks are recorded below; physical touch and vibration hardware remain
+unverified.
 
 The shell motion check additionally captured `lock-dragging.ppm` and
 `lock-settled.ppm`, verifying that a short drag moves the lock instruction and
@@ -119,3 +120,19 @@ tracking, twelve live notifications, restored application input, volume/mute,
 power-menu cancellation, lock protection, backdrop dismissal and UI poweroff.
 Snapshot comparisons wait for observed final lock/home/shade geometry so
 software emulation does not mistake an entrance frame for a settled reference.
+
+The final main-workspace validation rebuilt all four local Buildroot components
+with `./scripts/build.sh leonmobile-rebuild`, regenerated the complete default
+image with `./scripts/build.sh` and rebuilt the exported SDK example. Six native
+CTest checks, twelve Python integration checks and independent Weston passed
+again; the motion fixture observed 31 intermediate frames, no settled repaints
+and only two requested final frames with reduced motion.
+
+The full QEMU check then passed against `output/images/` with the notification
+probe and an SDK package compiled before the motion changes. The old ELF was
+installed, launched, captured and removed without recompilation, validating
+generation 1 target compatibility. The current captured-input SDK sample had
+already passed the private-image run. Final evidence is in
+`build/qemu-test/`, `build/screenshots/` and the ignored
+`build/motion-{distribution,image,native,example}-build.log` files. The default
+image used by a new `make run` disk includes the integrated motion changes.
