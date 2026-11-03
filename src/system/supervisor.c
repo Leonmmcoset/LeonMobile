@@ -272,6 +272,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     umask(old);
+    chmod(socket_path, 0666);
     for (int i = 0; i < count; ++i)
         services[i].wanted = services[i].autostart;
     while (!shutting_down) {

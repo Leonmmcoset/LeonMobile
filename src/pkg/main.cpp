@@ -16,6 +16,14 @@ int main(int argc, char **argv) {
             throw std::runtime_error("usage: lmpkg [--root DIR] list | install FILE | remove ID "
                                      "[--purge-data] | launch ID");
         std::string verb = argv[i++];
+        if (verb == "running" && i == argc) {
+            auto response =
+                leon::Json::parse(leon::request("/run/leon/apps.sock", {{"op", "list"}}));
+            if (!response.value("ok", false))
+                throw std::runtime_error(response.value("error", "service error"));
+            std::cout << response.at("running").dump() << '\n';
+            return 0;
+        }
         if (verb == "list" && i == argc) {
             std::cout << packages.list().dump(2) << '\n';
             return 0;
