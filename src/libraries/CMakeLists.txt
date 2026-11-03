@@ -1,0 +1,6 @@
+add_subdirectory(ipc)
+add_subdirectory(package)
+if(LEON_GRAPHICS)
+  add_subdirectory(lmui)
+  add_subdirectory(app-support)
+endif()

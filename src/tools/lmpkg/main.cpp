@@ -1,5 +1,6 @@
-#include "package.hpp"
 #include <iostream>
+#include <leon/ipc.hpp>
+#include <leon/package.hpp>
 #include <unistd.h>
 static leon::Json broker(const leon::Json &message) {
     auto response = leon::Json::parse(leon::request("/run/leon/apps.sock", message));

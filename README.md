@@ -5,9 +5,12 @@ LeonMobile 1.0.0 是面向 ARM64 的 Linux 移动操作系统图形原型，首�
 这是面向开发的图形原型；版本号表示目标发行版本，不表示生产级手机系统认证。
 
 - `distro/`：Buildroot 2026.08.1 外部配置层、设备配置、软件包和根文件系统配置。
-- `src/system/`：C17 自研 PID 1、服务管理器和管理命令。
-- `src/pkg/`：原生 ELF 应用包安装器及应用启动服务。
-- `src/desktop/`、`src/lmui/`、`src/apps/`：移动桌面、C++20 UI 框架和系统应用。
+- `src/services/`：PID 1、服务管理器及应用服务；各自拥有独立入口和内部模块。
+- `src/libraries/`：LMUI、应用公共组件、IPC 客户端和包管理库。
+- `src/tools/`：`leonctl`、`lmpkg` 管理命令。
+- `src/desktop/`：独立的 Wayland 合成器和移动桌面工程。
+- `src/apps/`：八个独立工程、独立清单、独立 ELF 的内置应用。
+- `cmake/`：应用注册及构建规则。
 - `scripts/`、`tests/`、`docs/`：构建工具、验证和接口文档。
 
 仅验证系统及应用管理代码：

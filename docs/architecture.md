@@ -27,6 +27,36 @@ The `leon-ipc` client library implements the local JSON transport without linkin
 the privileged package installer, OpenSSL or libarchive into applications.
 Native build executables live in `build/host/bin/`, independent of source paths.
 
+## Source ownership
+
+| Directory | Responsibility |
+| --- | --- |
+| `src/libraries/lmui` | Public UI headers and shared LMUI runtime |
+| `src/libraries/ipc` | Unprivileged local JSON client transport |
+| `src/libraries/app-support` | Internal built-in window, input and UI helpers |
+| `src/libraries/package` | Manifest policy, durable JSON, catalog, archive verification and installation transactions |
+| `src/services/init` | Early root setup, PID 1 supervision and final shutdown |
+| `src/services/serviced` | Service configuration, dependency graph, process lifecycle, scheduling and local control |
+| `src/services/appd` | Socket server, peer-authorized broker, application process registry and preferences/audio operations |
+| `src/tools` | Service and package command-line clients |
+| `src/desktop` | Separate compositor and shell processes |
+| `src/apps/NAME` | Application entry point, view, private model/backend and manifest |
+| `distro` | Buildroot recipes, board definition, image layout and system policy |
+
+Libraries expose intentional headers under `include/`; implementation helpers
+remain private to their component. Applications depend on LMUI and the narrow
+client transport. Package policy and archive processing are owned by the tools
+and application service. Service configuration and process management do not
+depend on graphics. The service manager passes an explicit manager instance to
+its graph, process and control modules. The application broker owns separate
+process and settings objects; request dispatch does not implement child setup
+or audio subprocess handling.
+
+Each component lists its own sources and dependencies in CMake. Installed
+executable paths and the version 1 service protocols do not depend on the
+repository layout. Buildroot remains the distribution assembly layer; these
+source boundaries do not imply verified production phone support.
+
 ## Boot and storage
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
