@@ -2,6 +2,6 @@ name = "compositor"
 command = ["/usr/libexec/leon/compositor"]
 after = ["prepare", "seat"]
 uid = 1000
-gid = 44
+gid = 28
 restart = "always"
 restart_limit = 10
