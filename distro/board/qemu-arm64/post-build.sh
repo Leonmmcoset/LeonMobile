@@ -2,6 +2,8 @@
 set -euo pipefail
 target=$1
 mkdir -p "$target/data" "$target/var" "$target/run" "$target/tmp" "$target/usr/share/leon/apps"
+chmod 0755 "$target/usr/libexec/leon/"*
+chmod 0644 "$target/etc/leon/services/"*
 ln -sfn /sbin/leon-init "$target/sbin/init"
 rm -f "$target/etc/init.d/rcS" "$target/etc/inittab"
 cat > "$target/etc/os-release" <<'EOF'
