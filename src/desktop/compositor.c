@@ -1227,6 +1227,9 @@ int main(int argc, char *argv[]) {
     wl_list_remove(&server.cursor_button.link);
     wl_list_remove(&server.cursor_axis.link);
     wl_list_remove(&server.cursor_frame.link);
+    wl_list_remove(&server.touch_down.link);
+    wl_list_remove(&server.touch_motion.link);
+    wl_list_remove(&server.touch_up.link);
 
     wl_list_remove(&server.new_input.link);
     wl_list_remove(&server.request_cursor.link);

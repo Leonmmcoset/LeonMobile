@@ -244,6 +244,8 @@ def main():
                     raise RuntimeError("UI poweroff did not stop QEMU") from error
                 if proc.returncode:
                     raise RuntimeError("QEMU exited with status " + str(proc.returncode))
+                if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
+                    raise RuntimeError("Compositor did not shut down cleanly")
                 passed = True
                 print("QEMU boot, native app listing, display input and clean UI poweroff passed")
                 print("Artifacts:", artifacts)
