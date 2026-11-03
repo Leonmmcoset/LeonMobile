@@ -9,16 +9,21 @@ namespace lmui {
 inline constexpr int api_version = 1;
 struct Rect {
     double x{}, y{}, w{}, h{};
-    bool contains(double px, double py) const { return px >= x && py >= y && px < x + w && py < y + h; }
+    bool contains(double px, double py) const {
+        return px >= x && py >= y && px < x + w && py < y + h;
+    }
 };
-struct Color { double r{}, g{}, b{}, a{1}; static Color hex(unsigned value, double alpha = 1); };
+struct Color {
+    double r{}, g{}, b{}, a{1};
+    static Color hex(unsigned value, double alpha = 1);
+};
 struct Theme {
     Color background, surface, container, primary, on_primary, text, muted, outline;
     bool dark{};
     static Theme material(bool dark = false);
 };
 class Canvas {
-public:
+  public:
     Canvas(cairo_t *context, int width, int height, Theme theme);
     cairo_t *cr;
     int width, height;
@@ -27,7 +32,8 @@ public:
     void rounded(Rect rect, Color color, double radius = 24);
     void circle(double x, double y, double r, Color color);
     void line(double x1, double y1, double x2, double y2, Color color, double thickness = 2);
-    void text(const std::string &value, Rect bounds, double size = 16, Color color = {}, bool bold = false, int align = 0);
+    void text(const std::string &value, Rect bounds, double size = 16, Color color = {},
+              bool bold = false, int align = 0);
     void image(cairo_surface_t *image, Rect bounds);
     void save();
     void restore();
@@ -58,9 +64,13 @@ Widget Toggle(std::string text, bool checked, std::function<void()> action);
 Widget Slider(double value, std::function<void(double)> action);
 Widget TextField(std::string text, std::function<void()> focus);
 
-struct KeyEvent { unsigned symbol{}; std::string text; bool pressed{}; };
+struct KeyEvent {
+    unsigned symbol{};
+    std::string text;
+    bool pressed{};
+};
 class Application {
-public:
+  public:
     Application(std::string id, std::string title);
     ~Application();
     Application(const Application &) = delete;
@@ -78,8 +88,9 @@ public:
     void input_region(const std::vector<Rect> &rectangles);
     int width() const;
     int height() const;
-private:
+
+  private:
     struct Impl;
     std::unique_ptr<Impl> impl;
 };
-}
+} // namespace lmui
