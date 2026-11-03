@@ -270,12 +270,21 @@ static void server_new_keyboard(struct leon_server *server, struct wlr_input_dev
     /* We need to prepare an XKB keymap and assign it to the keyboard. This
      * assumes the defaults (e.g. layout = "us"). */
     struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!context) {
+        wlr_log(WLR_ERROR, "Cannot create XKB context; check the installed keyboard data");
+        free(keyboard);
+        return;
+    }
     struct xkb_keymap *keymap =
         xkb_keymap_new_from_names(context, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
-
-    wlr_keyboard_set_keymap(wlr_keyboard, keymap);
+    bool ready = keymap && wlr_keyboard_set_keymap(wlr_keyboard, keymap);
     xkb_keymap_unref(keymap);
     xkb_context_unref(context);
+    if (!ready) {
+        wlr_log(WLR_ERROR, "Cannot configure keyboard keymap");
+        free(keyboard);
+        return;
+    }
     wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
 
     /* Here we set up listeners for keyboard events. */
@@ -1130,6 +1139,10 @@ int main(int argc, char *argv[]) {
     static const struct wlr_keyboard_impl keyboard_impl = {.name = "leon-fallback"};
     wlr_keyboard_init(&server.fallback_keyboard, &keyboard_impl, "LeonMobile keyboard");
     struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!ctx) {
+        wlr_log(WLR_ERROR, "Cannot create XKB context; check the installed keyboard data");
+        return 1;
+    }
     struct xkb_keymap *km = xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
     if (!km || !wlr_keyboard_set_keymap(&server.fallback_keyboard, km))
         return 1;
