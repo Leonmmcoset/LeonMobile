@@ -8,9 +8,7 @@ LEONMOBILE_DEPENDENCIES = host-pkgconf host-wayland wlroots wayland wayland-prot
 LEONMOBILE_CONF_OPTS = -DBUILD_TESTING=OFF
 LEONMOBILE_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = --exclude .cache --exclude build --exclude output --exclude dist --exclude .git
 
-# Buildroot's upstream wlroots recipe enables GLES only. Keep pixman for the
-# reference software renderer and headless output for automated boot checks.
-WLROOTS_RENDERERS += pixman
-WLROOTS_BACKENDS += headless
+# wlroots 0.20 builds its pixman renderer and headless backend unconditionally;
+# the upstream recipe additionally enables the DRM/libinput and GLES paths.
 
 $(eval $(cmake-package))
