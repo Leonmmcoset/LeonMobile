@@ -36,7 +36,10 @@ class SupervisorTests(unittest.TestCase):
                         with socket.socket(socket.AF_UNIX) as client:
                             client.connect(endpoint)
                             client.sendall(b"status\n")
-                            status = client.recv(4096).decode()
+                            pieces = []
+                            while piece := client.recv(4096):
+                                pieces.append(piece)
+                            status = b"".join(pieces).decode()
                             if "child\tfailed" in status and attempts.exists() and len(attempts.read_text().splitlines()) == 2:
                                 break
                     time.sleep(.1)

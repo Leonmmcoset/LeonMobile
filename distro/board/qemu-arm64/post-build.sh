@@ -5,6 +5,8 @@ mkdir -p "$target/data" "$target/var" "$target/run" "$target/tmp" "$target/usr/s
 chmod 0755 "$target/usr/libexec/leon/"*
 chmod 0644 "$target/etc/leon/services/"*
 ln -sfn /sbin/leon-init "$target/sbin/init"
+ln -sfn /usr/sbin/leon-init "$target/sbin/leon-init"
+ln -sfn /usr/sbin/leond "$target/sbin/leond"
 rm -f "$target/etc/init.d/rcS" "$target/etc/inittab"
 cat > "$target/etc/os-release" <<'EOF'
 NAME="LeonMobile"

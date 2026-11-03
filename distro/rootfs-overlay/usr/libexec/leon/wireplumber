@@ -2,5 +2,4 @@
 set -eu
 export XDG_RUNTIME_DIR=/run/user/1000
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
-export WIREPLUMBER_CONFIG_DIR=/etc/wireplumber
 exec /usr/bin/wireplumber

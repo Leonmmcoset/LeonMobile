@@ -100,6 +100,11 @@ static void start(struct service *s) {
             }
         }
         setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1);
+        if (s->uid == 1000) {
+            setenv("HOME", "/data/home/leon", 1);
+            setenv("XDG_CONFIG_HOME", "/data/home/leon/.config", 1);
+            setenv("XDG_STATE_HOME", "/data/home/leon/.local/state", 1);
+        }
         setenv("WAYLAND_DISPLAY", "/run/leon/wayland/wayland-0", 1);
         setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket", 1);
         execv(s->argv[0], s->argv);
