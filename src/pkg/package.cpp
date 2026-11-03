@@ -270,7 +270,11 @@ void Packages::install(const fs::path &filename) {
         auto appdir = root / "apps" / id;
         fs::create_directories(appdir / "versions");
         auto dest = appdir / "versions" / ver;
-        require(!fs::exists(dest), "version directory already exists");
+        // An interrupted transaction may have published this unused version
+        // directory before switching current. Validation above guarantees that
+        // this version is newer than the active one, so it is safe to replace.
+        if (fs::exists(dest))
+            fs::remove_all(dest);
         durable_dir(stage);
         fs::rename(stage, dest);
         durable_dir(appdir / "versions");
@@ -303,7 +307,7 @@ void Packages::remove(const std::string &id, bool purge) {
 }
 std::string request(const std::string &socket_path, const Json &message) {
     Fd fd(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0));
-    timeval timeout{2, 0};
+    timeval timeout{message.value("op", "") == "install" ? 60 : 3, 0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     sockaddr_un address{};

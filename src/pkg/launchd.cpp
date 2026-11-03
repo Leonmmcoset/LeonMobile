@@ -1,6 +1,7 @@
 #include "package.hpp"
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstring>
 #include <fcntl.h>
@@ -24,6 +25,8 @@ static void fail(bool ok, const char *message) {
         throw std::runtime_error(message);
 }
 static std::map<std::string, pid_t> running;
+static std::string runtime_prefix = "/run/user";
+static std::string wayland_socket = "/run/leon/wayland/wayland-0";
 
 static void reap() {
     pid_t p;
@@ -39,6 +42,14 @@ static void reap() {
 static int run_tool(const std::vector<std::string> &args) {
     pid_t pid = fork();
     if (!pid) {
+        setsid();
+        if (setgroups(0, nullptr) || setgid(29) || setuid(1000))
+            _exit(126);
+        clearenv();
+        setenv("PATH", "/usr/bin:/bin", 1);
+        std::string runtime = runtime_prefix + "/1000";
+        setenv("XDG_RUNTIME_DIR", runtime.c_str(), 1);
+        setenv("HOME", "/data/home/leon", 1);
         std::vector<char *> av;
         for (const auto &a : args)
             av.push_back(const_cast<char *>(a.c_str()));
@@ -49,9 +60,19 @@ static int run_tool(const std::vector<std::string> &args) {
     if (pid < 0)
         return -1;
     int status = 0;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (std::chrono::steady_clock::now() < deadline) {
+        pid_t result = waitpid(pid, &status, WNOHANG);
+        if (result == pid)
+            return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        if (result < 0 && errno != EINTR)
+            return -1;
+        usleep(10000);
+    }
+    kill(-pid, SIGKILL);
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
     }
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    return -1;
 }
 static pid_t launch(leon::Packages &packages, const std::string &id) {
     reap();
@@ -63,7 +84,7 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
     fs::create_directories(home);
     fail(!chown(home.c_str(), uid, uid) && !chmod(home.c_str(), 0700),
          "cannot create application home");
-    std::string runtime = "/run/user/" + std::to_string(uid);
+    std::string runtime = runtime_prefix + "/" + std::to_string(uid);
     fs::create_directories(runtime);
     fail(!chown(runtime.c_str(), uid, uid) && !chmod(runtime.c_str(), 0700),
          "cannot create runtime directory");
@@ -72,12 +93,17 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
     for (const auto &a : m.value("args", Json::array()))
         args.push_back(a.get<std::string>());
     /* Pin both executable and working directory to the selected version. */
-    auto work = m.value("builtin", false) ? fs::path("/usr/share/leon") : exe.parent_path();
+    auto work = m.value("builtin", false) ? packages.builtin.parent_path() : exe.parent_path();
     pid_t pid = fork();
     fail(pid >= 0, "cannot fork application");
     if (!pid) {
         setsid();
         umask(077);
+        int input = open("/dev/null", O_RDONLY | O_CLOEXEC);
+        if (input >= 0) {
+            dup2(input, STDIN_FILENO);
+            close(input);
+        }
         int log = open((home / "application.log").c_str(),
                        O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0600);
         if (log >= 0) {
@@ -95,7 +121,7 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
         setenv("XDG_DATA_HOME", home.c_str(), 1);
         setenv("XDG_CONFIG_HOME", home.c_str(), 1);
         setenv("XDG_RUNTIME_DIR", runtime.c_str(), 1);
-        setenv("WAYLAND_DISPLAY", "/run/leon/wayland/wayland-0", 1);
+        setenv("WAYLAND_DISPLAY", wayland_socket.c_str(), 1);
         setenv("LANG", "C.UTF-8", 1);
         setenv("TERM", "xterm-256color", 1);
         setenv("LEON_APP_ID", id.c_str(), 1);
@@ -109,7 +135,7 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
     running[id] = pid;
     return pid;
 }
-int main() {
+int main(int argc, char **argv) {
     if (geteuid()) {
         std::cerr << "leon-launchd requires root\n";
         return 1;
@@ -118,10 +144,38 @@ int main() {
     signal(SIGINT, on_signal);
     signal(SIGPIPE, SIG_IGN);
     prctl(PR_SET_CHILD_SUBREAPER, 1);
-    const char *socket_path = "/run/leon/apps.sock";
+    leon::Packages packages;
+    std::string socket_name = "/run/leon/apps.sock";
+    bool development = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string option = argv[i];
+        if (i + 1 == argc) {
+            std::cerr << "Missing option value\n";
+            return 2;
+        }
+        std::string value = argv[++i];
+        if (option == "--root") {
+            packages.root = value;
+            development = true;
+        } else if (option == "--builtin")
+            packages.builtin = value;
+        else if (option == "--socket")
+            socket_name = value;
+        else if (option == "--runtime-dir")
+            runtime_prefix = value;
+        else if (option == "--wayland")
+            wayland_socket = value;
+        else {
+            std::cerr << "Unknown option: " << option << '\n';
+            return 2;
+        }
+    }
+    const char *socket_path = socket_name.c_str();
     int server = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     sockaddr_un address{};
     address.sun_family = AF_UNIX;
+    if (socket_name.size() >= sizeof(address.sun_path))
+        return 2;
     strcpy(address.sun_path, socket_path);
     unlink(socket_path);
     mode_t old = umask(0);
@@ -132,7 +186,6 @@ int main() {
     }
     chmod(socket_path, 0666);
     umask(old);
-    leon::Packages packages;
     Json defaults{
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
     auto prefs = packages.root / "settings.json";
@@ -203,10 +256,8 @@ int main() {
                 fail(valid, "invalid setting");
                 if (key == "volume") {
                     int percent = value;
-                    fail(run_tool({"/usr/bin/setpriv", "--reuid=1000", "--regid=1000",
-                                   "--clear-groups", "/usr/bin/env",
-                                   "XDG_RUNTIME_DIR=/run/user/1000", "/usr/bin/wpctl", "set-volume",
-                                   "@DEFAULT_AUDIO_SINK@", std::to_string(percent) + "%"}) == 0,
+                    fail(run_tool({"/usr/bin/wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@",
+                                   std::to_string(percent) + "%"}) == 0,
                          "audio sink unavailable");
                 }
                 auto state = leon::read_json(prefs);
@@ -215,6 +266,7 @@ int main() {
                 response = {{"settings", state}};
             } else if (op == "poweroff" || op == "reboot") {
                 fail(shell, "permission denied");
+                fail(!development, "power operations disabled for development roots");
                 kill(1, op == "reboot" ? SIGUSR2 : SIGUSR1);
             } else if (op == "notifications") {
                 fail(shell, "permission denied");

@@ -71,6 +71,13 @@ int main(int argc, char **argv) {
             for (;;)
                 pause();
         }
+        if (mount("/proc", "/newroot/proc", NULL, MS_MOVE, NULL) ||
+            mount("/sys", "/newroot/sys", NULL, MS_MOVE, NULL) ||
+            mount("/dev", "/newroot/dev", NULL, MS_MOVE, NULL)) {
+            perror("move early mounts");
+            for (;;)
+                pause();
+        }
         execl("/bin/busybox", "busybox", "switch_root", "/newroot", "/sbin/leon-init",
               (char *)NULL);
         perror("switch_root");
