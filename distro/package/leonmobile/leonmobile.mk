@@ -12,3 +12,7 @@ LEONMOBILE_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = --exclude .cache --exclude build -
 # the upstream recipe additionally enables the DRM/libinput and GLES paths.
 
 $(eval $(cmake-package))
+
+# Buildroot's local-source legal archive uses a separate rsync invocation.
+# Apply the same exclusions there: the build output lives inside our source tree.
+leonmobile-legal-info: RSYNC_VCS_EXCLUSIONS += $(LEONMOBILE_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS)

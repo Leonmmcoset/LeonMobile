@@ -1,0 +1,3 @@
+# License files shipped with the local userspace source.
+sha256  cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30  LICENSE
+sha256  9ae58252b35106323701066c033a6b86023f59732a9c52a2d882a0777ffe55a5  third_party/tinywl-LICENSE
