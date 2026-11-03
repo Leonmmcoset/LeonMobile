@@ -175,10 +175,13 @@ static cairo_surface_t *load_image(const std::string &path) {
     jpeg_decompress_struct d{};
     JpegError err{};
     d.err = jpeg_std_error(&err.base);
+    cairo_surface_t *volatile image = nullptr;
     err.base.error_exit = [](j_common_ptr ptr) {
         longjmp(reinterpret_cast<JpegError *>(ptr->err)->jump, 1);
     };
     if (setjmp(err.jump)) {
+        if (image)
+            cairo_surface_destroy(image);
         jpeg_destroy_decompress(&d);
         fclose(f);
         return nullptr;
@@ -195,19 +198,23 @@ static cairo_surface_t *load_image(const std::string &path) {
     jpeg_start_decompress(&d);
     auto *s =
         cairo_image_surface_create(CAIRO_FORMAT_RGB24, int(d.output_width), int(d.output_height));
+    image = s;
     if (cairo_surface_status(s)) {
         cairo_surface_destroy(s);
         jpeg_destroy_decompress(&d);
         fclose(f);
         return nullptr;
     }
-    std::vector<unsigned char> row(d.output_width * 3);
+    // libjpeg owns the row allocation, so its longjmp error path cannot skip
+    // a C++ destructor or leak the partially decoded surface.
+    JSAMPARRAY rows = (*d.mem->alloc_sarray)(reinterpret_cast<j_common_ptr>(&d), JPOOL_IMAGE,
+                                             d.output_width * 3, 1);
     auto *data = cairo_image_surface_get_data(s);
     int stride = cairo_image_surface_get_stride(s);
     while (d.output_scanline < d.output_height) {
         auto y = d.output_scanline;
-        JSAMPROW p = row.data();
-        jpeg_read_scanlines(&d, &p, 1);
+        jpeg_read_scanlines(&d, rows, 1);
+        auto *row = rows[0];
         auto *dst = reinterpret_cast<uint32_t *>(data + y * stride);
         for (unsigned x = 0; x < d.output_width; ++x)
             dst[x] =
