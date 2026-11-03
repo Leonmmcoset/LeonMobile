@@ -10,7 +10,7 @@ Json read_json(const fs::path &path);
 void atomic_json(const fs::path &path, const Json &data);
 void validate_manifest(const Json &m, bool builtin = false);
 class Packages {
-public:
+  public:
     explicit Packages(fs::path root = "/data/leon", fs::path builtin = "/usr/share/leon/apps");
     Json list() const;
     Json lookup(const std::string &id) const;
@@ -21,4 +21,4 @@ public:
     fs::path builtin;
 };
 std::string request(const std::string &socket, const Json &message);
-}
+} // namespace leon
