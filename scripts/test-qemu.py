@@ -94,6 +94,13 @@ class QMP:
         self.command("input-send-event", {"events": [
             {"type": "btn", "data": {"down": False, "button": "left"}}]})
 
+    def key(self, code):
+        for down in (True, False):
+            self.command("input-send-event", {"events": [
+                {"type": "key", "data": {"down": down,
+                 "key": {"type": "qcode", "data": code}}}]})
+            time.sleep(.05)
+
     def capture(self, path):
         self.command("screendump", {"filename": str(path)})
         with path.open("rb") as stream:
@@ -211,23 +218,90 @@ def main():
                 # take several seconds under software CPU emulation.
                 for attempt in range(30):
                     frame = qmp.capture(artifacts / "settings-light.ppm")
-                    point = (242 * 480 + 440) * 3
-                    if frame[point:point + 3] == bytes.fromhex("d5cadd"):
+                    point = (206 * 480 + 440) * 3
+                    row = (380 * 480 + 430) * 3
+                    if (frame[point:point + 3] == bytes.fromhex("eaddff") and
+                            frame[row:row + 3] == bytes.fromhex("fffbff")):
                         break
                     time.sleep(.25)
                 else:
                     raise RuntimeError("Settings did not render its interactive controls")
-                qmp.click(400, 242)
+                # Settings now has a category home, separate detail pages and
+                # a real search field. Exercise the same public UI as a user.
+                qmp.click(180, 380)  # Display
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-display-light.ppm")
+                qmp.click(400, 257)  # Dark theme switch
                 time.sleep(1)
-                qmp.capture(artifacts / "settings-dark.ppm")
+                qmp.capture(artifacts / "settings-display-dark.ppm")
                 preferences = json.loads(guest.run("cat /data/leon/settings.json"))
                 if preferences.get("dark") is not True:
                     raise RuntimeError("Settings UI did not persist the dark theme")
-                qmp.click(133, 480)
+                qmp.click(36, 75)  # Back to categories
+                time.sleep(.4)
+                qmp.capture(artifacts / "settings-dark.ppm")
+                qmp.click(180, 206)  # Search settings
+                for code in "volume":
+                    qmp.key(code)
                 time.sleep(.5)
+                qmp.capture(artifacts / "settings-search.ppm")
+                qmp.click(180, 296)  # Matching Sound result
+                time.sleep(.5)
+                qmp.click(146, 346)  # 25% of the playback slider
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-sound.ppm")
                 preferences = json.loads(guest.run("cat /data/leon/settings.json"))
                 if preferences.get("volume") != 25:
                     raise RuntimeError("Settings UI did not apply the playback volume")
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(436, 206)  # Clear search, restore all categories
+                time.sleep(.3)
+                qmp.click(180, 296)  # Network & internet
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-network.ppm")
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(180, 548)  # Storage
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-storage.ppm")
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(180, 632)  # System
+                time.sleep(.3)
+                qmp.capture(artifacts / "settings-system.ppm")
+                qmp.click(180, 244)  # Languages
+                time.sleep(.3)
+                qmp.click(180, 328)  # English
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-english.ppm")
+                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                if preferences.get("language") != "en":
+                    raise RuntimeError("Language selection did not persist")
+                qmp.click(180, 244)  # Restore simplified Chinese
+                time.sleep(.3)
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(180, 328)  # System navigation
+                time.sleep(.3)
+                qmp.click(350, 320)  # 3-button navigation
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-navigation-buttons.ppm")
+                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                if preferences.get("navigation") != "buttons":
+                    raise RuntimeError("Navigation selection did not persist")
+                qmp.click(120, 320)  # Restore gestures
+                time.sleep(.3)
+                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                if preferences.get("navigation") != "gestures" or preferences.get("language") != "zh-CN":
+                    raise RuntimeError("Settings UI could not restore language/navigation")
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(36, 75)
+                time.sleep(.3)
+                qmp.click(180, 716)  # About device
+                time.sleep(.5)
+                qmp.capture(artifacts / "settings-about.ppm")
                 network = guest.run("ip -4 addr show dev eth0; ip route show default; cat /etc/resolv.conf")
                 if "10.0.2.15" not in network or "default via 10.0.2.2" not in network or "nameserver 10.0.2.3" not in network:
                     raise RuntimeError("QEMU DHCP, routing or DNS configuration failed")
@@ -281,7 +355,7 @@ def main():
                 if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
                     raise RuntimeError("Compositor did not shut down cleanly")
                 passed = True
-                print("QEMU boot, native app listing, display input and clean UI poweroff passed")
+                print("QEMU boot, native apps, settings categories/search/preferences and clean UI poweroff passed")
                 print("Artifacts:", artifacts)
             finally:
                 if proc.poll() is None:

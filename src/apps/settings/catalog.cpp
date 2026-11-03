@@ -1,0 +1,43 @@
+#include "catalog.hpp"
+#include <algorithm>
+#include <cctype>
+#include <stdexcept>
+#include <string>
+
+namespace leon::apps::settings {
+const std::array<Entry, 8> &entries() {
+    static const std::array<Entry, 8> catalog{{
+        {Page::network, Icon::network, "网络与互联网", "Network & internet",
+         "网络 互联网 以太网 IP ethernet connection", true},
+        {Page::display, Icon::display, "显示", "Display", "显示 主题 深色 浅色 dark light theme",
+         true},
+        {Page::sound, Icon::sound, "声音", "Sound", "声音 音量 播放 volume audio playback", true},
+        {Page::storage, Icon::storage, "存储", "Storage", "存储 空间 数据 磁盘 space disk data",
+         true},
+        {Page::system, Icon::system, "系统", "System", "系统 语言 导航 language navigation", true},
+        {Page::about, Icon::about, "关于设备", "About device", "关于 设备 版本 内核 version kernel",
+         true},
+        {Page::language, Icon::language, "语言", "Languages", "语言 中文 英文 简体 English Chinese",
+         false},
+        {Page::navigation, Icon::navigation, "系统导航", "System navigation",
+         "导航 手势 三键 按钮 gestures buttons", false},
+    }};
+    return catalog;
+}
+const Entry &entry(Page page) {
+    for (const auto &item : entries())
+        if (item.page == page)
+            return item;
+    throw std::logic_error("unknown settings page");
+}
+bool matches(const Entry &item, std::string_view query) {
+    auto fold = [](std::string text) {
+        std::transform(text.begin(), text.end(), text.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return text;
+    };
+    auto haystack = std::string(item.chinese) + " " + std::string(item.english) + " " +
+                    std::string(item.keywords);
+    return fold(haystack).find(fold(std::string(query))) != std::string::npos;
+}
+} // namespace leon::apps::settings

@@ -65,12 +65,17 @@ void ApplicationWindow::edit(std::string &target, const std::string &text) {
     else if (target.size() + text.size() <= 1024 * 1024)
         target += text;
 }
+void ApplicationWindow::paint_header(Canvas &c) {
+    auto t = c.theme;
+    double w = c.width;
+    c.text(tr(en, chinese_, english_), {24, 12, w - 100, 58}, 30, t.text, true);
+    button(c, hits, {w - 64, 22, 40, 40}, "×", [this] { app.quit(); });
+}
 void ApplicationWindow::paint(Canvas &c) {
     hits.clear();
     auto t = c.theme;
     double w = c.width, h = c.height;
-    c.text(tr(en, chinese_, english_), {24, 12, w - 100, 58}, 30, t.text, true);
-    button(c, hits, {w - 64, 22, 40, 40}, "×", [this] { app.quit(); });
+    paint_header(c);
     double bottom = keyboard ? h - 250 : h - 16;
     paint_content(c, bottom);
     if (!error.empty()) {

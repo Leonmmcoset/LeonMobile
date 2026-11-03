@@ -16,6 +16,7 @@ class ApplicationWindow {
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
     bool en{}, keyboard{}, theme_override{};
     double scroll{};
+    virtual void paint_header(Canvas &canvas);
     virtual void paint_content(Canvas &canvas, double bottom) = 0;
     virtual void text_input(const std::string &) {}
     virtual bool key_event(const KeyEvent &) { return false; }

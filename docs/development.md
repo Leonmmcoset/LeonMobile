@@ -70,6 +70,13 @@ built-ins need it. Public UI functionality belongs in LMUI. Ordinary clients
 use the IPC transport, while privileged installation and identity policy stay
 in `src/libraries/package` and `src/services/appd`.
 
+The settings app keeps its page/search catalog, navigation state, preference
+views, device views and read-only device queries in separate private modules.
+Its Android-style home links to actual supported settings; network and storage
+pages report kernel interface data and `statvfs` usage without adding device
+control APIs. Built-ins may override the internal window header while retaining
+the shared input, preference polling, keyboard and error handling.
+
 Run `make test` and the independent Weston check after client changes. Runtime
 or image integration changes also require the QEMU test. Native integration
 checks stage runtime and development payloads in a temporary directory and
