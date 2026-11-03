@@ -375,13 +375,27 @@ def main():
                     if any(app["id"] == "org.example.hello" for app in json.loads(guest.run("lmpkg list"))):
                         raise RuntimeError("SDK package removal failed")
                 qmp.click(80, 940)  # Recent tasks
-                time.sleep(.6)
-                qmp.capture(artifacts / "tasks-before-dismiss.ppm")
+                container = bytes.fromhex("30293c" if preferences.get("dark") else "eaddff")
+                for attempt in range(40):
+                    before_tasks = qmp.capture(artifacts / "tasks-before-dismiss.ppm")
+                    point = (180 * 480 + 30) * 3
+                    if before_tasks[point:point + 3] == container:
+                        break
+                    time.sleep(.1)
+                else:
+                    raise RuntimeError("Recent tasks did not finish its entrance")
                 qmp.click(432, 190)  # Dismiss calculator, allow remaining rows to settle
                 time.sleep(.12)
                 qmp.capture(artifacts / "tasks-dismissing.ppm")
-                time.sleep(.5)
-                qmp.capture(artifacts / "tasks-after-dismiss.ppm")
+                # Wait for observed final geometry under software emulation.
+                for attempt in range(40):
+                    after_tasks = qmp.capture(artifacts / "tasks-after-dismiss.ppm")
+                    point = (180 * 480 + 30) * 3
+                    if after_tasks[point:point + 3] == container:
+                        break
+                    time.sleep(.1)
+                else:
+                    raise RuntimeError("Recent task rows did not settle into the dismissed row")
                 if "org.leon.calculator" in json.loads(guest.run("lmpkg running")):
                     raise RuntimeError("Recent tasks dismissal did not stop the selected app")
                 qmp.click(400, 22)
