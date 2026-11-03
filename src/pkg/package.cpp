@@ -196,7 +196,9 @@ void Packages::install(const fs::path &filename) {
         std::set<std::string> files;
         size_t bytes = 0;
         int rc;
+        unsigned entries = 0;
         while ((rc = archive_read_next_header(reader, &entry)) == ARCHIVE_OK) {
+            require(++entries <= 8192, "excessive archive entries");
             std::string name = archive_entry_pathname(entry);
             require(safe_path(name), "unsafe archive path");
             require(!archive_entry_symlink(entry) && !archive_entry_hardlink(entry),

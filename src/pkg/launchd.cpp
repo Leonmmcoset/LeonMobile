@@ -40,10 +40,13 @@ static void reap() {
     }
 }
 static int run_tool(const std::vector<std::string> &args) {
+    pid_t parent = getpid();
     pid_t pid = fork();
     if (!pid) {
         setsid();
         if (setgroups(0, nullptr) || setgid(29) || setuid(1000))
+            _exit(126);
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) || getppid() != parent)
             _exit(126);
         clearenv();
         setenv("PATH", "/usr/bin:/bin", 1);
@@ -94,6 +97,7 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
         args.push_back(a.get<std::string>());
     /* Pin both executable and working directory to the selected version. */
     auto work = m.value("builtin", false) ? packages.builtin.parent_path() : exe.parent_path();
+    pid_t parent = getpid();
     pid_t pid = fork();
     fail(pid >= 0, "cannot fork application");
     if (!pid) {
@@ -113,6 +117,8 @@ static pid_t launch(leon::Packages &packages, const std::string &id) {
             close(log);
         }
         if (setgroups(0, nullptr) || setgid(uid) || setuid(uid) || chdir(work.c_str()))
+            _exit(126);
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) || getppid() != parent)
             _exit(126);
         prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
         clearenv();

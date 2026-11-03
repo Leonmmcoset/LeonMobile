@@ -79,6 +79,7 @@ static int dependencies_ready(struct service *s) {
 static void start(struct service *s) {
     if (s->pid || !s->wanted || now_ms() < s->next_ms || !dependencies_ready(s))
         return;
+    pid_t parent = getpid();
     pid_t pid = fork();
     if (!pid) {
         setsid();
@@ -100,6 +101,8 @@ static void start(struct service *s) {
                 _exit(126);
             }
         }
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) || getppid() != parent)
+            _exit(126);
         setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1);
         if (s->uid == 1000) {
             setenv("HOME", "/data/home/leon", 1);

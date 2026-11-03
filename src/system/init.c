@@ -121,6 +121,9 @@ int main(int argc, char **argv) {
             manager = fork();
             if (!manager)
                 boot_child("/sbin/leond");
+        } else if (pid > 0) {
+            // Reap and terminate an orphaned service's remaining process group.
+            kill(-pid, SIGKILL);
         } else if (pid < 0 && errno != EINTR)
             pause();
     }
