@@ -49,6 +49,13 @@ bool TouchInput::handle(const PointerEvent &e, const std::vector<TouchTarget> &t
     released_ = motion_time();
     // Copy before invocation: an action may cancel this capture or rebuild its tree.
     auto target = target_;
+    if (target.continuous && !cancelled_) {
+        if (target.position_action)
+            target.position_action(e.x, e.y);
+        if (target.action)
+            target.action();
+        return true;
+    }
     if (!cancelled_ && target.rect.contains(e.x, e.y)) {
         if (target.position_action)
             target.position_action(e.x, e.y);

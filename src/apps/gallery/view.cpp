@@ -30,6 +30,7 @@ void GalleryApplication::paint_content(Canvas &c, double) {
                     },
                     false)});
     tree.layout({24, 142, w - 48, 340});
+    tree.children[3].interacting = touch_.continuous();
     tree.draw(c);
     for (const auto &child : tree.children) {
         auto a = child.activate;
@@ -41,6 +42,8 @@ void GalleryApplication::paint_content(Canvas &c, double) {
             if (change)
                 change(std::clamp((x - r.x) / r.w, 0.0, 1.0));
         });
+        hits.back().continuous = bool(change);
+        hits.back().prominent = child.kind == Kind::button && child.filled;
     }
     c.rounded({24, 520, w - 48, 90}, t.container, 28);
     c.text("Material You · LMUI 1", {40, 536, w - 80, 56}, 22, t.primary, true, 1);

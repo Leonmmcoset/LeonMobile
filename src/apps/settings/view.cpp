@@ -44,6 +44,8 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
         end = 500;
     else if (page_ == Page::system || page_ == Page::language)
         end = 340;
+    else if (page_ == Page::display)
+        end = 744;
     scroll = std::clamp(scroll, 0.0, std::max(0.0, end - bottom + 16));
     viewport_ = {0, top, double(c.width), std::max(0.0, bottom - top)};
     c.save();

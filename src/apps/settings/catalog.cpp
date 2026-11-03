@@ -9,8 +9,8 @@ const std::array<Entry, 8> &entries() {
     static const std::array<Entry, 8> catalog{{
         {Page::network, Icon::network, "网络与互联网", "Network & internet",
          "网络 互联网 以太网 IP ethernet connection", true},
-        {Page::display, Icon::display, "显示", "Display", "显示 主题 深色 浅色 dark light theme",
-         true},
+        {Page::display, Icon::display, "显示", "Display",
+         "显示 主题 深色 浅色 动画 动态 dark light theme animation motion", true},
         {Page::sound, Icon::sound, "声音", "Sound", "声音 音量 播放 volume audio playback", true},
         {Page::storage, Icon::storage, "存储", "Storage", "存储 空间 数据 磁盘 space disk data",
          true},

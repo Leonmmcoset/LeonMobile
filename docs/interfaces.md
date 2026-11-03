@@ -38,7 +38,7 @@ autostart = true
 | `notifications` | none | root/desktop |
 | `poweroff`, `reboot` | none | root/desktop |
 
-Settings are `dark` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, simplified Chinese, gestures and a preferred volume of 70. The stored volume represents the user's last requested volume.
+Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
 
 The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `shell` or `focus APP_ID`. The compositor also checks peer UID. Ordinary application users cannot invoke these operations. Normal Wayland clients receive assigned mobile window bounds, rather than implementing arbitrary interactive move/resize.
 

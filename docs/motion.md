@@ -66,6 +66,8 @@ and callbacks, so rebuilding a tree cannot invalidate a held contact. Buttons
 activate on release inside their target; moving more than 12 logical pixels,
 leaving the target, or cancellation prevents activation. A continuous position
 control receives down/move/up updates and can clamp coordinates to its range.
+Its optional action runs after the final position update, including release
+outside the track, so expensive changes can be committed once per drag.
 `handle(event, widget)` also supports a retained Widget tree and its sliders.
 
 ```cpp
@@ -93,6 +95,14 @@ settings change. Held controls still display a static state layer; there is
 no expanding ripple, spatial movement or delayed release fade. Debug
 `LMUI_CAPTURE_FRAME` / `LMUI_QUIT_AFTER_FRAME` render settled state for stable
 screenshots. These environment options do not add manifest permissions.
+
+Built-in applications read the persisted boolean `reduce_motion` preference.
+Settings exposes it under Display → Reduce motion. All eight built-ins share
+release activation and ripples; keyboard expansion, content resizing, error
+messages, settings selections and folder/page navigation use the same motion
+policy. Settings and file lists track touch drags immediately, then apply a
+short bounded scroll settle. The volume slider previews locally while held
+and sends one audio request on release rather than blocking each motion event.
 
 `lmui-motion-and-touch` covers bounded curves, interruption, stale-key removal,
 release/cancel/drag behavior and rendered transition continuity. The independent

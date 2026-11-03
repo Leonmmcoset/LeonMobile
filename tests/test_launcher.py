@@ -47,6 +47,9 @@ class LauncherTests(unittest.TestCase):
             m = builtin / "gallery.json"
             m.write_text(json.dumps(manifest))
             m.chmod(0o644)
+            # Existing stores predate the optional motion preference.
+            (root / "settings.json").write_text(json.dumps(dict(
+                dark=False, language="zh-CN", navigation="gestures", volume=70)))
             endpoint = str(path / "apps.sock")
             proc = subprocess.Popen([BIN / "bin/leon-launchd", "--root", root,
                                      "--builtin", builtin, "--socket", endpoint,
@@ -67,6 +70,12 @@ class LauncherTests(unittest.TestCase):
                 deadline = time.monotonic() + 5
                 while not Path(endpoint).exists() and time.monotonic() < deadline:
                     time.sleep(.02)
+                self.assertIs(rpc({"op": "settings"})["settings"]["reduce_motion"], False)
+                self.assertTrue(rpc({"op": "set", "key": "reduce_motion", "value": True})["ok"])
+                self.assertIs(json.loads((root / "settings.json").read_text())["reduce_motion"], True)
+                for invalid in (1, "true", None):
+                    self.assertFalse(rpc({"op": "set", "key": "reduce_motion", "value": invalid})["ok"])
+                self.assertTrue(rpc({"op": "set", "key": "reduce_motion", "value": False})["ok"])
                 self.assertTrue(rpc({"op": "launch", "id": "org.leon.gallery"})["ok"])
                 result = root / "data/org.leon.gallery/result"
                 while not result.exists() and time.monotonic() < deadline:

@@ -11,11 +11,7 @@ namespace mobile {
 namespace fs = std::filesystem;
 using namespace lmui;
 using leon::Json;
-struct Hit {
-    Rect rect;
-    std::function<void()> action;
-    std::function<void(double, double)> position_action;
-};
+using Hit = lmui::TouchTarget;
 inline Json rpc(const Json &message) {
     auto response = Json::parse(leon::request("/run/leon/apps.sock", message));
     if (!response.value("ok", false))
@@ -36,6 +32,27 @@ inline void button(Canvas &c, std::vector<Hit> &hits, Rect r, const std::string 
     c.rounded(r, filled ? c.theme.primary : c.theme.container, 24);
     c.text(text, r, 16, filled ? c.theme.on_primary : c.theme.primary, true, 1);
     click(hits, r, std::move(action));
+    hits.back().prominent = filled;
+}
+inline void translate_hits(std::vector<Hit> &hits, size_t first, double dx, double dy, Rect clip) {
+    for (size_t i = first; i < hits.size(); ++i) {
+        auto &r = hits[i].rect;
+        r.x += dx;
+        r.y += dy;
+        double right = std::min(r.x + r.w, clip.x + clip.w);
+        double bottom = std::min(r.y + r.h, clip.y + clip.h);
+        r.x = std::max(r.x, clip.x);
+        r.y = std::max(r.y, clip.y);
+        r.w = std::max(0.0, right - r.x);
+        r.h = std::max(0.0, bottom - r.y);
+        // Position callbacks consume content coordinates, even during movement.
+        if (hits[i].position_action && (dx != 0 || dy != 0)) {
+            auto action = hits[i].position_action;
+            hits[i].position_action = [action, dx, dy](double x, double y) {
+                action(x - dx, y - dy);
+            };
+        }
+    }
 }
 inline void activate(std::vector<Hit> hits, double x, double y) {
     for (auto i = hits.rbegin(); i != hits.rend(); ++i)

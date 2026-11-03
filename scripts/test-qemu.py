@@ -237,6 +237,17 @@ def main():
                 preferences = json.loads(guest.run("cat /data/leon/settings.json"))
                 if preferences.get("dark") is not True:
                     raise RuntimeError("Settings UI did not persist the dark theme")
+                qmp.click(400, 720)  # Display -> Reduce motion
+                time.sleep(.4)
+                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                if preferences.get("reduce_motion") is not True:
+                    raise RuntimeError("Reduce motion preference did not persist")
+                qmp.capture(artifacts / "settings-reduced-motion.ppm")
+                qmp.click(400, 720)  # Restore full motion
+                time.sleep(.4)
+                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                if preferences.get("reduce_motion") is not False:
+                    raise RuntimeError("Full motion preference could not be restored")
                 qmp.click(36, 75)  # Back to categories
                 time.sleep(.4)
                 qmp.capture(artifacts / "settings-dark.ppm")
@@ -345,10 +356,12 @@ def main():
                         raise RuntimeError("SDK package removal failed")
                 qmp.click(400, 22)
                 time.sleep(.5)
+                qmp.capture(artifacts / "quick-poweroff.ppm")
                 qmp.click(240, 526)
                 try:
                     proc.wait(timeout=20)
                 except subprocess.TimeoutExpired as error:
+                    qmp.capture(artifacts / "poweroff-wait.ppm")
                     raise RuntimeError("UI poweroff did not stop QEMU") from error
                 if proc.returncode:
                     raise RuntimeError("QEMU exited with status " + str(proc.returncode))

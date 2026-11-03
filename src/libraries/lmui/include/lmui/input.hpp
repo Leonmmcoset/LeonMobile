@@ -26,6 +26,7 @@ class TouchInput {
     void cancel();
     void draw(Canvas &canvas) const;
     bool pressed() const { return held_; }
+    bool continuous() const { return held_ && target_.continuous; }
 
   private:
     TouchTarget target_;

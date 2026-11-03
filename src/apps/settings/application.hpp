@@ -14,10 +14,12 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     std::string query_;
     mobile::Rect viewport_;
     unsigned status_ticks_{};
+    int volume_preview_{-1};
     void paint_header(mobile::Canvas &canvas) override;
     void paint_content(mobile::Canvas &canvas, double bottom) override;
     void text_input(const std::string &text) override;
     bool key_event(const mobile::KeyEvent &event) override;
+    bool can_scroll(double x, double y) const override { return viewport_.contains(x, y); }
     void on_tick() override;
     void open(settings::Page page);
     void back();

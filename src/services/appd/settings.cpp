@@ -48,16 +48,24 @@ static int run_tool(const std::vector<std::string> &args, const std::string &run
 }
 Settings::Settings(const Options &options)
     : path_(options.root / "settings.json"), runtime_prefix_(options.runtime_prefix) {
-    Json defaults{
-        {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
+    Json defaults{{"dark", false},
+                  {"language", "zh-CN"},
+                  {"navigation", "gestures"},
+                  {"volume", 70},
+                  {"reduce_motion", false}};
     if (!fs::exists(path_))
         atomic_json(path_, defaults);
 }
-Json Settings::read() const { return read_json(path_); }
+Json Settings::read() const {
+    auto state = read_json(path_);
+    if (!state.contains("reduce_motion"))
+        state["reduce_motion"] = false;
+    return state;
+}
 Json Settings::set(const Json &request) {
     auto value = request.at("value");
     std::string key = request.at("key");
-    bool valid = (key == "dark" && value.is_boolean()) ||
+    bool valid = ((key == "dark" || key == "reduce_motion") && value.is_boolean()) ||
                  (key == "language" && (value == "zh-CN" || value == "en")) ||
                  (key == "navigation" && (value == "gestures" || value == "buttons")) ||
                  (key == "volume" && value.is_number_integer() && value.get<int>() >= 0 &&
@@ -70,7 +78,7 @@ Json Settings::set(const Json &request) {
                       runtime_prefix_) == 0,
              "audio sink unavailable");
     }
-    auto state = leon::read_json(path_);
+    auto state = read();
     state[key] = value;
     leon::atomic_json(path_, state);
     return state;

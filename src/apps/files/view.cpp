@@ -11,6 +11,7 @@ void FilesApplication::paint_content(Canvas &c, double bottom) {
     double w = c.width;
     c.text(directory.path.string(), {24, 78, w - 48, 40}, 13, t.muted);
     button(c, hits, {20, 126, 72, 44}, "↑", [&] {
+        transition_content(-32);
         directory.path = directory.path.parent_path();
         scroll = 0;
     });
@@ -20,6 +21,7 @@ void FilesApplication::paint_content(Canvas &c, double bottom) {
     button(c, hits, {28 + (w - 48) / 2, 180, (w - 48) / 2, 44}, tr(en, "新建目录", "New folder"),
            [&] { perform([&] { directory.create(file_input, true); }); });
     auto entries = directory.entries();
+    scroll = std::clamp(scroll, 0.0, std::max(0.0, 242 + entries.size() * 60.0 - bottom));
     std::error_code ec;
     double y = 242 - scroll;
     for (auto &entry : entries) {
@@ -29,6 +31,7 @@ void FilesApplication::paint_content(Canvas &c, double bottom) {
             button(c, hits, {20, y, w - 94, 48}, (dir ? "▣  " : "·  ") + p.filename().string(),
                    [&, p, dir] {
                        if (dir) {
+                           transition_content();
                            directory.path = p;
                            scroll = 0;
                        } else {

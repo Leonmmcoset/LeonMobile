@@ -78,16 +78,18 @@ void chevron(Canvas &c, double x, double y) {
     c.line(x - 3, y - 5, x + 2, y, c.theme.muted, 1.8);
     c.line(x + 2, y, x - 3, y + 5, c.theme.muted, 1.8);
 }
-void radio(Canvas &c, double x, double y, bool selected) {
-    c.circle(x, y, 10, selected ? c.theme.primary : c.theme.muted);
+void radio(Canvas &c, double x, double y, bool selected, const std::string &key) {
+    double state = c.animate(key, selected ? 1 : 0, motion::settle);
+    c.circle(x, y, 10, mix(c.theme.muted, c.theme.primary, state));
     c.circle(x, y, 8, c.theme.surface);
-    if (selected)
-        c.circle(x, y, 5, c.theme.primary);
+    if (state > 0)
+        c.circle(x, y, 5 * state, c.theme.primary);
 }
-void toggle(Canvas &c, Rect r, bool selected) {
-    c.rounded(r, selected ? c.theme.primary : c.theme.outline, r.h / 2);
-    c.circle(selected ? r.x + r.w - r.h / 2 : r.x + r.h / 2, r.y + r.h / 2, r.h / 2 - 4,
-             selected ? c.theme.on_primary : c.theme.surface);
+void toggle(Canvas &c, Rect r, bool selected, const std::string &key) {
+    double state = c.animate(key, selected ? 1 : 0, motion::settle);
+    c.rounded(r, mix(c.theme.outline, c.theme.primary, state), r.h / 2);
+    c.circle(r.x + r.h / 2 + (r.w - r.h) * state, r.y + r.h / 2, r.h / 2 - 5 + state,
+             mix(c.theme.surface, c.theme.on_primary, state));
 }
 void information(Canvas &c, double y, const std::string &label, const std::string &value) {
     c.text(label, {32, y, double(c.width - 64), 25}, 16, c.theme.text);

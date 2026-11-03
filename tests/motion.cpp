@@ -66,7 +66,7 @@ int main() {
     input.handle({10, 20, PointerPhase::down}, slider);
     input.handle({200, 20, PointerPhase::move}, slider);
     input.handle({200, 20, PointerPhase::up}, slider);
-    assert(activations == 4);
+    assert(activations == 5);
     input.cancel();
 
     auto *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 128, 80);

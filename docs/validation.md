@@ -56,3 +56,26 @@ verified. The headless QEMU check uses the `none` host audio backend. It verifie
 the guest audio device, graph and volume, without asserting audible sound.
 Security, device support and update boundaries are documented in
 [architecture.md](architecture.md).
+
+## Material motion validation (2026-11-03)
+
+The LMUI motion and application changes passed five native CTest checks and
+twelve Python integration checks, including a relocated SDK example build.
+The independent Weston peer rendered all eight built-ins and the shell.
+The motion client observed intermediate frames in normal mode, exact final
+values and no further repaints while settled; reduced motion rendered only
+the two requested final states. Unit checks cover interruption continuity,
+contact cancellation, release activation and continuous slider updates.
+
+An isolated target build used the existing Buildroot AArch64/musl SDK. Its
+Runtime payload was staged into a private ext4/disk image copy, leaving the
+other development session's Buildroot output untouched. The QEMU target
+script passed boot, calculator input, settings pages/search/keyboard, real
+PipeWire volume, all eight application identities, networking and clean UI
+shutdown. Display → Reduce motion was enabled and disabled through the UI;
+both boolean values were checked in the persisted settings store. Evidence
+includes `settings-reduced-motion.ppm` and `quick-poweroff.ppm`. An initial
+run timed out at shutdown; a rerun with the shutdown-screen capture passed.
+This validates the changed clients and settings service in the reference
+image, without asserting a fresh full distribution rebuild or physical touch
+and vibration hardware support.

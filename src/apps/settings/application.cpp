@@ -8,6 +8,7 @@ SettingsApplication::SettingsApplication()
     : ApplicationWindow("org.leon.settings", "设置", "Settings"),
       device_(settings::read_device_info()) {}
 void SettingsApplication::open(Page page) {
+    transition_content();
     history_.push_back(page_);
     page_ = page;
     keyboard = false;
@@ -19,6 +20,7 @@ void SettingsApplication::back() {
     if (keyboard)
         keyboard = false;
     else if (!history_.empty()) {
+        transition_content(-32);
         page_ = history_.back();
         history_.pop_back();
     } else
@@ -59,6 +61,7 @@ void SettingsApplication::save_preference(const std::string &key, Json value) {
     prefs = rpc({{"op", "set"}, {"key", key}, {"value", std::move(value)}}).at("settings");
     en = prefs.value("language", "zh-CN") == "en";
     app.dark = prefs.value("dark", false);
+    app.reduce_motion = prefs.value("reduce_motion", false);
     app.redraw();
 }
 std::string SettingsApplication::title(Page page) const {
