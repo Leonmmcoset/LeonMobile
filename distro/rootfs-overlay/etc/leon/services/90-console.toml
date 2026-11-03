@@ -1,0 +1,4 @@
+name = "console"
+command = ["/sbin/getty", "-n", "-l", "/usr/libexec/leon/console", "-L", "ttyAMA0", "115200", "vt100"]
+after = ["prepare"]
+restart = "always"

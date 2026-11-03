@@ -1,0 +1,6 @@
+name = "session-bus"
+command = ["/usr/bin/dbus-daemon", "--session", "--nofork", "--nopidfile", "--address=unix:path=/run/user/1000/bus"]
+after = ["prepare"]
+uid = 1000
+gid = 1000
+restart = "always"

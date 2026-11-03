@@ -12,6 +12,7 @@ struct service {
     int restart;
     unsigned restart_limit;
     int autostart;
+    int oneshot;
     pid_t pid;
     int wanted, state, retries, exit_status;
     long long started_ms, next_ms;

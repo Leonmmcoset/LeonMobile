@@ -1,0 +1,4 @@
+name = "seat"
+command = ["/usr/bin/seatd", "-g", "video"]
+after = ["prepare"]
+restart = "always"

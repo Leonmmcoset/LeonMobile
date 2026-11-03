@@ -1,0 +1,4 @@
+name = "network"
+command = ["/usr/libexec/leon/network"]
+after = ["prepare"]
+restart = "always"

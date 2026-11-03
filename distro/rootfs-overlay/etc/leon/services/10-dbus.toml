@@ -1,0 +1,4 @@
+name = "dbus"
+command = ["/usr/bin/dbus-daemon", "--system", "--nofork", "--nopidfile"]
+after = ["prepare"]
+restart = "always"

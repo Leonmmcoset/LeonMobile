@@ -1,0 +1,6 @@
+name = "pipewire"
+command = ["/usr/bin/pipewire"]
+after = ["prepare", "dbus"]
+uid = 1000
+gid = 29
+restart = "always"

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+export XDG_RUNTIME_DIR=/run/leon/wayland
+export LIBSEAT_BACKEND=seatd
+export WLR_RENDERER=pixman
+export WLR_LIBINPUT_NO_DEVICES=1
+unset DISPLAY WAYLAND_DISPLAY
+exec /usr/bin/leon-compositor

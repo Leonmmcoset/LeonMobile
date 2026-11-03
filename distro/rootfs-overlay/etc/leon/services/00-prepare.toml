@@ -1,0 +1,4 @@
+name = "prepare"
+type = "oneshot"
+command = ["/usr/libexec/leon/prepare"]
+restart = "never"

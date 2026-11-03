@@ -1,0 +1,4 @@
+name = "apps"
+command = ["/usr/sbin/leon-launchd"]
+after = ["prepare"]
+restart = "always"

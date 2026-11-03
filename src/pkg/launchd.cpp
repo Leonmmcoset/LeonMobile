@@ -94,6 +94,12 @@ int main() {
             bool settings = shell || peer.uid == 11000;
             if (op == "list") { fail(shell, "permission denied"); response = {{"apps", packages.list()}, {"running", running}}; }
             else if (op == "launch") { fail(shell, "permission denied"); response = {{"pid", launch(packages, request.at("id"))}}; }
+            else if (op == "install") { fail(shell, "permission denied"); packages.install(request.at("file").get<std::string>()); }
+            else if (op == "remove") {
+                fail(shell, "permission denied"); std::string id = request.at("id");
+                if (running.contains(id)) { kill(-running[id], SIGKILL); running.erase(id); }
+                packages.remove(id, request.value("purge", false));
+            }
             else if (op == "stop") {
                 fail(shell, "permission denied"); std::string id = request.at("id");
                 if (running.contains(id)) { kill(-running[id], SIGKILL); running.erase(id); }

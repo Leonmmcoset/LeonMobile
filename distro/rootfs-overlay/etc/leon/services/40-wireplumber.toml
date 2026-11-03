@@ -1,0 +1,6 @@
+name = "wireplumber"
+command = ["/usr/libexec/leon/wireplumber"]
+after = ["pipewire", "session-bus"]
+uid = 1000
+gid = 29
+restart = "always"

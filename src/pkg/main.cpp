@@ -13,7 +13,12 @@ int main(int argc, char **argv) {
         std::string argument = argv[i++];
         if (verb == "launch" && i == argc) std::cout << leon::request("/run/leon/apps.sock", {{"op", "launch"}, {"id", argument}});
         else {
-            if (geteuid()) throw std::runtime_error("installation and removal require root");
+            if (geteuid()) {
+                if (verb == "install" && i == argc) std::cout << leon::request("/run/leon/apps.sock", {{"op", "install"}, {"file", std::filesystem::absolute(argument).string()}});
+                else if (verb == "remove" && (i == argc || (i + 1 == argc && std::string(argv[i]) == "--purge-data"))) std::cout << leon::request("/run/leon/apps.sock", {{"op", "remove"}, {"id", argument}, {"purge", i != argc}});
+                else throw std::runtime_error("unknown command or arguments");
+                return 0;
+            }
             if (verb == "install" && i == argc) packages.install(argument);
             else if (verb == "remove") {
                 bool purge = i < argc && std::string(argv[i]) == "--purge-data";

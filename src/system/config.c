@@ -60,7 +60,7 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
     FILE *f = fopen(path, "r");
     if (!f) { snprintf(err, size, "%s: %s", path, strerror(errno)); return -1; }
     char *line = NULL; size_t cap = 0; int number = 0, rc = -1; unsigned seen = 0;
-    const char *keys[] = {"name", "command", "after", "uid", "gid", "restart", "restart_limit", "autostart"};
+    const char *keys[] = {"name", "command", "after", "uid", "gid", "restart", "restart_limit", "autostart", "type"};
     while (getline(&line, &cap, f) >= 0) {
         ++number;
         char *p = trim(line);
@@ -69,16 +69,19 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
         if (!eq) goto bad;
         *eq++ = 0;
         char *key = trim(p), *value = trim(eq);
-        int k = 0; while (k < 8 && strcmp(key, keys[k])) ++k;
-        if (k == 8 || (seen & (1u << k))) goto bad;
+        int k = 0; while (k < 9 && strcmp(key, keys[k])) ++k;
+        if (k == 9 || (seen & (1u << k))) goto bad;
         seen |= 1u << k;
-        if (k == 0 || k == 5) {
+        if (k == 0 || k == 5 || k == 8) {
             char *v = string(&value);
             if (!v || *trim(value)) { free(v); goto bad; }
             if (k == 0) {
                 if (!*v || strlen(v) >= sizeof(s->name)) { free(v); goto bad; }
                 for (char *c = v; *c; ++c) if (!isalnum((unsigned char)*c) && *c != '-' && *c != '_') { free(v); goto bad; }
                 strcpy(s->name, v);
+            } else if (k == 8) {
+                if (!strcmp(v, "oneshot")) s->oneshot = 1;
+                else if (strcmp(v, "simple")) { free(v); goto bad; }
             } else {
                 if (!strcmp(v, "always")) s->restart = 2;
                 else if (!strcmp(v, "on-failure")) s->restart = 1;

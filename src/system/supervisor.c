@@ -47,7 +47,7 @@ static int load(const char *dir) {
 static int dependencies_ready(struct service *s) {
     for (int i = 0; s->after[i]; ++i) {
         int j = index_of(s->after[i]);
-        if (j < 0 || (services[j].state != RUNNING && services[j].state != FINISHED)) return 0;
+        if (j < 0 || (services[j].oneshot ? services[j].state != FINISHED : services[j].state != RUNNING)) return 0;
     }
     return 1;
 }

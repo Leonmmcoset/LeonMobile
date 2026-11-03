@@ -1,0 +1,7 @@
+name = "shell"
+command = ["/usr/libexec/leon/shell"]
+after = ["compositor", "apps"]
+uid = 1000
+gid = 1000
+restart = "always"
+restart_limit = 10
