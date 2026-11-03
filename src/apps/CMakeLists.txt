@@ -1,0 +1,8 @@
+pkg_check_modules(VTERM REQUIRED IMPORTED_TARGET vterm)
+find_package(JPEG REQUIRED)
+add_executable(leon-app applications.cpp)
+target_link_libraries(leon-app PRIVATE lmui leon-package PkgConfig::VTERM JPEG::JPEG util)
+add_executable(leon-shell shell.cpp)
+target_link_libraries(leon-shell PRIVATE lmui leon-package)
+install(TARGETS leon-app leon-shell RUNTIME DESTINATION bin)
+install(DIRECTORY manifests/ DESTINATION share/leon/apps FILES_MATCHING PATTERN "*.json")

@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.clock",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-app",
+  "args": [
+    "clock"
+  ],
+  "name": "时钟",
+  "name_en": "Clock",
+  "lmui": 1,
+  "icon": "clock"
+}

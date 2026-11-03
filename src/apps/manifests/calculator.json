@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.calculator",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-app",
+  "args": [
+    "calculator"
+  ],
+  "name": "计算器",
+  "name_en": "Calculator",
+  "lmui": 1,
+  "icon": "calculator"
+}

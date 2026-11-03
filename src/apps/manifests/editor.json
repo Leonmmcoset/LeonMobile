@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.editor",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-app",
+  "args": [
+    "editor"
+  ],
+  "name": "文本编辑器",
+  "name_en": "Editor",
+  "lmui": 1,
+  "icon": "editor"
+}

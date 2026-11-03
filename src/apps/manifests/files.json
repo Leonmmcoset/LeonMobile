@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.files",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-app",
+  "args": [
+    "files"
+  ],
+  "name": "文件",
+  "name_en": "Files",
+  "lmui": 1,
+  "icon": "files"
+}

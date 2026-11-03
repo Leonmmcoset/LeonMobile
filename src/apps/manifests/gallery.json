@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.gallery",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-app",
+  "args": [
+    "gallery"
+  ],
+  "name": "LMUI 展示",
+  "name_en": "Gallery",
+  "lmui": 1,
+  "icon": "gallery"
+}
