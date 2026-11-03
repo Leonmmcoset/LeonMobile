@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "id": "org.example.hello",
+  "name": "你好 LeonMobile",
+  "name_en": "Hello LeonMobile",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "lmui": 1,
+  "entry": "bin/hello",
+  "icon": "gallery"
+}

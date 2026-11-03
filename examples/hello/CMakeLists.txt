@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(LeonHello LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LMUI REQUIRED IMPORTED_TARGET lmui)
+add_executable(hello main.cpp)
+target_link_libraries(hello PRIVATE PkgConfig::LMUI)
