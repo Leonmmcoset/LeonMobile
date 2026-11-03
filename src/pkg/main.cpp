@@ -1,6 +1,12 @@
 #include "package.hpp"
 #include <iostream>
 #include <unistd.h>
+static leon::Json broker(const leon::Json &message) {
+    auto response = leon::Json::parse(leon::request("/run/leon/apps.sock", message));
+    if (!response.value("ok", false))
+        throw std::runtime_error(response.value("error", "service error"));
+    return response;
+}
 int main(int argc, char **argv) {
     try {
         leon::Packages packages;
@@ -14,13 +20,10 @@ int main(int argc, char **argv) {
         }
         if (i >= argc)
             throw std::runtime_error("usage: lmpkg [--root DIR] list | install FILE | remove ID "
-                                     "[--purge-data] | launch ID");
+                                     "[--purge-data] | launch ID | running");
         std::string verb = argv[i++];
         if (verb == "running" && i == argc) {
-            auto response =
-                leon::Json::parse(leon::request("/run/leon/apps.sock", {{"op", "list"}}));
-            if (!response.value("ok", false))
-                throw std::runtime_error(response.value("error", "service error"));
+            auto response = broker({{"op", "list"}});
             std::cout << response.at("running").dump() << '\n';
             return 0;
         }
@@ -32,19 +35,19 @@ int main(int argc, char **argv) {
             throw std::runtime_error("missing argument");
         std::string argument = argv[i++];
         if (verb == "launch" && i == argc)
-            std::cout << leon::request("/run/leon/apps.sock", {{"op", "launch"}, {"id", argument}});
+            std::cout << broker({{"op", "launch"}, {"id", argument}}).dump() << '\n';
         else {
             if (geteuid() && !offline) {
                 if (verb == "install" && i == argc)
-                    std::cout << leon::request(
-                        "/run/leon/apps.sock",
-                        {{"op", "install"},
-                         {"file", std::filesystem::absolute(argument).string()}});
+                    std::cout << broker({{"op", "install"},
+                                         {"file", std::filesystem::absolute(argument).string()}})
+                                     .dump()
+                              << '\n';
                 else if (verb == "remove" &&
                          (i == argc || (i + 1 == argc && std::string(argv[i]) == "--purge-data")))
-                    std::cout << leon::request(
-                        "/run/leon/apps.sock",
-                        {{"op", "remove"}, {"id", argument}, {"purge", i != argc}});
+                    std::cout
+                        << broker({{"op", "remove"}, {"id", argument}, {"purge", i != argc}}).dump()
+                        << '\n';
                 else
                     throw std::runtime_error("unknown command or arguments");
                 return 0;
@@ -55,10 +58,11 @@ int main(int argc, char **argv) {
                 bool purge = i < argc && std::string(argv[i]) == "--purge-data";
                 if (i + int(purge) != argc)
                     throw std::runtime_error("unknown argument");
-                try {
-                    leon::request("/run/leon/apps.sock", {{"op", "stop"}, {"id", argument}});
-                } catch (...) {
-                }
+                if (!offline)
+                    try {
+                        broker({{"op", "stop"}, {"id", argument}});
+                    } catch (...) {
+                    }
                 packages.remove(argument, purge);
             } else
                 throw std::runtime_error("unknown command or arguments");
