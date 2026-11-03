@@ -1,2 +1,3 @@
 #!/bin/sh
+echo LEON_CONSOLE_READY
 exec /bin/login -f leon

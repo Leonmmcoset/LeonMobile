@@ -90,6 +90,8 @@ int main(int argc, char **argv) {
     directory("/data/var", 0755);
     if (mount("/data/var", "/var", NULL, MS_BIND, NULL))
         perror("/var");
+    directory("/var/log", 0755);
+    directory("/var/log/leon", 0750);
     directory("/run/leon", 0755);
     directory("/run/lock", 0755);
     setenv("PATH", "/usr/sbin:/usr/bin:/sbin:/bin", 1);

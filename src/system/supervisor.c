@@ -21,6 +21,7 @@ enum { STOPPED, RUNNING, FINISHED, FAILED };
 static struct service services[LM_MAX_SERVICES];
 static int count, order[LM_MAX_SERVICES];
 static int shutting_down;
+static const char *log_directory = "/var/log/leon";
 static long long now_ms(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -85,7 +86,7 @@ static void start(struct service *s) {
         sigemptyset(&mask);
         sigprocmask(SIG_SETMASK, &mask, NULL);
         char path[256];
-        snprintf(path, sizeof(path), "/var/log/leon/%s.log", s->name);
+        snprintf(path, sizeof(path), "%s/%s.log", log_directory, s->name);
         int fd = open(path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0640);
         if (fd >= 0) {
             dup2(fd, STDOUT_FILENO);
@@ -229,6 +230,8 @@ int main(int argc, char **argv) {
             dir = argv[++i];
         else if (!strcmp(argv[i], "--socket") && i + 1 < argc)
             socket_path = argv[++i];
+        else if (!strcmp(argv[i], "--log-dir") && i + 1 < argc)
+            log_directory = argv[++i];
         else {
             fputs("usage: leond [--check] [--config DIR] [--socket PATH]\n", stderr);
             return 2;
@@ -245,7 +248,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     prctl(PR_SET_CHILD_SUBREAPER, 1);
-    mkdir("/var/log/leon", 0750);
+    mkdir(log_directory, 0750);
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGCHLD);

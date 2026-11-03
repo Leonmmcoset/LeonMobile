@@ -26,7 +26,8 @@ class SupervisorTests(unittest.TestCase):
                 'name="child"\nafter=["prepare"]\nrestart="on-failure"\nrestart_limit=1\n'
                 'command=["/bin/sh","-c",' + json.dumps(f"echo attempt >> {attempts}; test -f {ready} && exit 7; exit 8") + ']\n')
             endpoint = str(path / "s.sock")
-            proc = subprocess.Popen([BIN / "src/system/leond", "--config", path, "--socket", endpoint],
+            proc = subprocess.Popen([BIN / "src/system/leond", "--config", path, "--socket", endpoint,
+                                     "--log-dir", path / "logs"],
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 status = ""
