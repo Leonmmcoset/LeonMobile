@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
     }
     mount_fs("tmpfs", "/run", "tmpfs", MS_NOSUID | MS_NODEV, "mode=0755");
     mount_fs("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
+    mount_fs("tmpfs", "/dev/shm", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
     mount_fs("/dev/vda2", "/data", "ext4", MS_NOSUID | MS_NODEV, NULL);
     directory("/data/var", 0755);
     if (mount("/data/var", "/var", NULL, MS_BIND, NULL))
