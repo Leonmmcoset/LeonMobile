@@ -169,10 +169,15 @@ def main():
                     raise RuntimeError("Native system application manifest checks failed")
                 while time.monotonic() < deadline:
                     try:
-                        qmp.capture(artifacts / "lock.ppm")
-                        break
+                        frame = qmp.capture(artifacts / "lock.ppm")
+                        # Wait for the initial fade to finish before recording
+                        # the lock screen or sending the first pointer event.
+                        point = (100 * 480) * 3
+                        if frame[point:point + 3] == bytes.fromhex("fff8ff"):
+                            break
                     except RuntimeError:
-                        time.sleep(.5)
+                        pass
+                    time.sleep(.25)
                 else:
                     raise RuntimeError("Desktop did not render; inspect guest compositor logs")
                 qmp.click(240, 790)
