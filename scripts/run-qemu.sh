@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
-images="$repo/output/images"
+images=${LEON_IMAGES:-"$repo/output/images"}
 disk=${LEON_DISK:-"$repo/build/leonmobile-user.img"}
 mkdir -p "$(dirname -- "$disk")"
 if [ ! -e "$disk" ]; then

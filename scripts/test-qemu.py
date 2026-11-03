@@ -112,11 +112,13 @@ class QMP:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timeout", type=int, default=150)
+    parser.add_argument("--images", type=Path, default=REPO / "output/images",
+                        help="image directory, including an assembled local release")
     parser.add_argument("--package", type=Path, help="also install, launch and remove the SDK hello package")
     args = parser.parse_args()
     if args.package and not args.package.is_file():
         parser.error("--package must name a compiled SDK hello package")
-    images = REPO / "output/images"
+    images = args.images.resolve()
     artifacts = REPO / "build/qemu-test"
     artifacts.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="leon-qemu-") as temp:

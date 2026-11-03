@@ -1,0 +1,90 @@
+{
+  "scope": "Sources, Bootlin GCC patches and notices for musl/libgcc/libstdc++ runtimes; external host toolchain reproduction is documented in its README.",
+  "files": [
+    {
+      "path": "gcc-final-14.3.0/0001-disable-split-stack-for-non-thread-builds.patch",
+      "sha256": "8bc3dc9c3c14518a388fb61284ef8ad3c348df4d73330c90b601a81d8ba4f054",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/sources/gcc-final-14.3.0/0001-disable-split-stack-for-non-thread-builds.patch"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/0002-libsanitizer-also-undef-_TIME_BITS-in-sanitizer_proc.patch",
+      "sha256": "01e9dc819a64dd4b493cb61d3e9503dfd147e3f2ac169c7de1c8f8452177602f",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/sources/gcc-final-14.3.0/0002-libsanitizer-also-undef-_TIME_BITS-in-sanitizer_proc.patch"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/0003-microblaze-add-atomic-test-and-set-support.patch",
+      "sha256": "360ee71a46c90037f83804cd4ee48a7bba7b944cb87f01fd7aae79aade702583",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/sources/gcc-final-14.3.0/0003-microblaze-add-atomic-test-and-set-support.patch"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/COPYING",
+      "sha256": "231f7edcc7352d7734a96eef0b8030f77982678c516876fcb81e25b32d68564c",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/gcc-final-14.3.0/COPYING"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/COPYING.LIB",
+      "sha256": "a9bdde5616ecdd1e980b44f360600ee8783b1f99b8cc83a2beb163a0a390e861",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/gcc-final-14.3.0/COPYING.LIB"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/COPYING.RUNTIME",
+      "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/gcc-final-14.3.0/COPYING.RUNTIME"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/COPYING3",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/gcc-final-14.3.0/COPYING3"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/COPYING3.LIB",
+      "sha256": "a853c2ffec17057872340eee242ae4d96cbf2b520ae27d903e1b2fef1a5f9d1c",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/gcc-final-14.3.0/COPYING3.LIB"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/gcc-14.3.0.tar.xz",
+      "sha256": "e0dc77297625631ac8e50fa92fffefe899a4eb702592da5c32ef04e2293aca3a",
+      "urls": [
+        "https://sources.buildroot.net/gcc/gcc-14.3.0.tar.xz",
+        "https://toolchains.bootlin.com/downloads/releases/sources/gcc-final-14.3.0/gcc-14.3.0.tar.xz"
+      ]
+    },
+    {
+      "path": "gcc-final-14.3.0/series",
+      "sha256": "a1fd8322aebca334a4f01d053439aa84d2d25c8f790af7cdca6ad4da793a086e",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/sources/gcc-final-14.3.0/series"
+      ]
+    },
+    {
+      "path": "musl-1.2.5/COPYRIGHT",
+      "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/licenses/musl-1.2.5/COPYRIGHT"
+      ]
+    },
+    {
+      "path": "musl-1.2.5/musl-1.2.5.tar.gz",
+      "sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+      "urls": [
+        "https://toolchains.bootlin.com/downloads/releases/sources/musl-1.2.5/musl-1.2.5.tar.gz"
+      ]
+    }
+  ]
+}
