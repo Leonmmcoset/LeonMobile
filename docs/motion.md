@@ -34,7 +34,8 @@ while dragging so it follows the contact immediately.
 
 The Wayland backend uses surface frame callbacks, a monotonic clock and at
 most three shared-memory buffers. Active motion requests the next frame;
-settled motion stops repainting. Hidden clients wait for their compositor
+settled motion stops repainting and leaves no idle callback blocking later
+input. Hidden clients wait for their compositor
 callback. The existing 200 ms `tick` callback remains for application logic,
 separate from animation. Custom time-based paint effects can use
 `frame_time()` and `request_frame()`; they must stop requesting frames when
@@ -101,8 +102,15 @@ Settings exposes it under Display → Reduce motion. All eight built-ins share
 release activation and ripples; keyboard expansion, content resizing, error
 messages, settings selections and folder/page navigation use the same motion
 policy. Settings and file lists track touch drags immediately, then apply a
-short bounded scroll settle. The volume slider previews locally while held
+short bounded scroll settle; reduced motion omits momentum. The volume slider previews locally while held
 and sends one audio request on release rather than blocking each motion event.
+
+The shell crossfades and translates lock/home/app-list/task pages using the
+same emphasized curve. Short lock drags follow the contact and return without
+unlocking; a deliberate upward swipe or tap unlocks the prototype. The gesture
+bar changes size while held, and remaining recent-task rows settle into the
+space left by a dismissed task. Hit regions follow presented coordinates.
+Transparent application regions remain available to the underlying client.
 
 `lmui-motion-and-touch` covers bounded curves, interruption, stale-key removal,
 release/cancel/drag behavior and rendered transition continuity. The independent

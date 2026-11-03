@@ -83,16 +83,20 @@ class QMP:
             raise RuntimeError(response["error"])
         return response.get("return")
 
-    def click(self, x, y):
+    def move(self, x, y):
         self.command("input-send-event", {"events": [
             {"type": "abs", "data": {"axis": "x", "value": int(x/480*32767)}},
             {"type": "abs", "data": {"axis": "y", "value": int(y/960*32767)}}]})
+    def button(self, down):
+        self.command("input-send-event", {"events": [
+            {"type": "btn", "data": {"down": down, "button": "left"}}]})
+
+    def click(self, x, y):
+        self.move(x, y)
         time.sleep(.05)
-        self.command("input-send-event", {"events": [
-            {"type": "btn", "data": {"down": True, "button": "left"}}]})
+        self.button(True)
         time.sleep(.1)
-        self.command("input-send-event", {"events": [
-            {"type": "btn", "data": {"down": False, "button": "left"}}]})
+        self.button(False)
 
     def key(self, code):
         for down in (True, False):
@@ -195,6 +199,22 @@ def main():
                     time.sleep(.25)
                 else:
                     raise RuntimeError("Desktop did not render; inspect guest compositor logs")
+                # A short lock-screen drag follows the contact, then returns
+                # without unlocking. Compare the static instruction region.
+                lock = frame
+                qmp.move(240, 790)
+                time.sleep(.05)
+                qmp.button(True)
+                qmp.move(240, 760)
+                time.sleep(.2)
+                held = qmp.capture(artifacts / "lock-dragging.ppm")
+                qmp.button(False)
+                time.sleep(.6)
+                settled = qmp.capture(artifacts / "lock-settled.ppm")
+                def lock_hint(pixels):
+                    return pixels[730 * 480 * 3:850 * 480 * 3]
+                if lock_hint(held) == lock_hint(lock) or lock_hint(settled) != lock_hint(lock):
+                    raise RuntimeError("Short lock drag did not track and settle without unlocking")
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
@@ -354,6 +374,16 @@ def main():
                     guest.run("lmpkg remove org.example.hello --purge-data")
                     if any(app["id"] == "org.example.hello" for app in json.loads(guest.run("lmpkg list"))):
                         raise RuntimeError("SDK package removal failed")
+                qmp.click(80, 940)  # Recent tasks
+                time.sleep(.6)
+                qmp.capture(artifacts / "tasks-before-dismiss.ppm")
+                qmp.click(432, 190)  # Dismiss calculator, allow remaining rows to settle
+                time.sleep(.12)
+                qmp.capture(artifacts / "tasks-dismissing.ppm")
+                time.sleep(.5)
+                qmp.capture(artifacts / "tasks-after-dismiss.ppm")
+                if "org.leon.calculator" in json.loads(guest.run("lmpkg running")):
+                    raise RuntimeError("Recent tasks dismissal did not stop the selected app")
                 qmp.click(400, 22)
                 time.sleep(.5)
                 qmp.capture(artifacts / "quick-poweroff.ppm")

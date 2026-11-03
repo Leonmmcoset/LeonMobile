@@ -37,7 +37,7 @@ class ApplicationWindow {
     unsigned content_revision_{};
     std::string shown_error_;
     double scroll_start_{}, down_y_{}, scroll_velocity_{}, scroll_last_{}, scroll_time_{};
-    bool scroll_eligible_{}, scroll_dragging_{};
+    bool scroll_eligible_{}, scroll_dragging_{}, reduced_motion_{};
     void paint(Canvas &canvas);
     void pointer(const PointerEvent &event);
 };

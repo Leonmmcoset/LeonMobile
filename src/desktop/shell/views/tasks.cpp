@@ -12,13 +12,14 @@ void Shell::paint_tasks(Canvas &c) {
         std::string id = m.at("id");
         if (!running.contains(id))
             continue;
+        double position = c.animate("shell/tasks/" + id, y, motion::spatial);
         std::string name = en ? m.value("name_en", "") : m.at("name").get<std::string>();
-        button(c, hits, {24, y, w - 104, 78}, name, [&, id] {
+        button(c, hits, {24, position, w - 104, 78}, name, [&, id] {
             active_id = id;
             page = Page::active;
             control("focus " + id);
         });
-        button(c, hits, {w - 68, y, 44, 78}, "×", [&, id] {
+        button(c, hits, {w - 68, position, 44, 78}, "×", [&, id] {
             rpc({{"op", "stop"}, {"id", id}});
             refresh();
         });

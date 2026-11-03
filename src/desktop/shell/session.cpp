@@ -18,7 +18,17 @@ Shell::Shell() {
         if (e.pressed && e.symbol == XKB_KEY_Escape)
             home();
     };
-    app.pointer = [this](double x, double y, bool down) { pointer(x, y, down); };
+    app.pointer_event = [this](const PointerEvent &event) {
+        if (event.phase == PointerPhase::cancel) {
+            pressed = false;
+            lock_drag = 0;
+            touch_feedback.cancel();
+            app.redraw();
+        } else if (event.phase == PointerPhase::move)
+            motion(event.x, event.y);
+        else
+            pointer(event.x, event.y, event.phase == PointerPhase::down);
+    };
     app.paint = [this](Canvas &canvas) { paint(canvas); };
 }
 int Shell::run() { return app.run(); }
@@ -31,6 +41,7 @@ void Shell::refresh() {
         prefs = rpc({{"op", "settings"}}).at("settings");
         notifications = rpc({{"op", "notifications"}}).at("notifications");
         app.dark = prefs.value("dark", false);
+        app.reduce_motion = prefs.value("reduce_motion", false);
         en = prefs["language"] == "en";
         error.clear();
     } catch (const std::exception &e) {

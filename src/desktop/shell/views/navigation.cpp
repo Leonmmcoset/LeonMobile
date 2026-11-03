@@ -14,7 +14,10 @@ void Shell::paint_navigation(Canvas &c) {
             control("shell");
         });
     } else {
-        c.rounded({w / 2 - 60, h - 24, 120, 5}, t.text, 3);
+        double feedback = c.animate("shell/navigation/press", pressed && down_y > h - 64 ? 1 : 0,
+                                    motion::feedback);
+        double length = 120 + 24 * feedback;
+        c.rounded({(w - length) / 2, h - 24 - 6 * feedback, length, 5 + feedback}, t.text, 3);
         click(hits, {w / 3, h - 64, w / 3, 64}, [this] { home(); });
         click(hits, {0, h - 64, w / 3, 64}, [&] {
             page = Page::tasks;

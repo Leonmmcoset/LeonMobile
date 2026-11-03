@@ -43,18 +43,22 @@ void Application::Impl::draw() {
     if (getenv("LMUI_QUIT_AFTER_FRAME"))
         running = false;
     cairo_surface_destroy(image);
+    dirty |= opacity < 1 || motion.active();
     wl_surface_attach(surface, b->buffer, 0, 0);
     wl_surface_damage(surface, 0, 0, w, h);
-    frame_callback = wl_surface_frame(surface);
-    static const wl_callback_listener frame_events = {
-        [](void *data, wl_callback *callback, uint32_t) {
-            auto &s = *static_cast<Impl *>(data);
-            wl_callback_destroy(callback);
-            s.frame_callback = nullptr;
-        }};
-    wl_callback_add_listener(frame_callback, &frame_events, this);
+    // Idle transparent surfaces may not receive a callback until some other
+    // surface damages the output. Never leave input waiting on an idle frame.
+    if (dirty) {
+        frame_callback = wl_surface_frame(surface);
+        static const wl_callback_listener frame_events = {
+            [](void *data, wl_callback *callback, uint32_t) {
+                auto &s = *static_cast<Impl *>(data);
+                wl_callback_destroy(callback);
+                s.frame_callback = nullptr;
+            }};
+        wl_callback_add_listener(frame_callback, &frame_events, this);
+    }
     wl_surface_commit(surface);
     b->busy = true;
-    dirty |= opacity < 1 || motion.active();
 }
 } // namespace lmui

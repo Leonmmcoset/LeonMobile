@@ -18,10 +18,15 @@ class Shell {
     bool en{}, connected{}, pressed{};
     int ticks{};
     double down_x{}, down_y{};
+    double lock_drag{};
+    lmui::TouchInput touch_feedback;
+    lmui::ContentTransition page_transition;
+    Page presented_page{Page::lock};
     void refresh();
     void home();
     void launch(std::string id);
     void pointer(double x, double y, bool down);
+    void motion(double x, double y);
     void paint(lmui::Canvas &canvas);
     void paint_status(lmui::Canvas &canvas, const std::string &time);
     void paint_lock(lmui::Canvas &canvas, const std::string &time);

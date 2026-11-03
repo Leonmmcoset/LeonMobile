@@ -79,3 +79,14 @@ run timed out at shutdown; a rerun with the shutdown-screen capture passed.
 This validates the changed clients and settings service in the reference
 image, without asserting a fresh full distribution rebuild or physical touch
 and vibration hardware support.
+
+The shell motion check additionally captured `lock-dragging.ppm` and
+`lock-settled.ppm`, verifying that a short drag moves the lock instruction and
+returns to its exact original pixels without unlocking. The new cross-built
+SDK sample was transferred with checksum verification, installed, launched
+and removed in QEMU. Home/app-list navigation, transparent app regions and
+shutdown were exercised with frame callbacks and page transitions enabled.
+The task dismissal test exposed a pending idle callback on a transparent shell;
+frame callbacks are now requested only while another animation frame is needed.
+Task dismissal captures cover row reflow and check that the selected process
+actually stops.

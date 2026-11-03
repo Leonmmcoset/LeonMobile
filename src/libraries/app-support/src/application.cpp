@@ -75,6 +75,7 @@ void ApplicationWindow::paint(Canvas &c) {
     hits.clear();
     auto t = c.theme;
     double w = c.width, h = c.height;
+    reduced_motion_ = c.reduced_motion();
     double keyboard_fraction = c.animate("window/keyboard", keyboard ? 1 : 0, motion::enter);
     double bottom = h - 16 - 234 * keyboard_fraction;
     content_transition_.begin(c);
@@ -149,7 +150,7 @@ void ApplicationWindow::pointer(const PointerEvent &e) {
                 scroll_time_ = now;
             }
         } else if (e.phase == PointerPhase::up && scroll_dragging_) {
-            if (motion_time() - scroll_time_ < .08)
+            if (!reduced_motion_ && motion_time() - scroll_time_ < .08)
                 scroll = std::max(0.0, scroll + std::clamp(scroll_velocity_ * .12, -200.0, 200.0));
             scroll_eligible_ = scroll_dragging_ = false;
             return;
