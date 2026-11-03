@@ -5,6 +5,7 @@ config BR2_PACKAGE_LEONMOBILE
 	select BR2_PACKAGE_JSON_FOR_MODERN_CPP
 	select BR2_PACKAGE_LIBARCHIVE
 	select BR2_PACKAGE_OPENSSL
+	select BR2_PACKAGE_JPEG
 	help
 	  LeonMobile 1.0.0 native system components.
 
