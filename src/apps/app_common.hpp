@@ -1,6 +1,7 @@
 #pragma once
 #include "package.hpp"
 #include <algorithm>
+#include <cstdlib>
 #include <functional>
 #include <lmui/lmui.hpp>
 #include <string>
@@ -11,6 +12,7 @@ using leon::Json;
 struct Hit {
     Rect rect;
     std::function<void()> action;
+    std::function<void(double, double)> position_action;
 };
 inline Json rpc(const Json &message) {
     auto response = Json::parse(leon::request("/run/leon/apps.sock", message));
@@ -22,7 +24,10 @@ inline std::string tr(bool en, const std::string &zh, const std::string &eng) {
     return en ? eng : zh;
 }
 inline void click(std::vector<Hit> &hits, Rect r, std::function<void()> action) {
-    hits.push_back({r, std::move(action)});
+    hits.push_back({r, std::move(action), {}});
+}
+inline void click(std::vector<Hit> &hits, Rect r, std::function<void(double, double)> action) {
+    hits.push_back({r, {}, std::move(action)});
 }
 inline void button(Canvas &c, std::vector<Hit> &hits, Rect r, const std::string &text,
                    std::function<void()> action, bool filled = false) {
@@ -33,7 +38,10 @@ inline void button(Canvas &c, std::vector<Hit> &hits, Rect r, const std::string 
 inline void activate(std::vector<Hit> hits, double x, double y) {
     for (auto i = hits.rbegin(); i != hits.rend(); ++i)
         if (i->rect.contains(x, y)) {
-            i->action();
+            if (i->position_action)
+                i->position_action(x, y);
+            else if (i->action)
+                i->action();
             break;
         }
 }

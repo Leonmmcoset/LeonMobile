@@ -140,8 +140,7 @@ int main() {
         std::string net;
         state >> net;
         connected = net == "up";
-        c.text(connected ? "ETH  ·  100%" : "—  ·  100%", {w - 180, 4, 156, 32}, 12, t.muted, false,
-               2);
+        c.text(connected ? "ETH  ·  AC" : "—  ·  AC", {w - 180, 4, 156, 32}, 12, t.muted, false, 2);
         click(hits, {0, 0, w / 2, 42}, [&] {
             if (page != Page::lock) {
                 page = Page::notifications;
@@ -282,7 +281,8 @@ int main() {
             }
         }
         if (!error.empty() && overlay) {
-            c.text(error, {20, h - 200, w - 40, 44}, 11, t.muted);
+            c.text(tr(en, "系统服务暂未就绪", "System services are starting"),
+                   {20, h - 200, w - 40, 44}, 13, t.muted);
         }
         app.input_region(overlay ? std::vector<Rect>{{0, 0, w, h}}
                                  : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});

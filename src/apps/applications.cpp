@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
     Application app(id, "LeonMobile");
     std::vector<Hit> hits;
     std::string error;
-    bool en = false, keyboard = false, input_focus = false;
+    bool en = false, keyboard = false, symbols = false, shift = false, theme_override = false;
     Json prefs = {
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
     Calculator calculator;
@@ -257,7 +257,8 @@ int main(int argc, char **argv) {
         try {
             prefs = rpc({{"op", "settings"}}).at("settings");
             en = prefs["language"] == "en";
-            app.dark = prefs.value("dark", false);
+            if (!theme_override)
+                app.dark = prefs.value("dark", false);
         } catch (...) {
         };
     };
@@ -291,8 +292,33 @@ int main(int argc, char **argv) {
         if (!e.pressed)
             return;
         if (e.symbol == XKB_KEY_Escape) {
-            keyboard = false;
+            if (terminal && !keyboard)
+                terminal->input("\033");
+            else
+                keyboard = false;
             return;
+        }
+        if (terminal) {
+            if (e.symbol == XKB_KEY_Up) {
+                terminal->input("\033[A");
+                return;
+            }
+            if (e.symbol == XKB_KEY_Down) {
+                terminal->input("\033[B");
+                return;
+            }
+            if (e.symbol == XKB_KEY_Right) {
+                terminal->input("\033[C");
+                return;
+            }
+            if (e.symbol == XKB_KEY_Left) {
+                terminal->input("\033[D");
+                return;
+            }
+            if (e.symbol == XKB_KEY_Tab) {
+                terminal->input("\t");
+                return;
+            }
         }
         if (e.symbol == XKB_KEY_BackSpace)
             text_input("\b");
@@ -358,11 +384,11 @@ int main(int argc, char **argv) {
                 auto a = child.activate;
                 auto change = child.change;
                 auto r = child.bounds;
-                click(hits, r, [&, a, change, r] {
+                click(hits, r, [a, change, r](double x, double) {
                     if (a)
                         a();
                     if (change)
-                        change(.7);
+                        change(std::clamp((x - r.x) / r.w, 0.0, 1.0));
                 });
             }
             c.text(tr(en, "设备：QEMU ARM64 开发原型", "Device: QEMU ARM64 prototype"),
@@ -396,12 +422,13 @@ int main(int argc, char **argv) {
                  Label(tr(en, "滑块组件", "Slider component")),
                  Slider(demo_slider, [&](double v) { demo_slider = v; }),
                  TextField(demo_input.empty() ? tr(en, "点此输入文字", "Tap to type") : demo_input,
-                           [&] {
-                               keyboard = true;
-                               input_focus = true;
-                           }),
+                           [&] { keyboard = true; }),
                  Button(
-                     tr(en, "切换深浅主题", "Toggle theme"), [&] { app.dark = !app.dark; },
+                     tr(en, "切换深浅主题", "Toggle theme"),
+                     [&] {
+                         theme_override = true;
+                         app.dark = !app.dark;
+                     },
                      false)});
             tree.layout({24, 142, w - 48, 340});
             tree.draw(c);
@@ -409,11 +436,11 @@ int main(int argc, char **argv) {
                 auto a = child.activate;
                 auto change = child.change;
                 auto r = child.bounds;
-                click(hits, r, [a, change] {
+                click(hits, r, [a, change, r](double x, double) {
                     if (a)
                         a();
                     if (change)
-                        change(.75);
+                        change(std::clamp((x - r.x) / r.w, 0.0, 1.0));
                 });
             }
             c.rounded({24, 520, w - 48, 90}, t.container, 28);
@@ -571,17 +598,24 @@ int main(int argc, char **argv) {
         }
         if (keyboard) {
             c.rounded({0, h - 246, w, 246}, t.container, 20);
-            std::vector<std::string> rows = {"qwertyuiop", "asdfghjkl", "zxcvbnm"};
+            std::vector<std::string> rows =
+                symbols ? std::vector<std::string>{"1234567890", "-/:;()$&@", ".,!?\"'=+"}
+                        : std::vector<std::string>{"qwertyuiop", "asdfghjkl", "zxcvbnm"};
             for (size_t r = 0; r < rows.size(); ++r) {
                 double kw = (w - 20) / rows[r].size();
                 for (size_t i = 0; i < rows[r].size(); ++i) {
                     std::string s(1, rows[r][i]);
+                    if (shift && !symbols)
+                        s[0] = char(std::toupper(static_cast<unsigned char>(s[0])));
                     button(c, hits, {10 + i * kw, h - 236 + r * 52, kw - 4, 46}, s,
                            [&, s] { text_input(s); });
                 }
             }
-            button(c, hits, {10, h - 78, 56, 48}, "⌄", [&] { keyboard = false; });
-            button(c, hits, {72, h - 78, w - 224, 48}, tr(en, "空格", "Space"),
+            button(c, hits, {10, h - 78, 40, 48}, "⌄", [&] { keyboard = false; });
+            button(c, hits, {56, h - 78, 48, 48}, symbols ? "ABC" : "123",
+                   [&] { symbols = !symbols; });
+            button(c, hits, {110, h - 78, 40, 48}, "⇧", [&] { shift = !shift; });
+            button(c, hits, {156, h - 78, w - 306, 48}, tr(en, "空格", "Space"),
                    [&] { text_input(" "); });
             button(c, hits, {w - 146, h - 78, 62, 48}, "⌫", [&] { text_input("\b"); });
             button(
