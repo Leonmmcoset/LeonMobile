@@ -40,7 +40,8 @@ jobs:
           path: .cache/downloads
           key: leon-sources-buildroot-2026.08.1-${{ hashFiles('distro/configs/*', 'distro/package/**/*.hash') }}
       - run: make image
-      - run: python3 scripts/test-qemu.py --timeout 240
+      - run: ./scripts/build-example.sh
+      - run: python3 scripts/test-qemu.py --timeout 240 --package build/hello/org.example.hello-1.0.0.lmpkg
       - uses: actions/upload-artifact@v4
         if: always()
         with:
