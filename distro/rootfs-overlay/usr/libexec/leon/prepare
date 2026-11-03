@@ -13,7 +13,7 @@ ln -sfn /proc/self/mounts /run/mtab
 touch /run/resolv.conf
 dbus-uuidgen --ensure=/var/lib/dbus/machine-id
 /sbin/udevd --daemon
-/bin/udevadm trigger --action=add
-/bin/udevadm settle
+/sbin/udevadm trigger --action=add
+/sbin/udevadm settle
 /sbin/ip link set lo up
 echo "LeonMobile: runtime directories and devices ready"

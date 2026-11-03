@@ -1,4 +1,4 @@
 name = "seat"
-command = ["/usr/bin/seatd", "-g", "video"]
+command = ["/usr/libexec/leon/seat"]
 after = ["prepare"]
 restart = "always"
