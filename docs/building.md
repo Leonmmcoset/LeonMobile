@@ -1,0 +1,68 @@
+# Build, run and validate
+
+The supported development host is Linux x86_64. This repository bootstraps a checksum-pinned Buildroot 2026.08.1 and an external AArch64 musl toolchain. A full initial build downloads several hundred MiB of source and needs several GiB of temporary storage; retain `.cache/downloads` between builds. Network access is needed for the first build.
+
+## Host setup
+
+On Debian/Ubuntu, install the cross-build prerequisites:
+
+```sh
+sudo apt-get install build-essential bison flex gawk gettext texinfo libssl-dev \
+  libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils \
+  qemu-system-arm qemu-utils
+```
+
+Native component development additionally uses:
+
+```sh
+sudo apt-get install cmake ninja-build pkg-config libarchive-dev nlohmann-json3-dev \
+  libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev \
+  libvterm-dev libjpeg-dev weston fonts-wqy-zenhei
+```
+
+No system-wide installation of LeonMobile is required for native tests. `make test` builds native core/LMUI/apps and runs component, package and image update tests. Identity-transition tests require root; run them in the disposable CI environment or with `sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v`. The tests redirect stores, sockets and runtime directories into temporary paths. Native rendering can be checked using `scripts/test-wayland.sh`; it uses Weston as an independent protocol peer, not the target compositor, and captures PNGs under `build/screenshots`.
+
+## Build the reference image
+
+```sh
+make image
+make run
+```
+
+`JOBS=4 make image` controls build parallelism. Buildroot configuration is generated from `distro/configs/leon_qemu_aarch64_defconfig` on the first build. After editing that defconfig, regenerate with:
+
+```sh
+./scripts/build.sh leon_qemu_aarch64_defconfig
+```
+
+Buildroot does not automatically rebuild already-built packages after changes to their configuration or local source. For local component changes use `./scripts/build.sh leonmobile-rebuild` followed by `make image`. A clean output tree is required when changing toolchains or incompatible foundational configuration. The download cache can be retained.
+
+The relevant outputs in `output/images` are `Image`, `leon-initramfs.cpio.gz`, `rootfs.ext4`, `data.ext4`, and `leonmobile-qemu-aarch64.img`. `make run` creates a separate writable disk at `build/leonmobile-user.img` on first use. Repeated runs reuse that disk, preserving data. `LEON_DISK` selects another writable image. The generated reference image is never used as a writable runtime disk by the launcher.
+
+The desktop is 480×960 portrait. Click the lock screen or swipe up to unlock. The status bar opens notifications on the left and quick settings on the right. Bottom gestures navigate home and tasks; three-button navigation can be selected in settings. Mouse clicks and drags act as single-touch input. The developer serial console automatically logs in as the non-root `leon` user.
+
+`LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks.
+
+## Install and update
+
+Build the example using the target SDK:
+
+```sh
+./scripts/build-example.sh
+```
+
+Transfer the resulting `build/hello/org.example.hello-1.0.0.lmpkg` into a readable guest data location using a development transport or offline disk tooling, then run `lmpkg install PATH` from the `leon` serial session. The prototype deliberately does not enable a network login or application repository.
+
+Stop QEMU before updating a runtime disk:
+
+```sh
+python3 scripts/update-image.py build/leonmobile-user.img output/images/rootfs.ext4
+```
+
+The tool validates GPT checksums/layout and ext4 magic and acquires a POSIX lock before writing the system partition. Back up important development data separately. This replacement process preserves the data partition but is not an atomic OTA update. Kernel and initramfs are loaded from the current build outputs on the next run.
+
+`make legal-info` gathers dependency license materials. `make release` assembles images, build provenance, a software manifest, documentation, legal materials and SHA-256 checksums under `dist/`. Release assembly does not sign images, create a Git tag, publish externally or certify production readiness.
+
+## Target validation
+
+`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64, checks guest version/application listing, captures actual QEMU display frames and performs UI input and poweroff. It writes evidence to `build/qemu-test`. On failure inspect `serial.log` and the guest's persistent `/var/log/leon/*.log` files. CI runs native checks on every change; the full image/QEMU job is available through workflow dispatch.

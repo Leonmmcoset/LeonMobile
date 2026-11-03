@@ -1,0 +1,48 @@
+name: LeonMobile validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Build and boot the full ARM64 image
+        type: boolean
+        default: false
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config libarchive-dev libssl-dev nlohmann-json3-dev libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev libvterm-dev libjpeg-dev weston fonts-wqy-zenhei
+      - run: make test
+      - name: Verify privileged service and identity boundaries
+        run: sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v
+      - run: ./scripts/test-wayland.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-ui-frames
+          path: build/screenshots/
+  image:
+    if: github.event_name == 'workflow_dispatch' && inputs.image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cross-build host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils
+      - uses: actions/cache@v4
+        with:
+          path: .cache/downloads
+          key: leon-sources-buildroot-2026.08.1-${{ hashFiles('distro/configs/*', 'distro/package/**/*.hash') }}
+      - run: make image
+      - run: python3 scripts/test-qemu.py --timeout 240
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qemu-boot-evidence
+          path: build/qemu-test/
