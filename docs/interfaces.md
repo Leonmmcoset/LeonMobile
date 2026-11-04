@@ -42,6 +42,39 @@ Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or
 
 The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `shell` or `focus APP_ID`. The compositor also checks peer UID. Ordinary application users cannot invoke these operations. Normal Wayland clients receive assigned mobile window bounds, rather than implementing arbitrary interactive move/resize.
 
+## Notification daemon
+
+`notificationd` owns a separate in-memory notification queue. Its endpoint is
+`/run/leon/notifications.sock`, an AF_UNIX stream socket with mode 0666. It uses
+one newline-terminated JSON object per connection, at most 8191 bytes before
+the newline, and replies with newline-terminated JSON followed by EOF. Every
+reply includes `ok`; failures also include `error`. Partial reads/writes are
+supported, with sixteen concurrent connections and a one-second absolute
+deadline for each request and response phase. Local peer credentials determine
+authorization; request fields cannot override an ordinary application's UID.
+
+| Operation | Fields | Caller |
+| --- | --- | --- |
+| `notify` | `title`, at most 160 UTF-8 bytes | installed application UID |
+| `notifications` | none | root or desktop UID 1000 |
+| `notify_for` | `uid`, `title` | root only; reserved for the legacy broker relay |
+
+The service resolves both built-in and installed application identities through
+the same validated catalog as the launcher, without calling the launcher. An
+uninstalled application's reserved UID is insufficient to submit a notification.
+Application-supplied `app` and `uid` fields in `notify` do not select its source.
+The queue retains the latest 64 entries, evicting the oldest first. Listing
+returns `notifications: [{"app": "APP_ID", "title": "TEXT"}, ...]` in oldest-first
+order. Submission returns `{"ok":true}`. Notifications contain no body, action,
+timestamp or persistent ID. They are not persisted, and restarting notificationd
+clears the queue. This protocol adds no clear/update operations, channels,
+permissions UI, sound/vibration or network push service.
+
+The root daemon accepts `--root DIR`, `--builtin DIR` and `--socket PATH` for
+isolated development. Its C17 entry point, concurrent socket loop and bounded
+store use a private C++ JSON/catalog adapter to reuse the existing manifest and
+identity policy; no new third-party JSON parser or public SDK is introduced.
+
 ## LMUI
 
 Applications include `<lmui/lmui.hpp>` and link through `pkg-config lmui` with C++20. `Application` owns the Wayland connection, window, input processing and event loop. Applications supply `paint`, `pointer`, `scroll`, `key` and `tick` callbacks. `redraw()` schedules a fresh frame; `quit()` ends the loop. A maximum of three live shared-memory buffers bounds frame allocation.
