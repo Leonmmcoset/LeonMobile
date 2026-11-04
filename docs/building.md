@@ -101,3 +101,35 @@ python3 scripts/test-qemu.py --package build/hello/org.example.hello-1.0.0.lmpkg
 ```
 
 `--images dist/leonmobile-1.0.0-qemu-aarch64` validates an assembled release. CI runs native checks on every change; the full image/QEMU job is available through workflow dispatch. See [validation evidence](validation.md) for the tested scope and limits.
+
+## Record a system tour
+
+An actual QEMU boot and touch-driven tour can be recorded on a headless host:
+
+```sh
+sudo apt-get install ffmpeg xvfb xdotool python3-pil qemu-system-gui
+python3 scripts/record-qemu.py --output build/recordings/LeonMobile-demo.mp4
+```
+
+The recorder uses a private disk copy, an isolated Xvfb display and QEMU's SDL
+backend. FFmpeg continuously records the native 480×960 viewport at 30 fps as
+H.264/yuv420p MP4, with playback chapters and fast-start metadata. The complete
+boot, waits, application launches, animations and shutdown stay at their actual
+speed. Kernel boot text remains on the serial console; the graphical capture
+starts blank until the compositor appears. The tour has no audio track.
+
+The tour opens all eight built-ins from their icons. It calculates `7 + 3`,
+changes settings, runs the stopwatch, types with the screen keyboard and saves
+a note, creates a file, posts an LMUI notification, opens the shade, displays a
+small PNG example, runs kernel/architecture commands in the terminal and
+switches recent tasks before powering off through the UI. The PNG example is
+temporary recording data, uploaded through the development console. Screenshots,
+serial/encoder logs and a chapter timeline are stored beside the video in a
+directory of the same name. The lock-screen screenshot is compared with the
+recorded viewport to detect host decorations, scaling or cropping.
+
+`--images DIR` selects another reference-image directory. An existing output is
+rejected; use a new filename for another take. Videos and supporting evidence
+belong under ignored `build/`, rather than in Git. This is a recording of the
+QEMU developer prototype, with the same device and security limits as normal
+target validation.

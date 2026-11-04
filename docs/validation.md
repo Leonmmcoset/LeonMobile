@@ -174,3 +174,19 @@ and shade display captures. The daemon remains a volatile local notification
 service for the QEMU developer prototype; persistence, clear/update operations,
 channels, alert hardware and network push are outside this change. The local
 `dist/` release bundle was not regenerated.
+
+## Recorded system tour (2026-11-04)
+
+`scripts/record-qemu.py` completed a real-time boot, touch-driven tour of all
+eight built-ins and UI poweroff using the default image on a private disk copy.
+The native framebuffer and Xvfb viewport matched at 480×960. The resulting
+silent MP4 contains 4,684 H.264/yuv420p frames at 30 fps, runs 156.134 seconds
+and includes twelve playback chapters. Full FFmpeg decoding completed without
+errors, and decoded frames were inspected for the lock screen, calculation,
+settings, stopwatch, keyboard, live notification, image and terminal.
+
+The video, preview, chapter timeline and serial/encoder logs are ignored under
+`build/recordings/LeonMobile-1.0.0-boot-and-apps*`; the capture command and host
+requirements are documented in [building.md](building.md#record-a-system-tour).
+The recording includes the actual graphical startup wait and application
+animations, with no playback acceleration or audio track.
