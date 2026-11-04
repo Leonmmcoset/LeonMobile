@@ -43,6 +43,7 @@ Oneshots cannot declare watchdogs. Existing simple services remain compatible.
 | --- | --- | --- |
 | `list` | none | root/desktop |
 | `launch`, `stop` | `id` | root/desktop |
+| `close` | `id` (asynchronous task dismissal) | root/desktop |
 | `foreground` | running `id` | root/desktop |
 | `save` | running cooperative `id` | root/desktop |
 | `background`, `lifecycle` | none | root/desktop |
@@ -77,12 +78,28 @@ notification shade retains the app's foreground state.
 
 `lifecycle` reports PID, foreground/cooperative/responsive/pending flags and
 the last event for each app, plus the latest 64 observed exit records.
+It also reports `stopping` and `stop_phase` (`running`, `shutdown`, `term`, or
+`kill`). `list` includes the same per-app state in `applications` alongside
+the existing `apps` and `running` fields, so task rows and PIDs share one snapshot.
 `lmpkg lifecycle` prints this state. Missing a two-second acknowledgement marks
 the app unresponsive, rather than killing an otherwise usable app. Stop/remove
 requests first send `shutdown`, allow two seconds for state save and exit, then
 SIGTERM for one second before SIGKILL. Broker shutdown sends all cooperative
 requests together with a two-second aggregate grace. Old manifests remain
 supported through signal-based termination, with no required SDK change.
+
+`close` / `lmpkg close APP_ID` starts this exit sequence without waiting for it;
+success means the request was accepted. The event loop continues serving other
+apps while the deadline runs. Repeated closes and closes of an absent app are
+idempotent and do not extend deadlines. Closing drops foreground priority and
+rejects launch, foreground and save requests for that instance. An acknowledgement
+confirms handling of `shutdown`, not process exit: the task remains `stopping`
+until `waitpid` observes its exit and records the actual status. Both cooperative
+and forced exits appear once in exit history. Legacy apps skip checkpoint grace
+and receive SIGTERM immediately. `stop` and `remove` retain synchronous behavior,
+with a four-second wait bound and a failure if the kernel has not reaped the app;
+an outstanding close continues in the event loop after that failure. Signals
+cannot guarantee immediate exit for a process stuck in uninterruptible kernel I/O.
 
 `lmpkg save APP_ID` dispatches an explicit checkpoint request without changing
 foreground state or restarting the application. Its successful reply confirms

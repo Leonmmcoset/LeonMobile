@@ -77,49 +77,56 @@ void Processes::poll_clients() {
 }
 void Processes::foreground(const std::string &id) {
     fail(running_.contains(id), "application is not running");
+    fail(clients_.at(id).stop_phase == StopPhase::none, "application is stopping");
     for (auto &[other, client] : clients_) {
         bool active = other == id;
         if (client.foreground != active) {
-            client.foreground = active;
+            priority(other, active);
             event(other, active ? "foreground" : "background");
-            if (!options_.development) {
-                auto oom = "/proc/" + std::to_string(running_.at(other)) + "/oom_score_adj";
-                int fd = open(oom.c_str(), O_WRONLY | O_CLOEXEC);
-                if (fd >= 0) {
-                    const char *value = active ? "0" : "500";
-                    write(fd, value, strlen(value));
-                    close(fd);
-                }
-            }
+        }
+    }
+}
+void Processes::priority(const std::string &id, bool foreground) {
+    clients_.at(id).foreground = foreground;
+    if (!options_.development) {
+        auto path = "/proc/" + std::to_string(running_.at(id)) + "/oom_score_adj";
+        int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            const char *value = foreground ? "0" : "500";
+            (void)write(fd, value, strlen(value));
+            close(fd);
         }
     }
 }
 void Processes::background() {
     for (auto &[id, client] : clients_)
         if (client.foreground) {
-            client.foreground = false;
+            priority(id, false);
             event(id, "background");
-            if (!options_.development) {
-                auto path = "/proc/" + std::to_string(running_.at(id)) + "/oom_score_adj";
-                int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
-                if (fd >= 0) {
-                    write(fd, "500", 3);
-                    close(fd);
-                }
-            }
         }
 }
 void Processes::save(const std::string &id) {
     fail(running_.contains(id), "application is not running");
+    fail(clients_.at(id).stop_phase == StopPhase::none, "application is stopping");
     fail(clients_.at(id).fd >= 0, "application does not support lifecycle requests");
     event(id, "save");
 }
 Json Processes::lifecycle() const {
     Json states = Json::object();
-    for (const auto &[id, client] : clients_)
-        states[id] = {{"pid", running_.at(id)},        {"foreground", client.foreground},
-                      {"cooperative", client.fd >= 0}, {"responsive", client.responsive},
-                      {"pending", client.pending},     {"event", client.event}};
+    for (const auto &[id, client] : clients_) {
+        const char *phase = client.stop_phase == StopPhase::shutdown ? "shutdown"
+                            : client.stop_phase == StopPhase::term   ? "term"
+                            : client.stop_phase == StopPhase::kill   ? "kill"
+                                                                     : "running";
+        states[id] = {{"pid", running_.at(id)},
+                      {"foreground", client.foreground},
+                      {"cooperative", client.fd >= 0},
+                      {"responsive", client.responsive},
+                      {"pending", client.pending},
+                      {"event", client.event},
+                      {"stopping", client.stop_phase != StopPhase::none},
+                      {"stop_phase", phase}};
+    }
     return {{"applications", states}, {"exits", exits_}};
 }
 std::string Processes::reclaim() {
@@ -128,7 +135,8 @@ std::string Processes::reclaim() {
     std::string victim;
     long long oldest = LLONG_MAX;
     for (const auto &[id, client] : clients_)
-        if (!client.foreground && client.fd >= 0 && client.deadline < oldest) {
+        if (!client.foreground && client.fd >= 0 && client.stop_phase == StopPhase::none &&
+            client.deadline < oldest) {
             oldest = client.deadline;
             victim = id;
         }
@@ -163,6 +171,7 @@ void Processes::reap() {
             } else
                 ++i;
     }
+    advance_stops();
 }
 pid_t Processes::launch(Packages &packages, const std::string &id) {
     reap();
@@ -354,42 +363,49 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
     foreground(id);
     return pid;
 }
-void Processes::stop(const std::string &id) {
-    if (running_.contains(id)) {
+void Processes::request_stop(const std::string &id) {
+    if (!running_.contains(id))
+        return;
+    auto &client = clients_.at(id);
+    // Repeated taps must not extend the checkpoint or termination deadline.
+    if (client.stop_phase != StopPhase::none)
+        return;
+    priority(id, false);
+    event(id, "shutdown");
+    client.stop_phase = StopPhase::shutdown;
+    client.stop_deadline = now_ms() + (client.fd >= 0 ? 2000 : 0);
+    advance_stops();
+}
+void Processes::advance_stops() {
+    auto now = now_ms();
+    for (auto &[id, client] : clients_) {
+        if (client.stop_phase == StopPhase::none || now < client.stop_deadline)
+            continue;
         pid_t pid = running_.at(id);
-        uid_t uid = clients_.at(id).uid;
-        event(id, "shutdown");
-        auto deadline = now_ms() + (clients_.at(id).fd >= 0 ? 2000 : 0);
-        while (running_.contains(id) && now_ms() < deadline) {
-            reap();
-            usleep(10000);
-        }
-        if (running_.contains(id)) {
+        if (client.stop_phase == StopPhase::shutdown) {
             kill(-pid, SIGTERM);
-            deadline = now_ms() + 1000;
-            while (running_.contains(id) && now_ms() < deadline) {
-                reap();
-                usleep(10000);
-            }
-        }
-        if (running_.contains(id)) {
-            if (!options_.development)
-                leon_cgroup_kill(uid);
+            client.stop_phase = StopPhase::term;
+            client.stop_deadline = now + 1000;
+        } else {
+            if (!options_.development && leon_cgroup_kill(client.uid))
+                perror("application cgroup termination");
             kill(-pid, SIGKILL);
-            int status;
-            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
-            }
-            if (!options_.development)
-                publish_exit(id, pid, 128 + SIGKILL);
-            auto &client = clients_.at(id);
-            if (client.fd >= 0)
-                close(client.fd);
-            clients_.erase(id);
-            running_.erase(id);
+            // Only waitpid may remove a task or report its exit status. A
+            // successful signal does not mean the process has already exited.
+            client.stop_phase = StopPhase::kill;
+            client.stop_deadline = now + 1000;
         }
-        if (!options_.development)
-            fail(!leon_cgroup_kill(uid), "cannot terminate application resource group");
     }
+}
+void Processes::stop(const std::string &id) {
+    request_stop(id);
+    auto deadline = now_ms() + 4000;
+    while (running_.contains(id) && now_ms() < deadline) {
+        reap();
+        if (running_.contains(id))
+            usleep(10000);
+    }
+    fail(!running_.contains(id), "application is still stopping");
 }
 Processes::~Processes() {
     for (const auto &[id, pid] : running_) {

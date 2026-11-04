@@ -37,7 +37,11 @@ static void write_all(int fd, const char *p, size_t n) {
 } // namespace
 std::string request(const std::string &socket_path, const Json &message) {
     Fd fd(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0));
-    timeval timeout{message.value("op", "") == "install" ? 60 : 3, 0};
+    auto op = message.value("op", "");
+    timeval timeout{op == "install"                                       ? 60
+                    : (op == "stop" || op == "remove" || op == "reclaim") ? 5
+                                                                          : 3,
+                    0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     sockaddr_un address{};

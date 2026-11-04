@@ -251,6 +251,16 @@ Permission-dialog input is restricted in the compositor as well as the shell.
 The status bar reads netd/powerd state and displays unknown supply information
 when the guest exposes no power supply.
 
+Asynchronous task dismissal added four native identity tests. All eight CTest
+checks and 37 Python integration tests passed, as did the independent Weston
+smoke. The rebuilt AArch64/musl image passed the core-only QEMU suite with an
+actual SIGSTOP-frozen Wayland app: close returned before checkpoint grace elapsed,
+another app launched and retained foreground priority, repeated closes did not
+reset deadlines, SIGTERM escalated to SIGKILL, and detached cgroup members died.
+Native checks additionally covered concurrent closes, acknowledgement without
+exit, cooperative checkpoints, legacy termination, access denial and exact exit
+history. Evidence is `build/task-lifecycle-step1-{native,wayland,target,image,qemu}.log`.
+
 Reproduce with `make test`, `./scripts/test-wayland.sh`,
 `./scripts/build-target-probes.sh` and the full target command in
 [building.md](building.md#target-validation). CI's optional image job includes

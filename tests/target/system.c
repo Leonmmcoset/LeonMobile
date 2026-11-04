@@ -239,6 +239,8 @@ static int timed(void) {
 }
 static int cleanup(void) {
     CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.gallery\"}"));
+    pid_t app = (pid_t)probe_integer("pid");
+    CHECK(app > 1);
     int gate[2];
     CHECK(!pipe(gate));
     pid_t child = fork();
@@ -260,7 +262,38 @@ static int cleanup(void) {
     CHECK(write(gate[1], "1", 1) == 1);
     close(gate[1]);
     usleep(100000);
-    CHECK(RPC("apps", "{\"op\":\"stop\",\"id\":\"org.leon.gallery\"}"));
+    // A stopped Wayland client cannot checkpoint or handle SIGTERM. Its close
+    // must still return promptly, leave the broker usable and reach SIGKILL.
+    CHECK(!kill(app, SIGSTOP));
+    struct timespec before, after;
+    CHECK(!clock_gettime(CLOCK_MONOTONIC, &before));
+    CHECK(RPC("apps", "{\"op\":\"close\",\"id\":\"org.leon.gallery\"}"));
+    CHECK(!clock_gettime(CLOCK_MONOTONIC, &after));
+    CHECK((after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1000000 <
+          1500);
+    CHECK(probe_has("\"stopping\":true") && probe_has("\"stop_phase\":\"shutdown\""));
+    CHECK(!probe_rpc("apps", "{\"op\":\"foreground\",\"id\":\"org.leon.gallery\"}", 0) &&
+          probe_has("\"ok\":false"));
+    CHECK(!probe_rpc("apps", "{\"op\":\"close\",\"id\":\"org.leon.gallery\"}", 11004) &&
+          probe_has("\"ok\":false"));
+    CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.calculator\"}"));
+    pid_t foreground = (pid_t)probe_integer("pid");
+    CHECK(foreground > 1);
+    int saw_term = 0, reaped = 0;
+    for (int i = 0; i < 60; ++i) {
+        CHECK(RPC("apps", "{\"op\":\"close\",\"id\":\"org.leon.gallery\"}"));
+        if (probe_has("\"stop_phase\":\"term\""))
+            saw_term = 1;
+        if (kill(app, 0) == -1 && errno == ESRCH) {
+            reaped = 1;
+            break;
+        }
+        usleep(100000);
+    }
+    CHECK(saw_term && reaped && !kill(foreground, 0));
+    CHECK(RPC("apps", "{\"op\":\"lifecycle\"}"));
+    CHECK(probe_has("\"status\":137") && probe_has("\"foreground\":true"));
+    CHECK(RPC("apps", "{\"op\":\"stop\",\"id\":\"org.leon.calculator\"}"));
     int status = 0;
     pid_t result = 0;
     for (int i = 0; i < 50; ++i) {
@@ -276,7 +309,8 @@ static int cleanup(void) {
     CHECK(result == child && WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
     CHECK(RPC("crash", "{\"op\":\"list\"}"));
     CHECK(probe_has("\"exits\":[{"));
-    passed("app stop kills detached cgroup members and persists observed exits");
+    passed("async close remains responsive, preserves foreground, escalates and kills detached "
+           "cgroup members");
     return 0;
 }
 static int crash(void) {

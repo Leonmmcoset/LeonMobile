@@ -12,13 +12,16 @@ Broker::Broker(const Options &options)
         fail(!leon_cgroup_reset(), "cannot clean stale application resource groups");
 }
 Json Broker::dispatch(const Json &request, uid_t caller) {
+    processes_.reap();
     Json response;
     auto op = request.at("op").get<std::string>();
     bool shell = caller == 0 || caller == 1000;
     bool settings = shell || caller == 11000;
     if (op == "list") {
         fail(shell, "permission denied");
-        response = {{"apps", packages_.list()}, {"running", processes_.running()}};
+        response = {{"apps", packages_.list()},
+                    {"running", processes_.running()},
+                    {"applications", processes_.lifecycle().at("applications")}};
     } else if (op == "launch") {
         fail(shell, "permission denied");
         response = {{"pid", processes_.launch(packages_, request.at("id"))}};
@@ -42,10 +45,14 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
         std::string id = request.at("id");
         processes_.stop(id);
         packages_.remove(id, request.value("purge", false));
-    } else if (op == "stop") {
+    } else if (op == "close" || op == "stop") {
         fail(shell, "permission denied");
         std::string id = request.at("id");
-        processes_.stop(id);
+        if (op == "close")
+            processes_.request_stop(id);
+        else
+            processes_.stop(id);
+        response = processes_.lifecycle();
     } else if (op == "settings")
         response = {{"settings", settings_.read()}};
     else if (op == "set") {
