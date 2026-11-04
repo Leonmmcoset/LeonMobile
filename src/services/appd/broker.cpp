@@ -1,12 +1,16 @@
 #include "broker.hpp"
 #include "internal.hpp"
+#include "sandbox.h"
 #include <csignal>
 #include <leon/ipc.hpp>
 #include <unistd.h>
 namespace leon::appd {
 Broker::Broker(const Options &options)
     : options_(options), packages_(options.root, options.builtin), processes_(options),
-      settings_(options) {}
+      settings_(options) {
+    if (!options_.development)
+        fail(!leon_cgroup_reset(), "cannot clean stale application resource groups");
+}
 Json Broker::dispatch(const Json &request, uid_t caller) {
     Json response;
     auto op = request.at("op").get<std::string>();
@@ -48,7 +52,8 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
     } else if (op == "poweroff" || op == "reboot") {
         fail(shell, "permission denied");
         fail(!options_.development, "power operations disabled for development roots");
-        kill(1, op == "reboot" ? SIGUSR2 : SIGUSR1);
+        response = Json::parse(leon::request("/run/leon/power.sock", {{"op", op}}));
+        fail(response.value("ok", false), "power service rejected request");
     } else if (op == "notifications" || op == "notify") {
         // Keep the v1 application endpoint as a relay; notificationd alone
         // owns the queue and validates the original peer's app identity.

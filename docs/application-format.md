@@ -74,3 +74,38 @@ installed app requests it from the independent permission portal and the desktop
 confirms it. See [core-services.md](core-services.md) for requests, decisions,
 revocation and selected-file copies. The terminal declares network access, and
 the editor declares file import; neither declaration is an automatic grant.
+
+## Kernel enforcement at launch
+
+On the reference target the broker waits for cgroup setup and an exec/setup
+acknowledgment before returning a successful launch. Required isolation failure
+is an error. Each application UID has a cgroup v2 subtree with `memory.max` =
+256 MiB, `memory.oom.group` = 1 and `pids.max` = 128. These limits include children.
+The whole cgroup is killed on app exit/forced stop, including children that create
+new sessions. Broker startup removes stale app processes left by an earlier
+broker crash. Foreground/background OOM priorities and cooperative checkpointing
+remain part of the lifecycle protocol.
+
+Landlock ABI 3 or later restricts writes to the app's home/runtime and the
+explicit PTY/null/random devices. Read/execute rules cover installed applications,
+OS libraries/programs, configuration, proc/sysfs and the public service directory;
+ordinary Unix permissions still apply. Other private homes and shared documents
+cannot be opened directly. `/tmp` is not granted; `TMPDIR` is the app's private
+`.tmp` directory. Apps should use HOME/XDG directories rather than shared scratch
+paths. Selected files arrive through the portal as private copies.
+
+The inherited seccomp policy permits AF_UNIX and grants AF_INET/AF_INET6 socket
+creation only when the manifest declares network and the portal has approved it.
+It denies netlink/packet sockets, ptrace, namespace creation, mount/privilege
+interfaces, dangerous kernel administration syscalls and io_uring's alternate
+socket path. The audit architecture and x32 syscall range are checked. Open-file
+limit is 512 and core limit is 8 MiB. Policies are inherited across fork/exec.
+
+This is an actual kernel-enforced developer policy with stated boundaries.
+AF_UNIX IPC and the Wayland server are shared; each privileged service must still
+authorize peers. Publisher signatures, full per-app namespaces, credential-based
+screen unlock, hardware device permission APIs and an adversarial security audit
+are outside this implementation. A granted app can communicate with other apps;
+this is not a claim of complete information-flow isolation. Explicit development
+roots (`leon-launchd --root`) bypass target cgroups/Landlock to support native host
+fixtures; distribution services never pass that option.

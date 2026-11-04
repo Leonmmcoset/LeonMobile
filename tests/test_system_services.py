@@ -220,6 +220,27 @@ class SystemServices(unittest.TestCase):
         failed=subprocess.run([BUILD/'bin/memd','--test','--socket',endpoint],capture_output=True,timeout=4)
         self.assertNotEqual(failed.returncode,0);self.assertEqual(target.read_text(),'keep')
 
+    def test_broker_transport_slow_peers_and_newline_validation(self):
+        endpoint=self.root/'apps.sock'
+        p=subprocess.Popen([BUILD/'bin/leon-launchd','--root',self.root,'--builtin',self.builtin,
+                            '--socket',endpoint,'--runtime-dir',self.root/'runtime'],
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        try:
+            deadline=time.monotonic()+4
+            while not endpoint.exists() and time.monotonic()<deadline:time.sleep(.01)
+            slow=[]
+            for _ in range(16):
+                sock=socket.socket(socket.AF_UNIX);sock.connect(str(endpoint));sock.sendall(b'{');slow.append(sock)
+            time.sleep(1.3)
+            self.assertTrue(rpc(endpoint,{'op':'settings'})['ok'])
+            for sock in slow:sock.close()
+            with socket.socket(socket.AF_UNIX) as sock:
+                sock.connect(str(endpoint));sock.sendall(b'{"op":"settings"}');sock.shutdown(socket.SHUT_WR)
+                self.assertFalse(json.loads(sock.recv(4096))['ok'])
+        finally:
+            p.terminate();_,stderr=p.communicate(timeout=6)
+            self.assertEqual(p.returncode,0,stderr.decode())
+
     def test_bounded_transport_malformed_and_slow_clients(self):
         with self.daemon('memd') as (endpoint,p):
             slow=[]

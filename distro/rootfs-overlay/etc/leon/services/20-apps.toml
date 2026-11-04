@@ -1,4 +1,7 @@
 name = "apps"
 command = ["/usr/sbin/leon-launchd"]
+type = "notify"
+ready_timeout_ms = 10000
+watchdog_ms = 15000
 after = ["prepare", "portal", "crash"]
 restart = "always"

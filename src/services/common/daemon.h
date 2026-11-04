@@ -2,6 +2,9 @@
 #define LEON_SYSTEM_DAEMON_H
 #include "json.h"
 #include <limits.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define LM_REQUEST_LIMIT 8191
 struct lm_options {
     const char *socket_path, *state, *root, *builtin, *proc, *sys;
@@ -29,4 +32,7 @@ int lm_read_text(const char *path, char *out, size_t size);
 int lm_child_setup(pid_t parent);
 int lm_child(char *const argv[], const char *input, unsigned timeout_ms);
 lm_json *lm_rpc(const char *socket, const lm_json *request);
+#ifdef __cplusplus
+}
+#endif
 #endif

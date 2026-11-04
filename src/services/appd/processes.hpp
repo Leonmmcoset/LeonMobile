@@ -23,6 +23,7 @@ class Processes {
     Options options_;
     std::map<std::string, pid_t> running_;
     struct Client {
+        uid_t uid{};
         int fd{-1};
         unsigned sequence{};
         long long deadline{};
