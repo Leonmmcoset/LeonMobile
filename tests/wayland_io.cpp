@@ -26,5 +26,22 @@ int main() {
     assert(writable == 1);
     close(fds[0]);
     close(fds[1]);
+    lmui::Application committed("org.leon.commit-test", "Surface commit ordering");
+    int paints = 0, callbacks = 0, idle_ticks = 0;
+    committed.paint = [&](lmui::Canvas &) { ++paints; };
+    committed.after_commit([&] { assert(false && "superseded callback must be cancelled"); });
+    committed.after_commit([&] {
+        assert(paints > 0 && callbacks == 0);
+        ++callbacks;
+        int previous = paints;
+        committed.after_commit([&, previous] {
+            assert(paints > previous && callbacks == 1);
+            ++callbacks;
+            committed.quit();
+        });
+    });
+    committed.tick = [&] { assert(++idle_ticks < 10 && "commit acknowledgement timed out"); };
+    assert(!committed.run());
+    assert(callbacks == 2);
     return 0;
 }

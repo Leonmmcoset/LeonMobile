@@ -125,3 +125,13 @@ build an external program from the relocated SDK. Target checks launch every
 built-in and compare its process command and UID with the installed manifest.
 Record observed validation and commit each completed reviewable step before
 starting the next. Downloads, build evidence and generated images remain ignored.
+# Surface commit acknowledgement
+
+`lmui::Application::after_commit(std::function<void()>)` schedules a callback on
+the UI thread after the Wayland server has processed the next submitted buffer
+commit. It uses `wl_display.sync` after `wl_surface.commit`; it confirms server
+processing, not physical presentation. A newer call replaces a callback waiting
+for its commit. One acknowledgement may be in flight while another waits for the
+next commit. Destruction cancels both. The shell uses this barrier before asking
+the compositor to reveal a newly painted, opaque lock page. The independent
+Weston I/O test verifies ordering, replacement and nested scheduling.

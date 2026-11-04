@@ -21,6 +21,8 @@ struct Application::Impl {
     wl_touch *touch{};
     wl_surface *surface{};
     wl_callback *frame_callback{};
+    wl_callback *commit_sync{};
+    std::function<void()> pending_commit, synced_commit;
     xdg_surface *xdg{};
     xdg_toplevel *toplevel{};
     xkb_context *xkb{};

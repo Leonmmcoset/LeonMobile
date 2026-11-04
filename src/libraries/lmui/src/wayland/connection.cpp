@@ -13,6 +13,8 @@ Application::Impl::~Impl() {
         close(lifecycle_fd);
     if (frame_callback)
         wl_callback_destroy(frame_callback);
+    if (commit_sync)
+        wl_callback_destroy(commit_sync);
     for (auto &b : buffers) {
         if (b->buffer)
             wl_buffer_destroy(b->buffer);

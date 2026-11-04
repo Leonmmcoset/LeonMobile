@@ -30,6 +30,9 @@ class Application {
     bool transparent{};
     int run();
     void redraw();
+    // Runs on the UI thread after the server processes the next surface commit.
+    // A newer call replaces the callback waiting for that commit.
+    void after_commit(std::function<void()> callback);
     void quit();
     void input_region(const std::vector<Rect> &rectangles);
     void on_pointer_motion(std::function<void(double, double)> callback);

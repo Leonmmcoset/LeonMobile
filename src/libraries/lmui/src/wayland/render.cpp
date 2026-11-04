@@ -59,6 +59,22 @@ void Application::Impl::draw() {
         wl_callback_add_listener(frame_callback, &frame_events, this);
     }
     wl_surface_commit(surface);
+    if (pending_commit && !commit_sync) {
+        synced_commit = std::move(pending_commit);
+        commit_sync = wl_display_sync(display);
+        static const wl_callback_listener sync_events = {
+            [](void *data, wl_callback *callback, uint32_t) {
+                auto &s = *static_cast<Impl *>(data);
+                wl_callback_destroy(callback);
+                s.commit_sync = nullptr;
+                auto done = std::move(s.synced_commit);
+                if (s.pending_commit)
+                    s.dirty = true;
+                if (done)
+                    done();
+            }};
+        wl_callback_add_listener(commit_sync, &sync_events, this);
+    }
     b->busy = true;
 }
 } // namespace lmui

@@ -16,6 +16,10 @@ int Application::run() {
     }
 }
 void Application::redraw() { impl->dirty = true; }
+void Application::after_commit(std::function<void()> callback) {
+    impl->pending_commit = std::move(callback);
+    redraw();
+}
 void Application::quit() { impl->running = false; }
 void Application::on_lifecycle(std::function<bool(LifecycleEvent)> callback) {
     impl->lifecycle_callback = std::move(callback);
