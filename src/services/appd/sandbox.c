@@ -126,6 +126,7 @@ int leon_sandbox(const char *home, const char *runtime, int network) {
     if (rule(rules, home, all) || rule(rules, runtime, all) ||
         rule(rules, "/dev/null", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/zero", FS_READ | FS_WRITE) || rule(rules, "/dev/urandom", FS_READ) ||
+        rule(rules, "/dev/tty", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/random", FS_READ) || rule(rules, "/dev/ptmx", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/pts", FS_READ | FS_WRITE | FS_DIR))
         failed = 1;

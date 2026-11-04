@@ -11,7 +11,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 int main(int argc, char **argv) {
-    struct manager state = {.log_directory = "/var/log/leon"};
+    struct manager state = {.log_directory = "/var/log/leon",
+                            .policy_directory = "/data/leon/developer/services"};
     struct manager *manager = &state;
     const char *dir = "/etc/leon/services", *socket_path = "/run/leon/services.sock";
     int check = 0;
@@ -24,8 +25,12 @@ int main(int argc, char **argv) {
             socket_path = argv[++i];
         else if (!strcmp(argv[i], "--log-dir") && i + 1 < argc)
             manager->log_directory = argv[++i];
+        else if (!strcmp(argv[i], "--policy-dir") && i + 1 < argc)
+            manager->policy_directory = argv[++i];
         else {
-            fputs("usage: leond [--check] [--config DIR] [--socket PATH]\n", stderr);
+            fputs("usage: leond [--check] [--config DIR] [--socket PATH] [--log-dir DIR] "
+                  "[--policy-dir DIR]\n",
+                  stderr);
             return 2;
         }
     }

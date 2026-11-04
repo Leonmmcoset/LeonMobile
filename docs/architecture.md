@@ -41,12 +41,14 @@ session lifetime are documented in [terminal.md](terminal.md).
 | --- | --- |
 | `src/libraries/lmui` | Public UI headers and shared LMUI runtime |
 | `src/libraries/ipc` | Unprivileged local JSON client transport |
+| `src/libraries/root-client` | Peer-verified credential transport and root PTY descriptor framing |
 | `src/libraries/app-support` | Internal built-in window, input and UI helpers |
 | `src/libraries/package` | Manifest policy, durable JSON, catalog, archive verification and installation transactions |
 | `src/services/init` | Early root setup, PID 1 supervision and final shutdown |
 | `src/services/serviced` | Service configuration, dependency graph, process lifecycle, scheduling and local control |
 | `src/services/appd` | Socket server, peer-authorized broker, application process registry and preferences/audio operations |
 | `src/services/notificationd` | Independent notification socket, peer authorization, bounded queue and shared catalog adapter |
+| `src/services/rootd` | Durable root opt-in/password policy, isolated root PTYs and developer management |
 | `src/services/common` | Bounded C service transport, durable state helpers and private JSON/catalog adapter |
 | `src/services/{memd,powerd,storaged,netd,timed,crashd,portald}` | Independent system operations and policies described in core-services.md |
 | `src/tools` | Service and package command-line clients |

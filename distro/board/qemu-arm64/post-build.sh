@@ -36,3 +36,6 @@ chmod 0600 "$target/etc/shadow"
 rm -f "$target/bin/su" "$target/sbin/sulogin" "$target/usr/bin/sudoedit"
 chmod 0755 "$target/usr/bin/sudo"
 ln -s sudo "$target/usr/bin/sudoedit"
+if [ -x "$target/usr/bin/leonsu" ]; then
+    ln -sfn /usr/bin/leonsu "$target/bin/su"
+fi

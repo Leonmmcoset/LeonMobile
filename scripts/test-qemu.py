@@ -211,9 +211,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not notification_probe and not system_probe and not terminal_probe:
+    if not notification_probe and not system_probe and not terminal_probe and not root_probe:
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -226,6 +226,16 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         put(notification_probe, "/usr/bin/leon-test-notifications")
     if terminal_probe:
         put(terminal_probe, "/usr/bin/leon-test-terminal")
+    if root_probe:
+        put(root_probe, "/usr/bin/leon-test-root")
+        unit = temporary / "root-test.toml"
+        unit.write_text('name="root-test"\ncommand=["/usr/bin/leon-test-root"]\n'
+                        'after=["root"]\ntype="oneshot"\nrestart="never"\n')
+        put(unit, "/etc/leon/services/99-root-test.toml")
+        helper = temporary / "root-helper.toml"
+        helper.write_text('name="root-test-helper"\ncommand=["/bin/sleep","600"]\n'
+                          'after=["prepare"]\nrestart="never"\n')
+        put(helper, "/etc/leon/services/98-root-helper.toml")
     if system_probe:
         put(system_probe, "/usr/bin/leon-test-system")
         unit = temporary / "test-service.toml"
@@ -469,10 +479,18 @@ def main():
                         help="AArch64 system service/sandbox probe, injected only into a private disk")
     parser.add_argument("--terminal-probe", type=Path,
                         help="AArch64 terminal VT/PTY probe plus interactive shell/vi/top/clipboard tests")
+    parser.add_argument("--root-probe", type=Path,
+                        help="AArch64 root protocol/cgroup/module probe, only on a disposable disk")
+    parser.add_argument("--root-only", action="store_true",
+                        help="focused root protocol, cgroup and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
     if args.core_only and not args.system_probe:parser.error("--core-only requires --system-probe")
+    if args.root_only and (not args.root_probe or args.core_only):
+        parser.error("--root-only requires --root-probe and excludes --core-only")
+    if args.root_probe and not args.root_probe.is_file():
+        parser.error("--root-probe must name a compiled AArch64 probe")
     if args.package and not args.package.is_file():
         parser.error("--package must name a compiled SDK hello package")
     if args.notification_probe and not args.notification_probe.is_file():
@@ -491,7 +509,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -537,6 +555,9 @@ def main():
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":
                     raise RuntimeError("Guest kernel version mismatch")
+                if args.root_probe:
+                    from root_qemu import wait_probe
+                    wait_probe(guest, artifacts, 1)
                 if args.system_probe:
                     limit = time.monotonic() + 150
                     result = ""
@@ -552,7 +573,7 @@ def main():
                 services = guest.run("leonctl status")
                 (artifacts / "notifications-service.txt").write_text(services + "\n")
                 service_pids = {}
-                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"):
+                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root"):
                     running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
                     if not running:
                         raise RuntimeError("Required service is not running: " + service)
@@ -605,6 +626,18 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.root_only:
+                    from root_qemu import verify_console, reboot_and_probe
+                    verify_console(guest)
+                    for phase in (2, 3):
+                        reboot_and_probe(guest, artifacts, phase, args.timeout)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode:
+                        raise RuntimeError("Root test shutdown failed")
+                    passed = True
+                    print("Root protocol, cgroups, modules and two real reboots passed", flush=True)
+                    return
                 if args.core_only:
                     preferences=json.loads(guest.run("cat /data/leon/settings.json"))
                     exercise_core_ui(guest,qmp,artifacts,preferences)

@@ -1,17 +1,8 @@
 #include "daemon.h"
 #include "service.h"
+#include "linux_openat2.h"
 #include <errno.h>
 #include <fcntl.h>
-/* Linux openat2 UAPI, kept local for the pinned musl SDK's older headers. */
-struct open_how {
-    uint64_t flags, mode, resolve;
-};
-#define RESOLVE_NO_SYMLINKS 0x04
-#define RESOLVE_NO_MAGICLINKS 0x02
-#define RESOLVE_BENEATH 0x08
-#ifndef SYS_openat2
-#define SYS_openat2 437
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

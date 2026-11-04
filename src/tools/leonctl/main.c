@@ -6,7 +6,7 @@
 #include <unistd.h>
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 3) {
-        fputs("usage: leonctl status|start|stop|restart [SERVICE] | poweroff | reboot\n", stderr);
+        fputs("usage: leonctl status|start|stop|restart|reload [SERVICE] | poweroff | reboot\n", stderr);
         return 2;
     }
     const char *path = getenv("LEON_SERVICE_SOCKET");

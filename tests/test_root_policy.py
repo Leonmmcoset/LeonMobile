@@ -32,3 +32,7 @@ class RootImagePolicy(unittest.TestCase):
                     result = subprocess.run([target / "usr/bin" / name, "id"], capture_output=True)
                     self.assertEqual(result.returncode, 126)
                     self.assertIn(b"disabled by system policy", result.stderr)
+            (target / "usr/bin/leonsu").touch(mode=0o755)
+            subprocess.run(["bash", script, target], check=True, capture_output=True)
+            self.assertEqual(os.readlink(target / "bin/su"), "/usr/bin/leonsu")
+            self.assertFalse((target / "usr/bin/leonsu").stat().st_mode & 0o6000)

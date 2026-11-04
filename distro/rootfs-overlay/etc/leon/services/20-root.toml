@@ -1,0 +1,8 @@
+name = "root"
+command = ["/usr/sbin/rootd"]
+after = ["prepare"]
+restart = "always"
+restart_limit = 10
+type = "notify"
+ready_timeout_ms = 15000
+watchdog_ms = 5000

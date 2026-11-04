@@ -22,6 +22,13 @@ return `error`. Unknown operations and wrong field types fail.
 | `crash.sock` | `crash` / `crashd` | `/data/leon/crashes/` |
 | `portal.sock` | `portal` / `portald` | `/data/leon/system/grants.json` |
 
+The separate `root` / `rootd` service uses `/run/leon-root/control.sock` with a
+five-second watchdog and a root-owned runtime directory. Password policy,
+credential boundaries, authenticated PTY sessions, kernel/module management and
+persistent service overrides are specified in [root-access.md](root-access.md).
+Root elevation starts disabled; PID 1 and privileged system services keep their
+required UID 0 identity.
+
 Root and the desktop UID 1000 are trusted. Settings UID 11000 has only the
 explicit additional privileges below. Application identity comes from the
 validated installed package catalog. A supplied UID cannot impersonate a peer.

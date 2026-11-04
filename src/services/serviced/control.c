@@ -1,4 +1,5 @@
 #include "manager.h"
+#include "policy.h"
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -49,7 +50,12 @@ void manager_handle(struct manager *manager, int server) {
         int i = manager_index(manager, name);
         if (i < 0)
             dprintf(fd, "ERR unknown service\n");
-        else if (!strcmp(verb, "stop")) {
+        else if (!strcmp(verb, "reload")) {
+            if (service_policy_apply(manager->policy_directory, &manager->services[i]))
+                dprintf(fd, "ERR invalid developer policy\n");
+            else
+                dprintf(fd, "OK\n");
+        } else if (!strcmp(verb, "stop")) {
             manager_stop(&manager->services[i]);
             dprintf(fd, "OK\n");
         } else if (!strcmp(verb, "start") || !strcmp(verb, "restart")) {

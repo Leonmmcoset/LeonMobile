@@ -1,4 +1,5 @@
 #include "manager.h"
+#include "policy.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +30,14 @@ int manager_load(struct manager *manager, const char *dir) {
                 fprintf(stderr, "leond: %s\n",
                         manager->count == LM_MAX_SERVICES ? "too many services" : error);
                 result = -1;
-            } else
+            } else {
+                if (service_policy_apply(manager->policy_directory,
+                                         &manager->services[manager->count]))
+                    fprintf(stderr,
+                            "leond: invalid developer policy for %s; using built-in policy\n",
+                            manager->services[manager->count].name);
                 ++manager->count;
+            }
         }
         free(entries[i]);
     }

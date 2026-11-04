@@ -5,7 +5,7 @@ struct manager {
     struct service services[LM_MAX_SERVICES];
     int count, order[LM_MAX_SERVICES];
     int shutting_down;
-    const char *log_directory;
+    const char *log_directory, *policy_directory;
 };
 long long service_now_ms(void);
 int manager_index(const struct manager *manager, const char *name);

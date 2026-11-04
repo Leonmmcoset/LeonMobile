@@ -1,0 +1,5 @@
+find_package(OpenSSL REQUIRED)
+add_executable(rootd main.c policy.c session.c management.c)
+target_compile_definitions(rootd PRIVATE _GNU_SOURCE)
+target_link_libraries(rootd PRIVATE leon-system leon-root-wire leon-service-config leon-service-policy OpenSSL::Crypto util)
+install(TARGETS rootd RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR} COMPONENT Runtime)

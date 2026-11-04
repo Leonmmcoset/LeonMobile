@@ -33,7 +33,15 @@ Oneshots cannot declare watchdogs. Existing simple services remain compatible.
 
 `restart` is `never` (default), `on-failure`, or `always`. Rapid failures use exponential delay capped at 32 seconds and a configurable retry count; the count resets after 30 seconds of runtime. Stop sends SIGTERM to the service group and escalates after three seconds. During shutdown, a dependency remains alive until its dependent services exit; independent services can stop concurrently. The manager caps total shutdown at 30 seconds, and PID 1 allows 35 seconds for it to finish. The parser accepts IDs and retry limits in the range 0–60000. Default identity is root; non-root services have supplementary groups cleared.
 
-`/run/leon/services.sock` accepts one newline-terminated text command per connection. `status [name]` returns tab-separated service state, PID, exit code and retry count. `start name`, `stop name`, `restart name`, `poweroff`, and `reboot` require root and return `OK` or `ERR ...`. The client is `leonctl`. No network listener is exposed. This is a local v1 control interface, not a stable remote API.
+`/run/leon/services.sock` accepts one newline-terminated text command per connection. `status [name]` returns tab-separated service state, PID, exit code and retry count. `start name`, `stop name`, `restart name`, `reload name`, `poweroff`, and `reboot` require root and return `OK` or `ERR ...`. The client is `leonctl`. No network listener is exposed. This is a local v1 control interface, not a stable remote API.
+
+`reload` applies the root-owned developer override in
+`/data/leon/developer/services/NAME.json` (or `leond --policy-dir DIR` in tests).
+It contains exactly `autostart`, `restart` and `restart_limit`, validated against
+the descriptor's types/ranges. Restart policy changes immediately; autostart is
+read on next manager start. Reload does not restart or stop the current process.
+The independent root broker, its peer/password authorization, PTY FD transport
+and developer operations are specified in [root-access.md](root-access.md).
 
 ## Application broker
 

@@ -13,9 +13,16 @@ mkdir -p "$repo/build"
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
     "$repo/tests/target/system_sandbox.c" "$repo/src/services/appd/sandbox.c" \
     -o "$repo/build/system-probe"
+"$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
+    -I"$repo/src/libraries/root-client" -c "$repo/src/libraries/root-client/wire.c" \
+    -o "$repo/build/root-wire-probe.o"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    -I"$repo/src/libraries/root-client" \
+    "$repo/tests/target/root.c" "$repo/tests/target/system_transport.c" \
+    "$repo/build/root-wire-probe.o" -o "$repo/build/root-probe"
 "${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Os \
     -I"$repo/src/apps/terminal" \
     "$repo/tests/terminal.cpp" "$repo/src/apps/terminal/screen.cpp" \
     "$repo/src/apps/terminal/session.cpp" "$repo/src/apps/terminal/input.cpp" \
     -lvterm -lxkbcommon -lutil -o "$repo/build/terminal-probe"
-echo 'AArch64 notification, system and terminal probes compiled under build/; no image was changed.'
+echo 'AArch64 notification, system, root and terminal probes compiled under build/; no image was changed.'

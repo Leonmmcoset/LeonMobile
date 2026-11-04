@@ -16,7 +16,10 @@ static int call(const char *service, const char *request) {
     if (fd < 0)
         return -1;
     struct sockaddr_un address = {.sun_family = AF_UNIX};
-    snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon/%s.sock", service);
+    if (!strcmp(service, "root"))
+        snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon-root/control.sock");
+    else
+        snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon/%s.sock", service);
     struct timeval timeout = {.tv_sec = 6};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
