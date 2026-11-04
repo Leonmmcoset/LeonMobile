@@ -137,6 +137,8 @@ class AppManagementTests(unittest.TestCase):
         self.assertEqual(local["source"], "local-unsigned")
         self.assertTrue(local["actions"]["uninstall"])
         self.assertEqual(self.info()["source"], "system-image")
+        self.assertEqual(self.info()["storage"]["package"]["bytes"],
+                         Path(sys.executable).stat().st_blocks * 512)
         self.assertEqual(self.info()["permissions"][0]["state"], "not-requested")
         self.launch()
         self.launch("org.leon.settings")

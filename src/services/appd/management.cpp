@@ -73,9 +73,19 @@ Json managed_info(Packages &packages, const Processes &processes, const Options 
     }
     auto program = manifest.value("builtin", false) ? packages.executable(manifest)
                                                     : packages.root / "apps" / id;
+    Json program_usage;
+    try {
+        // Only image-owned executable paths may be resolved; data walks never
+        // follow links. Some images/native fixtures provide executable links.
+        if (manifest.value("builtin", false))
+            program = fs::canonical(program);
+        program_usage = storage_usage(program, false);
+    } catch (const std::exception &e) {
+        program_usage = {{"available", false}, {"error", e.what()}};
+    }
     app["permissions"] = permissions;
     app["permissions_available"] = permissions_available;
-    app["storage"] = {{"package", storage_usage(program, false)},
+    app["storage"] = {{"package", program_usage},
                         {"data", storage_usage(packages.root / "data" / id)},
                         {"runtime", storage_usage(fs::path(options.runtime_prefix) /
                                                    std::to_string(manifest.at("uid").get<uid_t>()))}};
