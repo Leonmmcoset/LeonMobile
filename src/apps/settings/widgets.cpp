@@ -76,6 +76,11 @@ void icon(Canvas &c, Icon type, double x, double y, Color color) {
         line(17, 5, 23, 12); line(23, 12, 17, 19);
         line(14, 2, 10, 22);
         break;
+    case Icon::applications:
+        for (int row = 0; row < 2; ++row)
+            for (int col = 0; col < 2; ++col)
+                outline({2.0 + col * 12, 2.0 + row * 12, 8, 8}, 2);
+        break;
     }
     c.restore();
 }

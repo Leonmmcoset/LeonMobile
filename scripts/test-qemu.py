@@ -211,9 +211,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -224,6 +224,8 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         commands.append("set_inode_field " + destination + " mode 0100755")
     if notification_probe:
         put(notification_probe, "/usr/bin/leon-test-notifications")
+    if applications_probe:
+        put(applications_probe, "/usr/bin/leon-test-applications")
     if terminal_probe:
         put(terminal_probe, "/usr/bin/leon-test-terminal")
     if auth_probe:
@@ -506,11 +508,22 @@ def main():
                         help="AArch64 authentication probe, only on a disposable disk")
     parser.add_argument("--auth-only", action="store_true",
                         help="real device credential UI, compositor protection, crash recovery and reboot checks")
+    parser.add_argument("--applications-probe", type=Path,
+                        help="test-only AArch64 management observation client")
+    parser.add_argument("--applications-only", action="store_true",
+                        help="Settings application management, clear/uninstall and real reboot persistence")
     parser.add_argument("--root-only", action="store_true",
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
+    if args.applications_only and (not args.applications_probe or not args.package or
+                                   args.auth_only or args.root_only or args.core_only):
+        parser.error("--applications-only requires --applications-probe and --package, excluding other focused modes")
+    if args.applications_probe and not args.applications_probe.is_file():
+        parser.error("--applications-probe must name a compiled AArch64 probe")
+    if args.applications_probe and not args.package:
+        parser.error("--applications-probe requires --package for management UI validation")
     if args.auth_only and (not args.auth_probe or not args.root_probe or args.core_only or args.root_only):
         parser.error("--auth-only requires --auth-probe and --root-probe, excluding other focused modes")
     if args.core_only and not args.system_probe:parser.error("--core-only requires --system-probe")
@@ -538,7 +551,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -648,23 +661,45 @@ def main():
                     raise RuntimeError("Desktop did not render; inspect guest compositor logs")
                 # A short lock-screen drag follows the contact, then returns
                 # without unlocking. Compare the static instruction region.
-                lock = frame
+                def lock_hint(pixels):
+                    return pixels[730 * 480 * 3:850 * 480 * 3]
+                # A saturated background pixel can precede the final text
+                # opacity. Observe a stable hint before comparing drag frames.
+                lock, stable = frame, 0
+                lock_deadline = time.monotonic() + 10
+                while time.monotonic() < lock_deadline:
+                    time.sleep(.15)
+                    current = qmp.capture(artifacts / "lock.ppm")
+                    stable = stable + 1 if lock_hint(current) == lock_hint(lock) else 0
+                    lock = current
+                    if stable >= 3: break
+                else: raise RuntimeError("Initial lock hint did not settle")
                 qmp.move(240, 790)
                 time.sleep(.05)
                 qmp.button(True)
                 qmp.move(240, 760)
-                time.sleep(.2)
-                held = qmp.capture(artifacts / "lock-dragging.ppm")
+                held = qmp.wait_frame(artifacts / "lock-dragging.ppm",
+                                      lambda current: lock_hint(current) != lock_hint(lock),
+                                      "Short lock drag did not follow the held pointer")
                 qmp.button(False)
-                time.sleep(.6)
-                settled = qmp.capture(artifacts / "lock-settled.ppm")
-                def lock_hint(pixels):
-                    return pixels[730 * 480 * 3:850 * 480 * 3]
-                if lock_hint(held) == lock_hint(lock) or lock_hint(settled) != lock_hint(lock):
-                    raise RuntimeError("Short lock drag did not track and settle without unlocking")
+                settled = qmp.wait_frame(artifacts / "lock-settled.ppm",
+                                         lambda current: lock_hint(current) == lock_hint(lock),
+                                         "Short lock drag did not settle without unlocking")
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.applications_only:
+                    from applications_qemu import exercise_applications_ui
+                    exercise_applications_ui(guest, qmp, artifacts, args.package, args.timeout,
+                                             reboot=True)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode: raise RuntimeError("Application management test shutdown failed")
+                    if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
+                        raise RuntimeError("Compositor did not shut down cleanly after management tests")
+                    passed = True
+                    print("Settings application management UI, package/data reset and actual reboot checks passed", flush=True)
+                    return
                 if args.auth_only:
                     from auth_qemu import exercise_authentication
                     exercise_authentication(guest, qmp, artifacts, args.timeout)
@@ -1157,6 +1192,15 @@ def main():
                 qmp.wait_frame(artifacts / "shade-backdrop-dismissed.ppm",
                                lambda frame: lock_header(frame) == lock_header(unlocked),
                                "Shade backdrop did not return to the home screen")
+                if args.applications_probe:
+                    if not args.package:
+                        raise RuntimeError("Application management UI checks require --package")
+                    from applications_qemu import exercise_applications_ui
+                    exercise_applications_ui(guest, qmp, artifacts, args.package, args.timeout)
+                    qmp.click(240, 940)
+                    qmp.wait_frame(artifacts / "applications-finished-home.ppm",
+                                   lambda frame: pixel(frame, 240, 210) == primary,
+                                   "Home did not settle after management checks")
                 qmp.click(400, 22)
                 wait_shade_stage("shade-before-poweroff.ppm", 700)
                 qmp.click(432, 628)

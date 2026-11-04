@@ -14,6 +14,14 @@ void SettingsApplication::open(Page page) {
     keyboard = false;
     scroll = 0;
     error.clear();
+    if (page == Page::applications) {
+        application_id_.clear();
+        application_ = Json::object();
+        applications_confirmation_.clear();
+        applications_query_.clear();
+        applications_message_.clear();
+        applications_refresh();
+    }
     if (page == Page::security)
         security_refresh();
     if (page == Page::developer) {
@@ -26,6 +34,8 @@ void SettingsApplication::open(Page page) {
     app.redraw();
 }
 void SettingsApplication::back() {
+    if (page_ == Page::applications && applications_back())
+        return;
     if (page_ == Page::security && security_dialog_) {
         clear_device_fields();
         app.redraw();
@@ -47,6 +57,10 @@ void SettingsApplication::back() {
     app.redraw();
 }
 void SettingsApplication::text_input(const std::string &text) {
+    if (page_ == Page::applications) {
+        applications_text(text);
+        return;
+    }
     if (page_ == Page::security) {
         security_text(text);
         return;
@@ -73,6 +87,7 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
     return true;
 }
 void SettingsApplication::on_tick() {
+    applications_poll();
     if (security_dialog_ && !app.focused()) {
         clear_device_fields();
         app.redraw();
@@ -133,6 +148,8 @@ std::string SettingsApplication::summary(Page page) const {
         return tr(en, "设备 PIN、密码与自动锁定", "Device PIN, password and locking");
     case Page::developer:
         return tr(en, "Root、内核、模块与服务", "Root, kernel, modules and services");
+    case Page::applications:
+        return tr(en, "应用信息、权限与存储", "App info, permissions and storage");
     default:
         return {};
     }

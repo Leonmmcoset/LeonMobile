@@ -26,6 +26,7 @@ class ApplicationWindow {
     virtual void restore_state(const Json &) {}
     virtual std::string enter_text() const { return "\n"; }
     virtual bool private_text_input() const { return false; }
+    virtual bool defer_preferences() const { return false; }
     virtual bool can_scroll(double, double) const { return false; }
     void transition_content(double dx = 32, double dy = 0);
     void perform(const std::function<void()> &action);

@@ -429,3 +429,35 @@ the older `dist/` release bundle was not regenerated. The production image conta
 no test helpers or fixture credentials. Reproduction and precise trust boundaries
 are in [device-authentication.md](device-authentication.md). Physical phone
 hardware and an independent security audit remain outside this validation.
+
+## Settings application management
+
+The native suite passed 11 CTest cases and 66 Python integration tests. The
+management fixtures use real Unix peer UIDs and cover protected apps, installed
+metadata/source, permission states and reset persistence, shutdown checkpoint
+writers, all-version uninstall, identity retention, symlinks/hardlinks/FIFOs,
+bounded storage scans and unavailable services. A transport regression checks
+that a disconnected service raises an IPC error with default SIGPIPE handling.
+
+Independent Weston passed the eight-app/shell/shade/motion/lifecycle smoke suite.
+The dedicated `--applications` input test drove the real Settings UI through
+search/details, stopping, cancelling and confirming data clear and uninstall,
+permission reset, broker SIGSTOP with responsive back navigation, and a broker
+exit/restart followed by Refresh. Screenshots were inspected for the detail,
+confirmation and target permission layouts.
+
+The focused AArch64 QEMU service run passed resource-group cleanup of a
+SIGSTOP-stalled app and a detached writer before deletion, protected actions,
+fresh storage and relaunch, plus the existing core/sandbox/IME/portal checks.
+The focused `--applications-only` run drove the same management actions under
+the real compositor, rebooted the kernel, verified reset/uninstall persistence,
+relaunched the cleared builtin and shut down the compositor cleanly.
+
+Reproduction and operation semantics are in
+[application-management.md](application-management.md). Evidence remains ignored
+under `build/app-management-*.log`, `build/screenshots/applications-*` and
+`build/qemu-test/applications-*`. The AArch64 image under `output/images/` was
+rebuilt; no management test helper is shipped and the older `dist/` release bundle
+was not regenerated. Validation is limited to the QEMU developer prototype;
+storage counts are allocated-space estimates and interrupted multi-service
+cleanup can require retry, as documented in the protocol.

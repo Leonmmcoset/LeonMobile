@@ -7,6 +7,29 @@ socket peers. UID 0, desktop UID 1000 and Settings UID 11000 can use `app_list`,
 Other app UIDs cannot inspect or modify another application's management data.
 The existing `list`, `launch` and `install` operations remain desktop/root-only.
 
+## Settings UI
+
+Open **Settings → Apps** (设置 → 应用管理) from the category home, or find it
+with the home search. The page lists installed builtins and local packages,
+supports name/ID filtering, and opens an individual app's information page.
+Details show version, honest source, current running state, declared permission
+status, allocated package/private/runtime storage and supported actions. System
+uninstall and Settings self-stop/reset are disabled in both UI and broker.
+
+Stop preserves app data and grants. Clear data and uninstall first show a
+confirmation naming the app and explaining deletion, permission reset and the
+preservation of shared files. Cancel has no mutation side effect. A started
+request continues if the user navigates away. Completed mutations refresh the
+details/catalog; errors remain explicit and can be retried with Refresh.
+
+Management requests run on a worker; controls disable during a request and idle
+pages refresh every five seconds. Settings defers the built-in support layer's
+synchronous preference polling during a pending request, so a stopped/busy broker
+does not block back navigation through that extra poll. Other builtins retain
+their existing polling behavior. The internal `ApplicationWindow::defer_preferences`
+hook is not part of the installed LMUI SDK. Native fixtures can select only the
+management endpoint with `LEON_APPS_SOCKET`; production uses the default socket.
+
 ## Wire protocol
 
 Requests are newline-delimited JSON using the existing bounded broker transport.
@@ -42,7 +65,8 @@ Apps with no declarations have an empty list.
 or `available:false,error:TEXT`. Bytes are allocated filesystem blocks (`st_blocks
 * 512`), including directory blocks, and each inode is counted once per category.
 Builtin package usage covers its executable only; shared libraries and system
-resources are excluded. Local package usage includes all retained versions.
+resources are excluded. Image-owned executable links resolve to their real file;
+application data links are never followed. Local package usage includes all retained versions.
 Private data includes logs, imported files, checkpoints and temporary files.
 Runtime space is reported separately. Live usage is an estimate, not a filesystem
 quota or a transactional snapshot.
@@ -53,9 +77,11 @@ System applications cannot be uninstalled. Settings cannot stop or reset itself.
 Validation happens before stopping an app; a rejected system uninstall has no
 process side effect. Private data removal never touches device credentials, root
 policy, global Settings preferences, another app's home, or shared user files.
-Legacy online `remove` uses the same validation, stop and permission reset; its
+Legacy broker `remove` uses the same validation, stop and permission reset; its
 `purge` flag still controls whether private data is retained. Offline `lmpkg
 --root` remains an image/development tool, without running services to coordinate.
+Settings always uses the broker; direct privileged package-library operations
+remain administrative tools and do not provide that cross-service coordination.
 
 Stopping first requests lifecycle shutdown, then escalates through SIGTERM to
 SIGKILL on the existing deadlines. On target, the broker kills the entire cgroup
@@ -100,3 +126,28 @@ build/system-probe`: live management/cgroup checks, existing core service and
 sandbox probes, IME crash recovery, permission denial/approval, file import and
 offline private-state inspection. Build logs, probes and disk evidence remain
 under ignored `build/` and `output/` paths.
+
+Reproduce the interactive checks after building host binaries and target image:
+
+```sh
+./scripts/test-wayland.sh
+python3 scripts/test-wayland-input.py --applications
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 300 --applications-only \
+  --applications-probe build/applications-probe \
+  --package build/hello/org.example.hello-1.0.0.lmpkg
+```
+
+The QEMU helper is injected into a disposable disk and is absent from the release
+image. It observes app metadata/storage under the real console UID independently
+of the Settings display. The focused run drives stop, cancel/confirm clear,
+protected Settings controls, permission display, cancel/confirm uninstall, then
+performs an actual reboot to check persisted reset/uninstall and builtin relaunch.
+
+The final native checks passed 11 CTest cases (including the daemon-disconnect
+transport regression) and 66 Python tests. Independent Weston passed all eight
+apps, shell/shade/motion/lifecycle smoke tests and actual Settings management
+input: search, details, stop, cancel/confirm clear and uninstall, permission reset,
+SIGSTOP-broker back navigation, daemon exit and refresh after restart. The focused
+QEMU management run passed all UI actions, actual reboot persistence, builtin
+relaunch and clean compositor shutdown on the rebuilt AArch64/musl image.

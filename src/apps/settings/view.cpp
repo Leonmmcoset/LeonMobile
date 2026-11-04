@@ -13,7 +13,9 @@ void SettingsApplication::paint_header(Canvas &c) {
         c.line(28, 33, 48, 33, t.text);
         click(hits, {8, 8, 56, 48}, [this] { back(); });
         c.text(tr(en, "设置", "Settings"), {72, 8, w - 96, 48}, 18, t.text);
-        c.text(title(page_), {24, 76, w - 48, 64}, 32, t.text);
+        c.text(page_ == Page::applications && !application_id_.empty()
+                   ? tr(en, "应用信息", "App info") : title(page_),
+               {24, 76, w - 48, 64}, 32, t.text);
         return;
     }
     c.text(tr(en, "设置", "Settings"), {24, 24, w - 48, 72}, 42, t.text);
@@ -40,6 +42,8 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     double end = 700;
     if (page_ == Page::home)
         end = top + visible_entries().size() * 84;
+    else if (page_ == Page::applications)
+        end = applications_bottom();
     else if (page_ == Page::sound || page_ == Page::navigation)
         end = 500;
     else if (page_ == Page::system)
@@ -67,7 +71,9 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     c.save();
     c.clip(viewport_);
     cairo_translate(c.cr, 0, -scroll);
-    if (page_ == Page::security)
+    if (page_ == Page::applications)
+        paint_applications(c);
+    else if (page_ == Page::security)
         paint_security(c);
     else if (page_ == Page::developer)
         paint_developer(c);

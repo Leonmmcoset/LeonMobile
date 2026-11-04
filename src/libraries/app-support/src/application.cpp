@@ -114,6 +114,8 @@ void ApplicationWindow::perform(const std::function<void()> &action) {
     app.redraw();
 }
 void ApplicationWindow::poll_preferences() {
+    if (defer_preferences())
+        return;
     if (++timezone_ticks_ % 5 == 0)
         try {
             auto zone = leon::system_request("time", {{"op", "status"}}).value("timezone", "");

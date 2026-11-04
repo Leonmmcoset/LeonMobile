@@ -14,7 +14,8 @@ enum class Page {
     language,
     navigation,
     developer,
-    security
+    security,
+    applications
 };
 enum class Icon {
     network,
@@ -25,7 +26,8 @@ enum class Icon {
     about,
     language,
     navigation,
-    developer
+    developer,
+    applications
 };
 struct Entry {
     Page page;
@@ -33,7 +35,7 @@ struct Entry {
     std::string_view chinese, english, keywords;
     bool home;
 };
-const std::array<Entry, 10> &entries();
+const std::array<Entry, 11> &entries();
 const Entry &entry(Page page);
 bool matches(const Entry &entry, std::string_view query);
 } // namespace leon::apps::settings

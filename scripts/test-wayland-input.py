@@ -9,6 +9,8 @@ import tempfile
 import time
 import json
 import socket
+import sys
+import signal
 
 repo = Path(__file__).resolve().parents[1]
 build = Path(os.environ.get("LEON_TEST_BIN", repo / "build/host"))
@@ -17,6 +19,7 @@ mode = parser.add_mutually_exclusive_group()
 mode.add_argument("--security", action="store_true", help="exercise real device credential setup, rotation and removal")
 mode.add_argument("--terminal", action="store_true", help="exercise the terminal with real shell, vi and clipboard")
 mode.add_argument("--developer", action="store_true", help="exercise Settings root setup and a private kernel fixture")
+mode.add_argument("--applications", action="store_true", help="exercise Settings app management with real broker/portal fixtures")
 args = parser.parse_args()
 with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
     runtime = Path(directory)
@@ -25,6 +28,7 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
                             pass_fds=[write_fd], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     os.close(write_fd)
     weston = client = rootd = authd = None
+    app_fixture = None
     try:
         if not select.select([read_fd], [], [], 10)[0]:
             raise RuntimeError("Xvfb did not allocate a display")
@@ -71,7 +75,17 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
                     return json.loads(connection.makefile('rb').readline())
             token = auth_call(op='authenticate')['token']
             assert auth_call(op='consume', purpose='unlock', token=token)['ok']
-        executable = "leon-terminal" if args.terminal else "leon-settings" if args.developer or args.security else "lmui-wayland-input-test"
+        if args.applications:
+            sys.path.insert(0, str(repo / "tests"))
+            from test_app_management import AppManagementTests
+            app_fixture = AppManagementTests()
+            app_fixture.setUp()
+            app_fixture.launch()
+            app_fixture.grant()
+            managed_data = app_fixture.root / "data/org.leon.gallery/private"
+            managed_data.write_text("native UI user data")
+            env["LEON_APPS_SOCKET"] = str(app_fixture.apps_endpoint)
+        executable = "leon-terminal" if args.terminal else "leon-settings" if args.developer or args.security or args.applications else "lmui-wayland-input-test"
         client = subprocess.Popen([build / "bin" / executable], env=env,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         window = subprocess.check_output(["xdotool", "search", "--sync", "--class", "weston"],
@@ -79,8 +93,79 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
         def action(*args):
             subprocess.run(["xdotool", *args], env=env, check=True, timeout=5)
         time.sleep(.6)
-        action("mousemove", "--window", window, "240", "20" if args.terminal or args.developer or args.security else "300", "click", "1")
-        if args.security:
+        action("mousemove", "--window", window, "240", "20" if args.terminal or args.developer or args.security or args.applications else "300", "click", "1")
+        if args.applications:
+            from PIL import ImageGrab
+            (repo / "build/screenshots").mkdir(parents=True, exist_ok=True)
+            def click(x, y):
+                action("mousemove", "--window", window, str(x), str(y), "click", "1")
+                time.sleep(.4)
+            def type_value(value):
+                action("type", "--clearmodifiers", "--delay", "5", value)
+                action("key", "Return")
+                time.sleep(.3)
+            def wait_for(check, description):
+                deadline = time.monotonic() + 6
+                while time.monotonic() < deadline:
+                    if check(): return
+                    if client.poll() is not None: raise RuntimeError(client.stderr.read())
+                    time.sleep(.05)
+                raise RuntimeError(description)
+            def capture(name):
+                time.sleep(.3)
+                ImageGrab.grab(xdisplay=display).save(repo / "build/screenshots" / (name + ".png"))
+            click(180, 164); type_value("Apps"); click(180, 254)
+            capture("applications-native-list")
+            click(150, 188); type_value("Gallery"); click(180, 324)
+            capture("applications-native-detail")
+            click(90, 416)
+            wait_for(lambda: not app_fixture.info()["running"], "Settings Stop did not stop app")
+            assert managed_data.exists(), "Stop must retain private data"
+            click(240, 416)
+            capture("applications-native-clear-confirm")
+            click(120, 512)
+            assert managed_data.exists(), "Cancel clear erased data"
+            click(240, 416); click(360, 512)
+            wait_for(lambda: not managed_data.exists(), "Settings clear did not erase private data")
+            wait_for(lambda: app_fixture.info()["permissions"][0]["state"] == "not-requested",
+                     "Settings clear did not reset grants")
+            capture("applications-native-cleared")
+            click(36, 33)
+            click(150, 188)
+            for _ in "Gallery": action("key", "BackSpace")
+            type_value("Demo"); click(180, 324)
+            capture("applications-native-local")
+            click(390, 416); click(120, 512)
+            assert app_fixture.call("app_info", app_fixture.local)["ok"], "Cancel uninstall removed app"
+            click(390, 416); click(360, 512)
+            wait_for(lambda: not app_fixture.call("app_info", app_fixture.local)["ok"],
+                     "Settings uninstall did not remove local app")
+            capture("applications-native-uninstalled")
+            # A blocked broker must not freeze Settings through its usual
+            # synchronous preference poll while an async management job waits.
+            os.kill(app_fixture.broker.pid, signal.SIGSTOP)
+            try:
+                started = time.monotonic()
+                click(420, 188)
+                click(36, 33)
+                shot = ImageGrab.grab(xdisplay=display)
+                assert shot.getpixel((30, 156))[:3] == (234, 221, 255), "Settings froze during broker stall"
+                assert time.monotonic() - started < 2, "Settings navigation stalled with broker"
+                shot.save(repo / "build/screenshots/applications-native-stalled-responsive.png")
+            finally:
+                os.kill(app_fixture.broker.pid, signal.SIGCONT)
+            time.sleep(.4)
+            click(180, 254)
+            broker_args = app_fixture.broker.args
+            app_fixture.broker.terminate(); app_fixture.broker.communicate(timeout=5)
+            click(420, 188)
+            capture("applications-native-service-unavailable")
+            assert client.poll() is None, "Broker failure crashed Settings"
+            app_fixture.broker = app_fixture.start(broker_args, app_fixture.apps_endpoint)
+            click(420, 188)
+            capture("applications-native-service-recovered")
+            print("Independent Weston: app search/details, stop, cancel/confirm clear and uninstall, permission reset, broker stall responsiveness and failure/retry passed")
+        elif args.security:
             def click(x, y):
                 action("mousemove", "--window", window, str(x), str(y), "click", "1")
                 time.sleep(.35)
@@ -253,7 +338,7 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
                 raise RuntimeError(error)
             print(out.strip())
     except Exception:
-        if args.terminal or args.developer or args.security:
+        if args.terminal or args.developer or args.security or args.applications:
             from PIL import ImageGrab
             (repo / "build/screenshots").mkdir(parents=True, exist_ok=True)
             ImageGrab.grab(xdisplay=display).save(repo / "build/screenshots/input-native-failed.png")
@@ -267,3 +352,6 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
                 process.terminate()
             if process:
                 process.communicate(timeout=5)
+        if app_fixture:
+            if not app_fixture.doCleanups():
+                raise RuntimeError("Application management fixture cleanup failed")

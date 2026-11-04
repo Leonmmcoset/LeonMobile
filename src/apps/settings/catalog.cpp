@@ -5,8 +5,8 @@
 #include <string>
 
 namespace leon::apps::settings {
-const std::array<Entry, 10> &entries() {
-    static const std::array<Entry, 10> catalog{{
+const std::array<Entry, 11> &entries() {
+    static const std::array<Entry, 11> catalog{{
         {Page::network, Icon::network, "网络与互联网", "Network & internet",
          "网络 互联网 以太网 IP ethernet connection", true},
         {Page::display, Icon::display, "显示", "Display",
@@ -17,6 +17,8 @@ const std::array<Entry, 10> &entries() {
         {Page::system, Icon::system, "系统", "System", "系统 语言 导航 language navigation", true},
         {Page::about, Icon::about, "关于设备", "About device", "关于 设备 版本 内核 version kernel",
          true},
+        {Page::applications, Icon::applications, "应用管理", "Apps",
+         "应用 管理 权限 停止 清除 卸载 软件 applications permissions uninstall data", true},
         {Page::language, Icon::language, "语言", "Languages", "语言 中文 英文 简体 English Chinese",
          false},
         {Page::navigation, Icon::navigation, "系统导航", "System navigation",

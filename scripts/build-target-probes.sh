@@ -13,6 +13,9 @@ mkdir -p "$repo/build"
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
     "$repo/tests/target/system_sandbox.c" "$repo/src/services/appd/sandbox.c" \
     -o "$repo/build/system-probe"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/applications.c" "$repo/tests/target/system_transport.c" \
+    -o "$repo/build/applications-probe"
 "$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
     -I"$repo/src/libraries/root-client" -c "$repo/src/libraries/root-client/wire.c" \
     -o "$repo/build/root-wire-probe.o"
@@ -32,4 +35,4 @@ mkdir -p "$repo/build"
 "${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os \
     -I"$repo/output/host/aarch64-buildroot-linux-musl/sysroot/usr/include/cairo" \
     "$repo/tests/wayland_spoof.cpp" -llmui -o "$repo/build/auth-forged-probe"
-echo 'AArch64 authentication, notification, system, root and terminal probes compiled under build/; no image was changed.'
+echo 'AArch64 application management, authentication, notification, system, root and terminal probes compiled under build/; no image was changed.'
