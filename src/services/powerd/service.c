@@ -1,4 +1,5 @@
 #include "service.h"
+#include "auth.h"
 #include "daemon.h"
 #include "hardware.h"
 #include <fcntl.h>
@@ -15,7 +16,7 @@ struct inhibitor {
     char reason[96];
 };
 struct power_state {
-    long long activity;
+    long long activity, sampled;
     unsigned idle_seconds, sequence;
     int locked, requested;
     struct inhibitor inhibitors[32];
@@ -34,9 +35,25 @@ static int inhibited(struct power_state *s) {
 }
 static void tick(struct lm_daemon *d) {
     struct power_state *s = d->data;
+    if (!d->options.test && lm_now_ms() - s->sampled >= 200) {
+        s->sampled = lm_now_ms();
+        struct auth_state state;
+        char response[LEON_AUTH_LIMIT];
+        int locked = auth_exchange(LEON_AUTH_SOCKET, "{\"op\":\"status\"}\n", response, 100) ||
+                     auth_decode(response, &state) || !state.ok || state.locked;
+        if (s->locked && !locked)
+            s->activity = lm_now_ms();
+        s->locked = locked;
+        s->requested = locked;
+    }
     if (!s->locked && s->idle_seconds && !inhibited(s) &&
-        lm_now_ms() - s->activity >= (long long)s->idle_seconds * 1000)
+        lm_now_ms() - s->activity >= (long long)s->idle_seconds * 1000) {
         s->requested = 1;
+        if (!d->options.test) {
+            (void)auth_lock(LEON_AUTH_SOCKET);
+            s->locked = 1;
+        }
+    }
 }
 static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
     struct power_state *s = d->data;
@@ -98,14 +115,27 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
         }
         if (!strcmp(op, "activity")) {
             s->activity = lm_now_ms();
-            s->requested = 0;
+            if (d->options.test)
+                s->requested = 0;
         } else if (!strcmp(op, "lock")) {
             s->requested = 1;
+            if (!d->options.test) {
+                if (auth_lock(LEON_AUTH_SOCKET)) {
+                    lm_free(out);
+                    return lm_failure(
+                        "authentication service unavailable; session remains protected");
+                }
+                s->locked = 1;
+            }
         } else if (!strcmp(op, "locked")) {
             int locked = lm_boolean(lm_get(r, "value"), -1);
             if (locked < 0) {
                 lm_free(out);
                 return lm_failure("value must be boolean");
+            }
+            if (!d->options.test) {
+                lm_free(out);
+                return lm_failure("lock state belongs to authd; use authenticated unlock");
             }
             s->locked = locked;
             s->requested = 0;

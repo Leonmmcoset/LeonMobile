@@ -228,6 +228,8 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         put(terminal_probe, "/usr/bin/leon-test-terminal")
     if auth_probe:
         put(auth_probe, "/usr/bin/leon-test-auth")
+        forged = auth_probe.parent / "auth-forged-probe"
+        if forged.is_file(): put(forged, "/usr/bin/leon-test-auth-forged")
         unit = temporary / "auth-test.toml"
         unit.write_text('name="authentication-test"\ncommand=["/usr/bin/leon-test-auth"]\n'
                         'after=["authentication"]\ntype="oneshot"\nrestart="never"\n')
@@ -255,6 +257,13 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
                         'after = ["apps", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"]\n'
                         'type = "oneshot"\nrestart = "never"\n')
         put(unit, "/etc/leon/services/99-system-test.toml")
+        # Lifecycle fault probes own foreground/background transitions. Finish
+        # them before the real shell backgrounds applications for its boot lock.
+        unit = temporary / "shell.toml"
+        unit.write_text((REPO / "distro/rootfs-overlay/etc/leon/services/30-shell.toml").read_text()
+                        .replace('after = [', 'after = ["system-test", '))
+        commands.append("rm /etc/leon/services/30-shell.toml")
+        put(unit, "/etc/leon/services/30-shell.toml")
     batch = temporary / "debugfs.commands"
     batch.write_text("\n".join(commands) + "\n")
     result = subprocess.run(["debugfs", "-w", "-f", batch, rootfs], capture_output=True, text=True, check=True)
@@ -495,11 +504,15 @@ def main():
                         help="AArch64 root protocol/cgroup/module probe, only on a disposable disk")
     parser.add_argument("--auth-probe", type=Path,
                         help="AArch64 authentication probe, only on a disposable disk")
+    parser.add_argument("--auth-only", action="store_true",
+                        help="real device credential UI, compositor protection, crash recovery and reboot checks")
     parser.add_argument("--root-only", action="store_true",
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
+    if args.auth_only and (not args.auth_probe or not args.root_probe or args.core_only or args.root_only):
+        parser.error("--auth-only requires --auth-probe and --root-probe, excluding other focused modes")
     if args.core_only and not args.system_probe:parser.error("--core-only requires --system-probe")
     if args.root_only and (not args.root_probe or args.core_only):
         parser.error("--root-only requires --root-probe and excludes --core-only")
@@ -652,6 +665,17 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.auth_only:
+                    from auth_qemu import exercise_authentication
+                    exercise_authentication(guest, qmp, artifacts, args.timeout)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode: raise RuntimeError("Authentication test shutdown failed")
+                    if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
+                        raise RuntimeError("Compositor did not shut down cleanly after authentication tests")
+                    passed = True
+                    print("Device authentication, compositor protection, fault recovery and real reboot checks passed", flush=True)
+                    return
                 if args.root_only:
                     from root_qemu import exercise_developer_ui, reboot_and_probe
                     exercise_developer_ui(guest, qmp, artifacts)

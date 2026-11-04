@@ -7,6 +7,8 @@ void focus_toplevel(struct leon_toplevel *toplevel) {
         return;
     }
     struct leon_server *server = toplevel->server;
+    if (server->session_locked && (!server->lock_ready || !server->auth_live))
+        return;
     if ((server->session_locked || server->session_modal) && !toplevel->is_shell)
         return;
     struct wlr_seat *seat = server->seat;
@@ -52,8 +54,16 @@ void focus_toplevel(struct leon_toplevel *toplevel) {
 struct leon_toplevel *desktop_toplevel_at(struct leon_server *server, double lx, double ly,
                                           struct wlr_surface **surface, double *sx, double *sy) {
     if (server->session_locked || server->session_modal) {
-        if (!server->shell)
+        if (!server->shell ||
+            (server->session_locked && (!server->lock_ready || !server->auth_live)))
             return NULL;
+        if (server->ime && server->active_text && server->input_method &&
+            ly >= server->height - 364 && ly < server->height - 64) {
+            *surface = server->ime->xdg_toplevel->base->surface;
+            *sx = lx;
+            *sy = ly - (server->height - 364);
+            return server->ime;
+        }
         *surface = server->shell->xdg_toplevel->base->surface;
         *sx = lx;
         *sy = ly;

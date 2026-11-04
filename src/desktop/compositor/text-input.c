@@ -8,12 +8,17 @@ struct leon_text_input {
     struct wl_listener enable, disable, commit, destroy;
 };
 static void geometry(struct leon_server *s) {
-    bool visible = s->active_text && s->input_method;
+    bool visible = s->active_text && s->input_method &&
+                   (!s->session_locked || (s->lock_ready && s->auth_live && s->shell &&
+                                           s->seat->keyboard_state.focused_surface ==
+                                               s->shell->xdg_toplevel->base->surface));
     if (s->ime) {
         wlr_scene_node_set_enabled(&s->ime->scene_tree->node, visible);
         if (visible)
             wlr_scene_node_raise_to_top(&s->ime->scene_tree->node);
     }
+    if (s->session_locked)
+        return;
     struct leon_toplevel *v;
     wl_list_for_each(v, &s->toplevels, link) {
         if (v->is_shell || v->is_ime)
@@ -151,8 +156,9 @@ static void new_method(struct wl_listener *listener, void *data) {
     struct leon_server *s = wl_container_of(listener, s, new_input_method);
     struct wlr_input_method_v2 *im = data;
     uid_t uid;
-    wl_client_get_credentials(wl_resource_get_client(im->resource), NULL, &uid, NULL);
-    if (uid != getuid() || s->input_method || im->seat != s->seat) {
+    pid_t pid;
+    wl_client_get_credentials(wl_resource_get_client(im->resource), &pid, &uid, NULL);
+    if (!leon_session_peer(pid, uid, "ime") || s->input_method || im->seat != s->seat) {
         wlr_input_method_v2_send_unavailable(im);
         return;
     }

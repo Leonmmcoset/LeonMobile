@@ -58,8 +58,11 @@ void Shell::pointer(double x, double y, bool down) {
         }
     }
     if (page == Page::lock) {
-        if (dy < -60 || (down_y > app.height() - 220 && std::abs(dx) < 16 && std::abs(dy) < 16))
-            home();
+        if (unlock_entry && std::abs(dx) < 16 && std::abs(dy) < 16)
+            touch_feedback.handle({x, y, PointerPhase::up}, hits);
+        else if (dy < -60 ||
+                 (down_y > app.height() - 220 && std::abs(dx) < 16 && std::abs(dy) < 16))
+            unlock_start();
         lock_drag = 0;
         touch_feedback.cancel();
         app.redraw();

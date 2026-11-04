@@ -14,6 +14,7 @@ repo = Path(__file__).resolve().parents[1]
 build = Path(os.environ.get("LEON_TEST_BIN", repo / "build/host"))
 parser = argparse.ArgumentParser(description=__doc__)
 mode = parser.add_mutually_exclusive_group()
+mode.add_argument("--security", action="store_true", help="exercise real device credential setup, rotation and removal")
 mode.add_argument("--terminal", action="store_true", help="exercise the terminal with real shell, vi and clipboard")
 mode.add_argument("--developer", action="store_true", help="exercise Settings root setup and a private kernel fixture")
 args = parser.parse_args()
@@ -23,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
     xvfb = subprocess.Popen(["Xvfb", "-displayfd", str(write_fd), "-screen", "0", "640x1100x24"],
                             pass_fds=[write_fd], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     os.close(write_fd)
-    weston = client = rootd = None
+    weston = client = rootd = authd = None
     try:
         if not select.select([read_fd], [], [], 10)[0]:
             raise RuntimeError("Xvfb did not allocate a display")
@@ -54,7 +55,23 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
             while not (runtime / "root.sock").exists() and time.monotonic() < deadline:
                 if rootd.poll() is not None: raise RuntimeError(rootd.stderr.read().decode())
                 time.sleep(.02)
-        executable = "leon-terminal" if args.terminal else "leon-settings" if args.developer else "lmui-wayland-input-test"
+        if args.security:
+            env["LEON_AUTH_SOCKET"] = str(runtime / "auth/control.sock")
+            authd = subprocess.Popen([build / "bin/authd", "--test", "--state-dir", runtime / "auth-state",
+                                      "--socket", env["LEON_AUTH_SOCKET"]], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            deadline = time.monotonic() + 5
+            while not Path(env["LEON_AUTH_SOCKET"]).exists() and time.monotonic() < deadline:
+                if authd.poll() is not None: raise RuntimeError(authd.stderr.read().decode())
+                time.sleep(.02)
+            def auth_call(**request):
+                with socket.socket(socket.AF_UNIX) as connection:
+                    connection.settimeout(4)
+                    connection.connect(env["LEON_AUTH_SOCKET"])
+                    connection.sendall(json.dumps(request).encode() + b'\n')
+                    return json.loads(connection.makefile('rb').readline())
+            token = auth_call(op='authenticate')['token']
+            assert auth_call(op='consume', purpose='unlock', token=token)['ok']
+        executable = "leon-terminal" if args.terminal else "leon-settings" if args.developer or args.security else "lmui-wayland-input-test"
         client = subprocess.Popen([build / "bin" / executable], env=env,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         window = subprocess.check_output(["xdotool", "search", "--sync", "--class", "weston"],
@@ -62,8 +79,47 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
         def action(*args):
             subprocess.run(["xdotool", *args], env=env, check=True, timeout=5)
         time.sleep(.6)
-        action("mousemove", "--window", window, "240", "20" if args.terminal or args.developer else "300", "click", "1")
-        if args.developer:
+        action("mousemove", "--window", window, "240", "20" if args.terminal or args.developer or args.security else "300", "click", "1")
+        if args.security:
+            def click(x, y):
+                action("mousemove", "--window", window, str(x), str(y), "click", "1")
+                time.sleep(.35)
+            def enter(value):
+                action("type", "--clearmodifiers", "--delay", "5", value)
+                action("key", "Return")
+                time.sleep(.25)
+            def wait_kind(kind):
+                deadline = time.monotonic() + 6
+                while time.monotonic() < deadline:
+                    status = auth_call(op='status')
+                    if status['kind'] == kind: return
+                    time.sleep(.05)
+                raise RuntimeError("Settings did not change credential kind: " + str(status))
+            click(180, 590)
+            click(180, 454)
+            click(180, 328)
+            enter('739182'); enter('739182')
+            wait_kind('pin')
+            from PIL import ImageGrab
+            (repo / "build/screenshots").mkdir(parents=True, exist_ok=True)
+            ImageGrab.grab(xdisplay=display).save(repo / "build/screenshots/security-native-pin.png")
+            click(180, 400)
+            for value in ('739182', 'Device passphrase 2026!', 'Device passphrase 2026!'): enter(value)
+            wait_kind('password')
+            click(180, 472)
+            enter('wrong-password')
+            deadline = time.monotonic() + 5
+            while not auth_call(op='status')['retry_after_ms'] and time.monotonic() < deadline: time.sleep(.02)
+            assert auth_call(op='status')['kind'] == 'password'
+            time.sleep(1.2)
+            click(180, 472)
+            enter('Device passphrase 2026!')
+            wait_kind('none')
+            policy = (runtime / 'auth-state/policy.json').read_text()
+            assert '739182' not in policy and 'Device passphrase 2026!' not in policy
+            ImageGrab.grab(xdisplay=display).save(repo / "build/screenshots/security-native-disabled.png")
+            print("Independent Weston: Settings PIN setup, password rotation, incorrect credential delay and authenticated removal passed")
+        elif args.developer:
             password = "NativeRoot!2026"
             def click(x, y):
                 action("mousemove", "--window", window, str(x), str(y), "click", "1")
@@ -197,7 +253,7 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
                 raise RuntimeError(error)
             print(out.strip())
     except Exception:
-        if args.terminal or args.developer:
+        if args.terminal or args.developer or args.security:
             from PIL import ImageGrab
             (repo / "build/screenshots").mkdir(parents=True, exist_ok=True)
             ImageGrab.grab(xdisplay=display).save(repo / "build/screenshots/input-native-failed.png")
@@ -206,7 +262,7 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
         raise
     finally:
         os.close(read_fd)
-        for process in (client, rootd, weston, xvfb):
+        for process in (client, rootd, authd, weston, xvfb):
             if process and process.poll() is None:
                 process.terminate()
             if process:

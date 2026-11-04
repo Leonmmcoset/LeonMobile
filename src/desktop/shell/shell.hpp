@@ -1,5 +1,7 @@
 #pragma once
+#include "auth.h"
 #include "shade.hpp"
+#include <future>
 #include <leon/mobile/ui.hpp>
 #include <leon/system.hpp>
 namespace leon::shell {
@@ -26,6 +28,15 @@ class Shell {
     double notification_scroll{}, notification_start{}, notification_limit{};
     mobile::Rect volume_track{}, notification_bounds{};
     int reported_locked{-1};
+    auth_state authentication{};
+    std::string device_secret, auth_message, ready_epoch;
+    std::future<auth_state> auth_job;
+    bool unlock_entry{}, unlock_pending{};
+    void authentication_refresh();
+    void unlock_start();
+    void unlock_submit();
+    void unlock_text(const std::string &text);
+    void clear_device_secret();
     Json permission = Json::object(), power_state = Json::object();
     std::string power_label(bool compact = false) const;
     bool permission_focused{};

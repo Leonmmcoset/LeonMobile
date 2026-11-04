@@ -5,11 +5,13 @@
 using namespace mobile;
 namespace leon::shell {
 Shell::Shell() {
+    device_secret.reserve(128);
     control("lock");
     control("unmodal");
     app.transparent = true;
     refresh();
     app.tick = [this] {
+        authentication_refresh();
         if (++ticks % 5 == 0) {
             refresh();
             if (page == Page::active && !active_id.empty() &&
@@ -21,6 +23,23 @@ Shell::Shell() {
         }
     };
     app.key = [this](const KeyEvent &e) {
+        if (page == Page::lock) {
+            if (e.pressed) {
+                if (e.symbol == XKB_KEY_Escape) {
+                    clear_device_secret();
+                    unlock_entry = false;
+                } else if (e.symbol == XKB_KEY_Return || e.symbol == XKB_KEY_KP_Enter)
+                    unlock_start();
+                else if (e.symbol == XKB_KEY_BackSpace)
+                    unlock_text("\b");
+                else if (!e.text.empty()) {
+                    unlock_entry = true;
+                    unlock_text(e.text);
+                }
+                app.redraw();
+            }
+            return;
+        }
         if (e.pressed && e.symbol == XKB_KEY_Escape) {
             if (power_menu) {
                 power_menu = false;
@@ -52,6 +71,7 @@ Shell::Shell() {
             app.redraw();
         }
     };
+    app.on_text_input([this](const std::string &text) { unlock_text(text); });
     app.paint = [this](Canvas &canvas) { paint(canvas); };
     if (getenv("LMUI_CAPTURE_FRAME")) {
         const char *preview = getenv("LEON_SHELL_CAPTURE_SHADE");
@@ -103,8 +123,15 @@ void Shell::synchronize_background() {
     }
 }
 void Shell::show_page(Page destination) {
-    if (destination == Page::lock || page == Page::lock)
-        control(destination == Page::lock ? "lock" : "unlock");
+    if (destination != Page::lock && page == Page::lock &&
+        (!authentication.ok || authentication.locked))
+        return;
+    if (destination == Page::lock) {
+        clear_device_secret();
+        unlock_entry = unlock_pending = false;
+        ready_epoch.clear();
+        control("lock");
+    }
     reset_shade();
     page = destination;
     active_id.clear();
@@ -117,6 +144,8 @@ void Shell::show_page(Page destination) {
 }
 void Shell::home() { show_page(Page::home); }
 void Shell::launch(std::string id) {
+    if (page == Page::lock || !authentication.ok || authentication.locked)
+        return;
     try {
         rpc({{"op", "launch"}, {"id", id}});
         background_pending = false;

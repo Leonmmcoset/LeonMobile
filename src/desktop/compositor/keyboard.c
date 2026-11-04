@@ -17,6 +17,8 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
 }
 
 static bool handle_keybinding(struct leon_server *server, xkb_keysym_t sym) {
+    if (server->session_locked)
+        return true;
     /*
      * Here we handle compositor keybindings. This is when the compositor is
      * processing keys, rather than passing them on to the client for its own

@@ -18,14 +18,6 @@ void Shell::system_refresh() {
     try {
         auto power = system_request("power", {{"op", "status"}});
         power_state = power;
-        if (power.value("lock_requested", false) && page != Page::lock)
-            show_page(Page::lock);
-        int locked = page == Page::lock;
-        if (locked != reported_locked) {
-            control(locked ? "lock" : "unlock");
-            system_request("power", {{"op", "locked"}, {"value", bool(locked)}});
-            reported_locked = locked;
-        }
     } catch (...) {
     }
     try {

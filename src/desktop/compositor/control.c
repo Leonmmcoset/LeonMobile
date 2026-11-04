@@ -13,7 +13,7 @@ static int mobile_control(int fd, uint32_t mask, void *data) {
     struct ucred peer;
     socklen_t length = sizeof(peer);
     if (getsockopt(client, SOL_SOCKET, SO_PEERCRED, &peer, &length) ||
-        (peer.uid != getuid() && peer.uid != 0)) {
+        (peer.uid != 0 && !leon_session_peer(peer.pid, peer.uid, "shell"))) {
         close(client);
         return 0;
     }
@@ -32,10 +32,11 @@ static int mobile_control(int fd, uint32_t mask, void *data) {
         } else if (!strcmp(command, "unmodal"))
             server->session_modal = false;
         else if (!strcmp(command, "lock")) {
-            server->session_locked = true;
-            focus_toplevel(server->shell);
-        } else if (!strcmp(command, "unlock"))
-            server->session_locked = false;
+            leon_session_lock(server);
+        } else if (!strncmp(command, "lock-ready ", 11))
+            leon_session_ready(server, command + 11);
+        else if (!strncmp(command, "unlock ", 7))
+            leon_session_unlock(server, command + 7);
         else if (!strcmp(command, "shell"))
             focus_toplevel(server->shell);
         else if (!strncmp(command, "focus ", 6)) {

@@ -95,3 +95,58 @@ unsafe policy files, malformed input and descriptor rejection.
 checks into a disposable disk, ordered before the compositor starts. Test helpers
 are never installed in the distribution image. Build logs and disk evidence stay
 under ignored `build/` and `output/` directories.
+
+## Lock screen and trusted input
+
+Settings → System → Security & screen lock configures, changes and removes the
+credential. Every credential field is private and masked; secret fields are
+cleared on submission, cancellation, focus loss and lock epoch changes. Shell,
+Settings credential entry, the authentication daemon and shared IME disable core
+dumps and same-UID ptrace access. Password derivation runs asynchronously for the
+UI; errors and cooldown countdowns remain visible without echoing the input.
+
+The compositor monitors authd on one root-verified connection. It starts locked;
+EOF, malformed state, a missing heartbeat for 1.25 seconds, or losing the trusted
+shell keeps/returns it to the locked state. A compositor-owned opaque scene
+rectangle covers the display while every application tree is disabled. Locking
+cancels keyboard/pointer grabs, clears focus and the clipboard, and hides app
+popups. Keyboard shortcuts cannot exit the compositor or focus apps while locked.
+
+`/run/leon/wm.sock` accepts control only from the actual supervised shell (or
+root). Bare `unlock` has no effect. `unlock TOKEN` is forwarded asynchronously
+for authd to consume; the compositor reveals apps only after a matching live
+monitor confirms successful consumption. Each fresh lock epoch revokes any old
+unlock attempt. Repeated unlocked heartbeat frames do not authorize a transition.
+
+The shell paints a full opaque lock page, discards saved transition patterns and
+uses LMUI's `after_commit` barrier before sending `lock-ready EPOCH`. The
+compositor reveals this trusted shell only for its current epoch. A hidden shell
+receives bounded frame callbacks so it can finish an interrupted animation and
+submit its lock page. A stopped/crashed shell cannot reveal an old application
+buffer. Role checks also validate shell and IME Wayland identities; claiming the
+same UID/app_id is insufficient. The verified IME may appear over a ready lock
+page for private password entry. Lock-screen notifications and permission dialogs
+remain hidden. With no configured credential, swipe still obtains and consumes
+a one-use grant rather than changing lock state directly.
+
+Powerd delegates manual/idle locking to authd and rejects legacy `locked` reports
+in production. User activity does not cancel a lock. Restarting either authd or
+the compositor starts a new locked session; credentials persist separately.
+
+For full target security checks, build probes and run:
+
+```sh
+python3 scripts/test-qemu.py --timeout 240 --auth-only \
+  --auth-probe build/auth-probe --root-probe build/root-probe
+```
+
+The disposable image includes a test-only root broker client with a fixed fixture
+password for controlled fault injection. It is never installed in product images.
+A forged shell/IME client tests actual Wayland role rejection. The focused suite
+exercises Settings, touch PIN entry, private IME password input, application
+concealment, stale buffers, wrong credentials, crashes/stalls and a kernel reboot.
+Native Settings input can be checked with
+`python3 scripts/test-wayland-input.py --security`; its `LEON_AUTH_SOCKET` override
+selects a private root-verified fixture endpoint, never a production service unit.
+These checks validate the QEMU reference platform, not physical phone security or
+resistance to an administrator who already controls UID 0.

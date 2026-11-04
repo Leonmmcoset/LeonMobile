@@ -15,6 +15,9 @@ static void output_frame(struct wl_listener *listener, void *data) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     wlr_scene_output_send_frame_done(scene_output, &now);
+    /* Let a hidden shell replace its old buffer despite an animation callback. */
+    if (output->server->session_locked && !output->server->lock_ready && output->server->shell)
+        wlr_surface_send_frame_done(output->server->shell->xdg_toplevel->base->surface, &now);
 }
 
 static void output_request_state(struct wl_listener *listener, void *data) {

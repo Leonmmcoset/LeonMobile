@@ -1,8 +1,9 @@
-add_executable(leon-shell main.cpp session.cpp system.cpp navigation.cpp render.cpp control.cpp shade.cpp
+find_package(Threads REQUIRED)
+add_executable(leon-shell main.cpp session.cpp authentication.cpp system.cpp navigation.cpp render.cpp control.cpp shade.cpp
                 views/status.cpp views/lock.cpp views/home.cpp views/tasks.cpp
                 views/shade.cpp views/shade_widgets.cpp views/quick.cpp
                 views/notifications.cpp views/navigation.cpp)
-target_link_libraries(leon-shell PRIVATE leon-app-support)
+target_link_libraries(leon-shell PRIVATE leon-app-support leon-auth-client Threads::Threads)
 install(TARGETS leon-shell RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Runtime)
 if(BUILD_TESTING)
   add_executable(shell-shade-test ${PROJECT_SOURCE_DIR}/tests/shell_shade.cpp shade.cpp)

@@ -2,5 +2,5 @@ name = "power"
 command = ["/usr/sbin/powerd"]
 type = "notify"
 watchdog_ms = 10000
-after = ["prepare"]
+after = ["prepare", "authentication"]
 restart = "always"

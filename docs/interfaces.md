@@ -307,3 +307,13 @@ over 1 MiB. `request_clipboard(callback)` asynchronously delivers UTF-8 text
 internal transfers share the descriptor-watch limit. Copy ownership ends when
 another source replaces it or the app exits; there is no clipboard history.
 LMUI does not accept terminal escape sequences as clipboard requests.
+
+### Device authentication and compositor session control
+
+The separate `authentication` service, privileged roles, newline JSON protocol,
+one-use grants, durable rate limits and compositor lock handshake are documented
+in [device-authentication.md](device-authentication.md). Ordinary applications
+cannot invoke credential operations or become the trusted shell/IME by choosing
+an app ID. `powerd`'s legacy `locked` report no longer sets production lock state.
+The shell must submit an opaque page and acknowledge the current lock epoch only
+after LMUI confirms that Wayland processed its buffer commit.

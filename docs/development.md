@@ -115,8 +115,8 @@ The desktop console compares both endpoints' queue contents and source IDs,
 and the target check verifies a separate supervised daemon PID. The probe is
 never installed in the system image. The target check also verifies shade
 drag/snap, theme, volume/mute restoration, app preservation and input recovery, settings launch,
-power-menu cancellation, screen locking and final power-off. The lock screen
-remains an unauthenticated developer convenience.
+power-menu cancellation, screen locking and final power-off. Device PIN/password authentication and fail-closed compositor locking are
+described in [device-authentication.md](device-authentication.md).
 
 Run `make test` and the independent Weston check after client changes. Runtime
 or image integration changes also require the QEMU test. Native integration

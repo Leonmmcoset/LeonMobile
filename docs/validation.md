@@ -385,3 +385,47 @@ ignored in `build/root-developer-*.log`, `build/rootd-native-tests.log`,
 apply to the QEMU developer prototype. Kernel image replacement, production
 device support and security against a deliberately unrestricted root user are
 outside this validation.
+
+## Device authentication and protected screen locking
+
+The authd integration was validated on the AArch64/musl QEMU reference platform.
+`make test` passed all 10 CTest checks and 60 Python integration tests. The
+independent Weston smoke, commit-barrier ordering, transition privacy reset,
+physical key/clipboard, terminal, developer Settings and device credential input
+checks also passed. Native authentication fixtures cover production peer
+impersonation, PIN/password setup/rotation/removal, persistent retry delays,
+malformed policies/transport, grant expiry/replay/audience/PID/epoch binding,
+monitor responsiveness, and cancellation of credential changes when a lock
+arrives during derivation.
+
+The focused QEMU `--auth-only` suite passed real Settings PIN setup, masked input,
+touch keypad unlock, private IME password unlock, authenticated credential
+removal, manual/idle locking and independent root/device passwords. It verified
+that private app scenes are hidden and input focus is cleared, a held pointer
+grab cannot retain the app, bare unlock and compositor shortcuts cannot bypass
+credentials, and same-UID forged shell/IME clients receive neither focus nor key
+events. It stopped and crashed authd and the shell, checked the compositor's
+opaque cover and locked recovery, then verified the fifth-failure cooldown
+survived another authd crash and a real kernel reboot. The configured device PIN
+still unlocked while the separate root policy was disabled. Input during a
+cooldown is discarded, so it cannot accumulate into the next attempt.
+
+The combined QEMU run passed the authentication and root protocol probes, core
+service/sandbox/cgroup/crash probes, native terminal VT/PTY tests, live
+notifications, Chinese IME input and restart, permission/file portal flows, all
+eight built-ins, SDK example installation, shade/navigation/lifecycle controls,
+and clean UI poweroff. Offline ext4 inspection verified the exact UTF-8 editor
+state and terminal edits/clipboard results. Test service fault probes run before
+the shell's initial lock so their intentional foreground transitions do not race
+the actual boot lock. These are disposable-image test ordering changes, not
+production service dependencies.
+
+Evidence remains ignored in `build/auth-final-native.log`,
+`build/auth-final-daemon-tests.log`, `build/auth-final-wayland.log`,
+`build/auth-final-settings-wayland.log`, `build/auth-*-regression.log`,
+`build/auth-ui-qemu.log`, `build/auth-final-full-qemu.log` and
+`build/qemu-test/`. The Buildroot image under `output/images/` was regenerated;
+the older `dist/` release bundle was not regenerated. The production image contains
+no test helpers or fixture credentials. Reproduction and precise trust boundaries
+are in [device-authentication.md](device-authentication.md). Physical phone
+hardware and an independent security audit remain outside this validation.

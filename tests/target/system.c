@@ -70,7 +70,8 @@ static int sample_memory(void) {
 }
 static int power(void) {
     CHECK(RPC("power", "{\"op\":\"policy\",\"idle_seconds\":1}"));
-    CHECK(RPC("power", "{\"op\":\"locked\",\"value\":false}"));
+    CHECK(!probe_rpc("power", "{\"op\":\"locked\",\"value\":false}", 0) &&
+          probe_has("\"ok\":false"));
     CHECK(
         !probe_rpc("power", "{\"op\":\"inhibit\",\"seconds\":2,\"reason\":\"QEMU test\"}", 11002) &&
         probe_has("\"ok\":true"));
@@ -81,14 +82,14 @@ static int power(void) {
     CHECK(!probe_rpc("power", request, 11004) && probe_has("\"ok\":false"));
     usleep(1200000);
     CHECK(RPC("power", "{\"op\":\"status\"}"));
-    CHECK(probe_has("\"lock_requested\":false"));
+    CHECK(probe_has("\"inhibited\":true"));
     usleep(1200000);
     CHECK(RPC("power", "{\"op\":\"status\"}"));
-    CHECK(probe_has("\"lock_requested\":true"));
+    CHECK(probe_has("\"inhibited\":false"));
     CHECK(RPC("power", "{\"op\":\"policy\",\"idle_seconds\":300}"));
-    CHECK(RPC("power", "{\"op\":\"locked\",\"value\":true}"));
+    CHECK(RPC("power", "{\"op\":\"status\"}"));
     CHECK(!probe_rpc("power", "{\"op\":\"poweroff\"}", 11004) && probe_has("\"ok\":false"));
-    passed("power idle, inhibitor expiry and peer authorization");
+    passed("authoritative authd lock state, inhibitor expiry and peer authorization");
     return 0;
 }
 static int storage(void) {

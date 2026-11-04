@@ -7,7 +7,7 @@
 using namespace mobile;
 using leon::apps::settings::Page;
 namespace leon::apps {
-SettingsApplication::~SettingsApplication() { clear_root_fields(); }
+SettingsApplication::~SettingsApplication() { clear_root_fields(); clear_device_fields(); }
 Json SettingsApplication::root_request(Json request) {
     struct Secrets {
         Json &request;

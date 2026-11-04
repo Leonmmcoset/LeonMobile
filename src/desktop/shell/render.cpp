@@ -14,6 +14,11 @@ void Shell::paint(Canvas &c) {
     double w = c.width, h = c.height;
     auto t = c.theme;
     bool overlay = page != Page::active;
+    if (page == Page::lock) {
+        presented_page = Page::lock;
+        page_transition.reset();
+        c.clear(t.background);
+    }
     if (page != presented_page) {
         double dx = page == Page::tasks ? 32 : 0;
         double dy = page == Page::active                                 ? 0
@@ -63,7 +68,7 @@ void Shell::paint(Canvas &c) {
         if (power_menu)
             paint_power_menu(c);
     }
-    if (!error.empty() && overlay && !shade.visible())
+    if (!error.empty() && overlay && page != Page::lock && !shade.visible())
         c.text(tr(en, "系统服务暂未就绪", "System services are starting"),
                {20, h - 200, w - 40, 44}, 13, t.muted);
     paint_permission(c);
@@ -73,5 +78,13 @@ void Shell::paint(Canvas &c) {
                          : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});
     if (shade.animating())
         c.request_frame();
+    if (page == Page::lock && authentication.ok && authentication.epoch[0] &&
+        ready_epoch != authentication.epoch) {
+        ready_epoch = authentication.epoch;
+        app.after_commit([this, epoch = ready_epoch] {
+            if (page == Page::lock && epoch == authentication.epoch)
+                control("lock-ready " + epoch);
+        });
+    }
 }
 } // namespace leon::shell

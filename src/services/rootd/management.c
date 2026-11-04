@@ -370,6 +370,7 @@ static lm_json *core(const struct root_options *o) {
     const char *components[][2] = {{"init", "/usr/sbin/leon-init"},
                                    {"leond", "/usr/sbin/leond"},
                                    {"rootd", "/usr/sbin/rootd"},
+                                   {"authd", "/usr/sbin/authd"},
                                    {"application broker", "/usr/sbin/leon-launchd"},
                                    {"LMUI", "/usr/lib/liblmui.so.1"},
                                    {"musl", "/lib/ld-musl-aarch64.so.1"},

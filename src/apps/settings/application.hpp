@@ -1,6 +1,8 @@
 #pragma once
+#include "auth.h"
 #include "catalog.hpp"
 #include "device.hpp"
+#include <future>
 #include <leon/mobile/application.hpp>
 namespace leon::apps {
 class SettingsApplication final : public mobile::ApplicationWindow {
@@ -28,7 +30,7 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     void paint_content(mobile::Canvas &canvas, double bottom) override;
     void text_input(const std::string &text) override;
     bool key_event(const mobile::KeyEvent &event) override;
-    bool private_text_input() const override { return root_dialog_; }
+    bool private_text_input() const override { return root_dialog_ || security_dialog_; }
     bool can_scroll(double x, double y) const override { return viewport_.contains(x, y); }
     void on_tick() override;
     void open(settings::Page page);
@@ -42,6 +44,17 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     void paint_home(mobile::Canvas &canvas);
     void paint_preferences(mobile::Canvas &canvas);
     void paint_device(mobile::Canvas &canvas);
+    auth_state security_status_{};
+    std::future<auth_state> security_job_;
+    std::string device_current_, device_new_, device_confirm_, security_kind_, security_message_;
+    bool security_dialog_{};
+    int security_field_{};
+    void security_refresh();
+    void security_begin(const std::string &kind);
+    void security_submit();
+    void security_text(const std::string &text);
+    void clear_device_fields();
+    void paint_security(mobile::Canvas &canvas);
     void paint_developer(mobile::Canvas &canvas);
     void developer_refresh();
     void developer_back();

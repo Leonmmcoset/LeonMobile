@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: CC0-1.0
  * Based on wlroots 0.20 tinywl; mobile policy additions by LeonMobile. */
 #pragma once
+#include "auth.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -48,6 +49,13 @@ struct leon_server {
     struct wlr_keyboard fallback_keyboard;
     struct wl_listener touch_down, touch_up, touch_motion;
     bool session_locked, session_modal;
+    bool auth_live, auth_consuming, lock_ready;
+    int auth_fd;
+    struct wl_event_source *auth_source, *auth_timer;
+    struct wlr_scene_rect *lock_cover;
+    char auth_epoch[33], auth_buffer[LEON_AUTH_LIMIT];
+    size_t auth_used;
+    long long auth_received, auth_sent;
     long long last_activity;
     int wm_fd;
     struct wl_event_source *wm_source;
@@ -149,3 +157,11 @@ void leon_text_geometry(struct leon_server *server);
 void leon_activity(struct leon_server *server);
 bool leon_control_init(struct leon_server *server);
 void leon_control_finish(struct leon_server *server);
+
+bool leon_session_init(struct leon_server *server);
+void leon_session_finish(struct leon_server *server);
+void leon_session_lock(struct leon_server *server);
+void leon_session_visibility(struct leon_server *server);
+void leon_session_ready(struct leon_server *server, const char *epoch);
+void leon_session_unlock(struct leon_server *server, const char *token);
+bool leon_session_peer(pid_t pid, uid_t uid, const char *role);

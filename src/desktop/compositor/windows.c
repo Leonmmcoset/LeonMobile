@@ -11,6 +11,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
         leon_text_geometry(toplevel->server);
     else
         focus_toplevel(toplevel);
+    leon_session_visibility(toplevel->server);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -20,8 +21,10 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
     wl_list_remove(&toplevel->link);
     if (toplevel->server->ime == toplevel)
         toplevel->server->ime = NULL;
-    if (toplevel->server->shell == toplevel)
+    if (toplevel->server->shell == toplevel) {
         toplevel->server->shell = NULL;
+        leon_session_lock(toplevel->server);
+    }
 }
 
 static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
@@ -39,8 +42,10 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
         wl_client_get_credentials(wl_resource_get_client(toplevel->xdg_toplevel->base->resource),
                                   &pid, &uid, &gid);
         const char *id = toplevel->xdg_toplevel->app_id;
-        toplevel->is_shell = uid == getuid() && id && !strcmp(id, "org.leon.shell");
-        toplevel->is_ime = uid == getuid() && id && !strcmp(id, "org.leon.ime");
+        toplevel->is_shell = id && !strcmp(id, "org.leon.shell") && !toplevel->server->shell &&
+                             leon_session_peer(pid, uid, "shell");
+        toplevel->is_ime = id && !strcmp(id, "org.leon.ime") && !toplevel->server->ime &&
+                           leon_session_peer(pid, uid, "ime");
         if (toplevel->is_ime)
             toplevel->server->ime = toplevel;
         if (toplevel->is_shell)
@@ -71,6 +76,7 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&toplevel->request_maximize.link);
     wl_list_remove(&toplevel->request_fullscreen.link);
 
+    wlr_scene_node_destroy(&toplevel->scene_tree->node);
     free(toplevel);
 }
 
@@ -127,10 +133,13 @@ static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
     struct leon_toplevel *toplevel = calloc(1, sizeof(*toplevel));
     toplevel->server = server;
     toplevel->xdg_toplevel = xdg_toplevel;
-    toplevel->scene_tree =
-        wlr_scene_xdg_surface_create(&toplevel->server->scene->tree, xdg_toplevel->base);
+    /* Own the outer tree: wlroots can toggle its inner surface tree on map. */
+    toplevel->scene_tree = wlr_scene_tree_create(&server->scene->tree);
+    struct wlr_scene_tree *surface_tree =
+        wlr_scene_xdg_surface_create(toplevel->scene_tree, xdg_toplevel->base);
+    wlr_scene_node_set_enabled(&toplevel->scene_tree->node, !server->session_locked);
     toplevel->scene_tree->node.data = toplevel;
-    xdg_toplevel->base->data = toplevel->scene_tree;
+    xdg_toplevel->base->data = surface_tree;
 
     /* Listen to the various events it can emit */
     toplevel->map.notify = xdg_toplevel_map;

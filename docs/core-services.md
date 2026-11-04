@@ -58,14 +58,17 @@ batteries, external power (`-1` unknown, `0` offline, `1` online) and the kernel
 suspend states. Applications only see their own inhibitor details. QEMU normally
 has no battery; a charge estimate is not invented.
 
-Desktop/root operations are `activity`, `lock`, `locked` with Boolean `value`,
-`poweroff`, `reboot`, and `suspend`. The compositor reports real pointer, keyboard
-and touch activity at most once per second. The shell acknowledges locked/unlocked
-state. The compositor separately prevents application focus while locked.
-Unlocking remains a developer gesture, without PIN/credential authentication.
+Desktop/root operations are `activity`, `lock`, `poweroff`, `reboot`, and
+`suspend`. The compositor reports real pointer, keyboard and touch activity at
+most once per second. `authd` owns authoritative lock state; `powerd` samples it
+and delegates manual/idle locks to authentication. `activity` cannot clear an
+outstanding lock. The legacy `locked` operation is rejected in production;
+private `--test` fixtures retain it for isolated idle/inhibitor tests. Device
+PIN/password and compositor enforcement are described in
+[device-authentication.md](device-authentication.md).
 
 Root sets `policy` with `idle_seconds` (0 disables; maximum 86400; default 300).
-Idle expiry requests a shell lock. `inhibit` accepts an installed application's
+Idle expiry locks the authoritative authentication session. `inhibit` accepts an installed application's
 nonempty `reason` (maximum 95 bytes) and `seconds` (1–300), returning a `token`.
 `release` requires that token and its owning UID (or root). There are 32 global
 slots, at most four per untrusted application. Expired inhibitors are removed.

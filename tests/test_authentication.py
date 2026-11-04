@@ -152,6 +152,24 @@ class Authentication(unittest.TestCase):
         self.assertTrue(self.call('status')['locked'])
         self.unlock(PIN)
 
+    def test_lock_during_derivation_cancels_credential_change(self):
+        self.enrolled()
+        self.unlock(PIN)
+        generation = self.call('status')['generation']
+        with socket.socket(socket.AF_UNIX) as client:
+            client.settimeout(5)
+            client.connect(str(self.endpoint))
+            client.sendall(json.dumps(dict(op='configure', kind='password', secret=PIN,
+                                           new_secret=PASSWORD)).encode() + b'\n')
+            self.call('lock')
+            reply = json.loads(client.makefile('rb').readline())
+            self.assertFalse(reply['ok'], reply)
+        state = self.call('status')
+        self.assertTrue(state['locked'])
+        self.assertEqual(state['kind'], 'pin')
+        self.assertEqual(state['generation'], generation)
+        self.unlock(PIN)
+
     def test_expired_grant_is_rejected(self):
         token = self.call('authenticate')['token']
         time.sleep(15.1)

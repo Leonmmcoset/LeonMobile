@@ -5,10 +5,15 @@
 #include <csignal>
 #include <iostream>
 #include <leon/mobile/ui.hpp>
+#include <sys/prctl.h>
+#include <sys/resource.h>
 using namespace mobile;
 static volatile sig_atomic_t stopping;
 static void stop(int) { stopping = 1; }
 int main() {
+    struct rlimit core{0, 0};
+    setrlimit(RLIMIT_CORE, &core);
+    prctl(PR_SET_DUMPABLE, 0);
     signal(SIGTERM, stop);
     signal(SIGINT, stop);
     ime_engine engine{};

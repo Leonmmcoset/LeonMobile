@@ -103,6 +103,8 @@ int main(int argc, char *argv[]) {
         return 1;
 
     leon_text_init(&server);
+    if (!leon_session_init(&server))
+        return 1;
 
     /* Add a Unix socket to the Wayland display. */
     const char *socket_name = wl_display_add_socket_auto(server.wl_display);
@@ -149,6 +151,7 @@ int main(int argc, char *argv[]) {
      * server. */
     wl_display_destroy_clients(server.wl_display);
     leon_text_finish(&server);
+    leon_session_finish(&server);
     leon_control_finish(&server);
     leon_input_detach(&server);
     leon_windows_finish(&server);
