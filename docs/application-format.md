@@ -29,6 +29,12 @@ resources/...
 
 `id` is a lowercase dotted identifier, maximum 96 bytes. Versions are three numeric components, without leading zeros, each at most six digits. `entry` is relative to the package root and must identify a regular little-endian AArch64 ELF executable. Optional `args` is an array of at most 16 strings. `name_en` and `icon` are optional presentation metadata. Built-in manifests are installed separately and use `/usr/bin/` executable paths and stable built-in identities.
 
+Optional `"lifecycle":1` opts into the private launcher event channel for
+foreground/background/checkpoint/shutdown requests, described in
+[interfaces.md](interfaces.md#application-lifecycle-v1). Existing format 1
+packages without this field continue to run. Current LMUI consumes the channel
+automatically and offers `Application::on_lifecycle` for app-owned state saves.
+
 Each built-in has its own ELF entry (`/usr/bin/leon-settings`, `leon-calculator`,
 `leon-gallery`, `leon-files`, `leon-editor`, `leon-terminal`, `leon-images`,
 `leon-clock`). The former `leon-app MODE` dispatcher is retired. Built-in IDs,

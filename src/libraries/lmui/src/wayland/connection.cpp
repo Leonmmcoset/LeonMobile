@@ -8,6 +8,8 @@
 #include <unistd.h>
 namespace lmui {
 Application::Impl::~Impl() {
+    if (lifecycle_fd >= 0)
+        close(lifecycle_fd);
     if (frame_callback)
         wl_callback_destroy(frame_callback);
     for (auto &b : buffers) {
@@ -69,6 +71,7 @@ void Application::Impl::global(void *data, wl_registry *reg, uint32_t name, cons
     }
 }
 int Application::Impl::run() {
+    lifecycle_open();
     const char *reduced = getenv("LMUI_REDUCE_MOTION");
     force_reduced = reduced && !strcmp(reduced, "1");
     display = wl_display_connect(nullptr);
@@ -128,12 +131,19 @@ int Application::Impl::run() {
         draw();
         if (wl_display_flush(display) < 0 && errno != EAGAIN)
             break;
-        pollfd p{wl_display_get_fd(display), POLLIN, 0};
+        pollfd fds[] = {{wl_display_get_fd(display), POLLIN, 0}, {lifecycle_fd, POLLIN, 0}};
         // Frame callbacks wake animations; idle clients only wake for their tick.
         int timeout = std::max(0, 200 - int(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                 std::chrono::steady_clock::now() - last)
                                                 .count()));
-        int rc = poll(&p, 1, timeout);
+        int rc = poll(fds, 2, timeout);
+        if (fds[1].revents & POLLIN)
+            lifecycle_dispatch();
+        if (fds[1].revents & (POLLERR | POLLHUP)) {
+            close(lifecycle_fd);
+            lifecycle_fd = -1;
+        }
+        auto &p = fds[0];
         if (rc < 0 && errno != EINTR)
             break;
         if (rc > 0) {

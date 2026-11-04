@@ -33,6 +33,9 @@ void validate_manifest(const Json &m, bool builtin) {
     version(m.at("version").get<std::string>());
     require(m.at("arch") == "aarch64", "application architecture must be aarch64");
     require(m.value("lmui", 0) == 1, "unsupported LMUI ABI");
+    if (m.contains("lifecycle"))
+        require(m.at("lifecycle").is_number_integer() && m.at("lifecycle") == 1,
+                "unsupported application lifecycle protocol");
     require(m.at("name").is_string() && !m.at("name").get<std::string>().empty(),
             "missing application name");
     std::string entry = m.at("entry");

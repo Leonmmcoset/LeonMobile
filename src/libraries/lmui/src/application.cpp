@@ -14,6 +14,9 @@ int Application::run() {
 }
 void Application::redraw() { impl->dirty = true; }
 void Application::quit() { impl->running = false; }
+void Application::on_lifecycle(std::function<bool(LifecycleEvent)> callback) {
+    impl->lifecycle_callback = std::move(callback);
+}
 void Application::on_pointer_motion(std::function<void(double, double)> callback) {
     impl->motion_callback = std::move(callback);
 }

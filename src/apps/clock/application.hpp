@@ -8,6 +8,10 @@ class ClockApplication final : public mobile::ApplicationWindow {
 
   private:
     Stopwatch stopwatch;
+    mobile::Json save_state() const override { return {{"seconds", stopwatch.seconds()}}; }
+    void restore_state(const mobile::Json &state) override {
+        stopwatch.restore(state.at("seconds"));
+    }
     void on_tick() override;
     void paint_content(mobile::Canvas &canvas, double bottom) override;
 };

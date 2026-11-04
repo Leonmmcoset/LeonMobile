@@ -7,6 +7,7 @@
 #include <vector>
 namespace lmui {
 class Canvas;
+enum class LifecycleEvent { foreground, background, save, shutdown };
 struct KeyEvent {
     unsigned symbol{};
     std::string text;
@@ -33,6 +34,7 @@ class Application {
     void on_pointer_event(std::function<void(const PointerEvent &)> callback);
     void reduce_motion(bool enabled);
     bool reduced_motion() const;
+    void on_lifecycle(std::function<bool(LifecycleEvent)> callback);
     int width() const;
     int height() const;
 

@@ -7,5 +7,6 @@
   "name": "计算器",
   "name_en": "Calculator",
   "lmui": 1,
-  "icon": "calculator"
+  "icon": "calculator",
+  "lifecycle": 1
 }

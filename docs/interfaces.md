@@ -43,6 +43,8 @@ Oneshots cannot declare watchdogs. Existing simple services remain compatible.
 | --- | --- | --- |
 | `list` | none | root/desktop |
 | `launch`, `stop` | `id` | root/desktop |
+| `foreground` | running `id` | root/desktop |
+| `background`, `lifecycle` | none | root/desktop |
 | `install` | absolute `file` path | root/desktop |
 | `remove` | `id`, optional `purge` | root/desktop |
 | `settings` | none | any connected local user |
@@ -60,6 +62,40 @@ is unavailable. New clients should connect to the notification endpoint below.
 for development; the default is `/run/leon/notifications.sock`.
 
 Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
+
+### Application lifecycle v1
+
+Manifests may declare `"lifecycle":1`. The launcher then passes a private
+nonblocking `SOCK_SEQPACKET` descriptor in `LEON_LIFECYCLE_FD`; the client marks
+it close-on-exec. One packet is `SEQUENCE EVENT`, with an increasing unsigned
+sequence and `foreground`, `background`, `save`, or `shutdown`. A client replies
+`SEQUENCE ok` or `SEQUENCE failed` after processing the event. Late or superseded
+acks do not acknowledge a new request. Foreground selection backgrounds the
+previous app; home/tasks/lock background it without stopping it. A transient
+notification shade retains the app's foreground state.
+
+`lifecycle` reports PID, foreground/cooperative/responsive/pending flags and
+the last event for each app, plus the latest 64 observed exit records.
+`lmpkg lifecycle` prints this state. Missing a two-second acknowledgement marks
+the app unresponsive, rather than killing an otherwise usable app. Stop/remove
+requests first send `shutdown`, allow two seconds for state save and exit, then
+SIGTERM for one second before SIGKILL. Broker shutdown sends all cooperative
+requests together with a two-second aggregate grace. Old manifests remain
+supported through signal-based termination, with no required SDK change.
+
+`Application::on_lifecycle(callback)` runs on the LMUI event loop and returns a
+boolean acknowledgement. Default shutdown exits the loop; callbacks can save
+state and report a failure. It adds private state without changing the public
+Application layout or generation 1 ABI. Built-in app support atomically writes
+a versioned `.session.json` under the private app home on background, save,
+shutdown and normal exit. Calculator state, editor drafts, file navigation and
+LMUI component state restore on the next launch. Terminal child sessions are
+ephemeral; lifecycle does not replay commands or reconstruct a dead PTY.
+The root-only `reclaim` broker operation selects a background cooperative app
+for the same checkpoint/exit sequence, excluding the foreground and legacy
+apps. It returns the reclaimed ID or an empty string when no candidate exists.
+Foreground/background transitions also adjust Linux `oom_score_adj` on target
+so background processes are preferred by the kernel OOM selector.
 
 The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `shell` or `focus APP_ID`. The compositor also checks peer UID. Ordinary application users cannot invoke these operations. Normal Wayland clients receive assigned mobile window bounds, rather than implementing arbitrary interactive move/resize.
 

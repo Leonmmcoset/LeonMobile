@@ -1,4 +1,6 @@
 #include "stopwatch.hpp"
+#include <algorithm>
+#include <cmath>
 namespace leon::apps {
 double Stopwatch::seconds() const {
     return elapsed_ +
@@ -16,5 +18,9 @@ void Stopwatch::toggle() {
 void Stopwatch::reset() {
     elapsed_ = 0;
     start_ = std::chrono::steady_clock::now();
+}
+void Stopwatch::restore(double seconds) {
+    elapsed_ = std::isfinite(seconds) ? std::clamp(seconds, 0.0, 315360000.0) : 0;
+    running_ = false;
 }
 } // namespace leon::apps

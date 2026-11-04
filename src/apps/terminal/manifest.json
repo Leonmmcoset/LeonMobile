@@ -7,5 +7,6 @@
   "name": "终端",
   "name_en": "Terminal",
   "lmui": 1,
-  "icon": "terminal"
+  "icon": "terminal",
+  "lifecycle": 1
 }

@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
             throw std::runtime_error("usage: lmpkg [--root DIR] list | install FILE | remove ID "
                                      "[--purge-data] | launch ID | running");
         std::string verb = argv[i++];
-        if (verb == "running" && i == argc) {
-            auto response = broker({{"op", "list"}});
-            std::cout << response.at("running").dump() << '\n';
+        if ((verb == "running" || verb == "lifecycle") && i == argc) {
+            auto response = broker({{"op", verb == "running" ? "list" : "lifecycle"}});
+            std::cout << (verb == "running" ? response.at("running") : response).dump() << '\n';
             return 0;
         }
         if (verb == "list" && i == argc) {

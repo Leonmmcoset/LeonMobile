@@ -18,6 +18,16 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
     } else if (op == "launch") {
         fail(shell, "permission denied");
         response = {{"pid", processes_.launch(packages_, request.at("id"))}};
+    } else if (op == "reclaim") {
+        fail(caller == 0, "permission denied");
+        response = {{"reclaimed", processes_.reclaim()}};
+    } else if (op == "foreground" || op == "background" || op == "lifecycle") {
+        fail(shell, "permission denied");
+        if (op == "foreground")
+            processes_.foreground(request.at("id"));
+        else if (op == "background")
+            processes_.background();
+        response = processes_.lifecycle();
     } else if (op == "install") {
         fail(shell, "permission denied");
         packages_.install(request.at("file").get<std::string>());

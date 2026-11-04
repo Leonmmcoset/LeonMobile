@@ -32,6 +32,10 @@ struct Application::Impl {
     MotionContext motion;
     std::function<void(double, double)> motion_callback;
     std::function<void(const PointerEvent &)> event_callback;
+    int lifecycle_fd{-1};
+    std::function<bool(LifecycleEvent)> lifecycle_callback;
+    void lifecycle_open();
+    void lifecycle_dispatch();
     bool running{true}, configured{}, dirty{true};
     std::chrono::steady_clock::time_point opened{};
     struct Buffer {

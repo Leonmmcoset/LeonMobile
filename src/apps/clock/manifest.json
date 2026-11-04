@@ -7,5 +7,6 @@
   "name": "时钟",
   "name_en": "Clock",
   "lmui": 1,
-  "icon": "clock"
+  "icon": "clock",
+  "lifecycle": 1
 }

@@ -1,5 +1,8 @@
 #include <cmath>
+#include <fcntl.h>
+#include <fstream>
 #include <leon/mobile/application.hpp>
+#include <unistd.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
 namespace mobile {
 ApplicationWindow::ApplicationWindow(std::string id, std::string chinese, std::string english)
@@ -29,8 +32,66 @@ ApplicationWindow::ApplicationWindow(std::string id, std::string chinese, std::s
     };
     app.on_pointer_event([this](const PointerEvent &event) { pointer(event); });
     app.paint = [this](Canvas &c) { paint(c); };
+    app.on_lifecycle([this](LifecycleEvent event) {
+        if (event == LifecycleEvent::background || event == LifecycleEvent::save ||
+            event == LifecycleEvent::shutdown)
+            return checkpoint();
+        return true;
+    });
 }
-int ApplicationWindow::run() { return app.run(); }
+bool ApplicationWindow::checkpoint() {
+    try {
+        auto text = Json{{"format", 1}, {"state", save_state()}}.dump() + "\n";
+        if (text.size() > 1024 * 1024)
+            return false;
+        auto target = fs::path(user_home()) / ".session.json";
+        auto temporary = target.string() + ".new";
+        int fd =
+            open(temporary.c_str(), O_CREAT | O_TRUNC | O_WRONLY | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd < 0)
+            return false;
+        size_t offset = 0;
+        while (offset < text.size()) {
+            ssize_t n = write(fd, text.data() + offset, text.size() - offset);
+            if (n < 0 && errno == EINTR)
+                continue;
+            if (n <= 0) {
+                close(fd);
+                return false;
+            }
+            offset += size_t(n);
+        }
+        bool ok = !fsync(fd);
+        close(fd);
+        if (!ok)
+            return false;
+        fs::rename(temporary, target);
+        fd = open(target.parent_path().c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+        if (fd < 0)
+            return false;
+        ok = !fsync(fd);
+        close(fd);
+        return ok;
+    } catch (...) {
+        return false;
+    }
+}
+int ApplicationWindow::run() {
+    try {
+        auto target = fs::path(user_home()) / ".session.json";
+        if (fs::exists(target) && fs::file_size(target) <= 1024 * 1024) {
+            std::ifstream file(target);
+            auto data = Json::parse(file);
+            if (data.value("format", 0) == 1)
+                restore_state(data.at("state"));
+        }
+    } catch (...) {
+        error = "Could not restore the previous session";
+    }
+    int result = app.run();
+    checkpoint();
+    return result;
+}
 void ApplicationWindow::perform(const std::function<void()> &action) {
     try {
         action();

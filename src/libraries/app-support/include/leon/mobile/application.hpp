@@ -22,6 +22,8 @@ class ApplicationWindow {
     virtual void text_input(const std::string &) {}
     virtual bool key_event(const KeyEvent &) { return false; }
     virtual void on_tick() {}
+    virtual Json save_state() const { return Json::object(); }
+    virtual void restore_state(const Json &) {}
     virtual std::string enter_text() const { return "\n"; }
     virtual bool can_scroll(double, double) const { return false; }
     void transition_content(double dx = 32, double dy = 0);
@@ -40,5 +42,6 @@ class ApplicationWindow {
     bool scroll_eligible_{}, scroll_dragging_{}, reduced_motion_{};
     void paint(Canvas &canvas);
     void pointer(const PointerEvent &event);
+    bool checkpoint();
 };
 } // namespace mobile

@@ -7,6 +7,7 @@ class Stopwatch {
     double seconds() const;
     void toggle();
     void reset();
+    void restore(double seconds);
 
   private:
     std::chrono::steady_clock::time_point start_{std::chrono::steady_clock::now()};
