@@ -107,9 +107,11 @@ build units does not introduce an on-device package repository or OTA service.
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
 
+The reference kernel enables memory PSI, Landlock, seccomp and cgroup v2 memory/process controllers. `prepare` mounts cgroup2, enables controllers beneath `/sys/fs/cgroup/leon/apps` and mounts a private tmpfs at `/media` so removable mount points can be created while the system partition stays read-only. Shutdown unmounts removable volumes before persistent partitions. `/etc/localtime` points into `/run`; the UTC boot default and installed timezone database are available before time policy is applied.
+
 The GPT disk contains `system` (768 MiB ext4, mounted read-only) and `data` (512 MiB ext4, mounted read/write). System software, configuration and built-in apps live in the system image. Installed apps, application-private data, settings and logs live under `/data`. Runtime sockets and device/session state live under `/run`.
 
-`prepare` is a oneshot service that must exit successfully before dependent services start. Other services run in the foreground and are supervised by process group. Dependency order controls startup; it does not imply protocol-level readiness for a long-running daemon. Connection retries and bounded process restarts handle readiness races.
+`prepare` is a oneshot service that must exit successfully before dependent services start. Other services run in the foreground and are supervised by process group. Notify services hold their dependants until an authenticated READY packet arrives. Ready timeouts, event-loop watchdogs and bounded process-group restarts detect startup failures and stalls; simple services retain process-start ordering.
 
 System updates replace the whole system partition while QEMU is stopped. There is no A/B boot, rollback, online updater or claim of recovery from power loss during system replacement. Local application upgrades use a different transaction mechanism described in the application format document.
 

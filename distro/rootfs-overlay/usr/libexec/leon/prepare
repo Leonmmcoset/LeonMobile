@@ -1,11 +1,20 @@
 #!/bin/sh
 set -eu
-mkdir -p /data/leon/apps /data/leon/staging /data/leon/data /data/home/leon /var/log/leon /var/cache/fontconfig /var/lib/dbus /run/dbus /run/leon/wayland /run/user/1000
+mkdir -p /data/leon/shared /data/leon/apps /data/leon/staging /data/leon/data /data/home/leon /var/log/leon /var/cache/fontconfig /var/lib/dbus /run/dbus /run/leon/wayland /run/user/1000
 chmod 0755 /data /data/leon /data/leon/apps /data/leon/data /run/leon
-chown 1000:1000 /data/home/leon /run/user/1000 /run/leon/wayland
+chown 1000:1000 /data/leon/shared /data/home/leon /run/user/1000 /run/leon/wayland
 chmod 0700 /data/home/leon
 chmod 0700 /run/user/1000
 chmod 0755 /run/leon/wayland
+ln -sfn /usr/share/zoneinfo/Etc/UTC /run/localtime
+mount -t tmpfs -o mode=0755,nosuid,nodev,noexec tmpfs /media
+mkdir -p /sys/fs/cgroup
+mount -t cgroup2 -o nosuid,nodev,noexec cgroup2 /sys/fs/cgroup
+echo '+memory +pids' > /sys/fs/cgroup/cgroup.subtree_control
+mkdir -p /sys/fs/cgroup/leon
+echo '+memory +pids' > /sys/fs/cgroup/leon/cgroup.subtree_control
+mkdir -p /sys/fs/cgroup/leon/apps
+echo '+memory +pids' > /sys/fs/cgroup/leon/apps/cgroup.subtree_control
 # Only the trusted desktop session can create the compositor control socket.
 chown 1000:1000 /run/leon
 chmod 0755 /run/leon

@@ -1,5 +1,7 @@
 #include "init.h"
 #include <signal.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
 #include <sys/wait.h>
@@ -20,6 +22,15 @@ _Noreturn void leon_shutdown(pid_t manager, int action) {
     while (waitpid(-1, NULL, WNOHANG) > 0) {
     }
     sync();
+    FILE *mounts = fopen("/proc/mounts", "r");
+    if (mounts) {
+        char line[4096], target[1024];
+        while (fgets(line, sizeof(line), mounts))
+            if (sscanf(line, "%*s %1023s", target) == 1 && !strncmp(target, "/media/", 7))
+                umount2(target, 0);
+        fclose(mounts);
+    }
+    umount2("/media", 0);
     umount2("/var", 0);
     umount2("/data", 0);
     mount(NULL, "/", NULL, MS_REMOUNT | MS_RDONLY, NULL);
