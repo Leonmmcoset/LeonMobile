@@ -135,3 +135,7 @@ for its commit. One acknowledgement may be in flight while another waits for the
 next commit. Destruction cancels both. The shell uses this barrier before asking
 the compositor to reveal a newly painted, opaque lock page. The independent
 Weston I/O test verifies ordering, replacement and nested scheduling.
+
+`lmui::ContentTransition::reset()` drops saved page patterns and cancels an active
+transition. A security boundary such as entering the lock screen must call it
+before painting, so a previous private page cannot appear in the new frame.

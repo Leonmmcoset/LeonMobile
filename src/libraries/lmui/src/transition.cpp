@@ -3,10 +3,17 @@
 
 namespace lmui {
 ContentTransition::~ContentTransition() {
+    reset();
+}
+void ContentTransition::reset() {
     if (last_)
         cairo_pattern_destroy(last_);
     if (previous_)
         cairo_pattern_destroy(previous_);
+    last_ = previous_ = nullptr;
+    pending_ = false;
+    fraction_ = 1;
+    progress_.reset(1);
 }
 void ContentTransition::start(double dx, double dy) {
     if (previous_)

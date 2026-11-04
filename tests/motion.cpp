@@ -99,6 +99,13 @@ int main() {
     assert(pixel() == 0xff00ff00 && !motion.active());
     assert(transition.offset_x() == 0 && transition.offset_y() == 0);
 
+    transition.start();
+    paint(12.1, {1, 0, 0, 1});
+    transition.reset();
+    paint(12.1, {0, 0, 1, 1});
+    assert(pixel() == 0xff0000ff); // Security reset cannot retain a private old page.
+    assert(transition.offset_x() == 0 && transition.offset_y() == 0);
+
     targets = {{{10, 10, 80, 48}, [] {}, {}}};
     input.handle({30, 30, PointerPhase::down}, targets);
     input.handle({30, 30, PointerPhase::up}, targets);

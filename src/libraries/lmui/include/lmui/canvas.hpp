@@ -38,6 +38,7 @@ class ContentTransition {
     ContentTransition(const ContentTransition &) = delete;
     ContentTransition &operator=(const ContentTransition &) = delete;
     void start(double dx = 32, double dy = 0);
+    void reset();
     void begin(Canvas &canvas);
     void end(Canvas &canvas);
     double offset_x() const { return dx_ * (1 - fraction_); }
