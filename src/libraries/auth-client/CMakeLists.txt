@@ -1,0 +1,5 @@
+find_package(nlohmann_json 3.10 REQUIRED)
+add_library(leon-auth-client STATIC client.c peer.c decode.cpp)
+target_compile_definitions(leon-auth-client PRIVATE _GNU_SOURCE)
+target_include_directories(leon-auth-client PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(leon-auth-client PUBLIC leon-root-wire PRIVATE nlohmann_json::nlohmann_json)

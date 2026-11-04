@@ -26,6 +26,10 @@ The separate `root` / `rootd` service uses `/run/leon-root/control.sock` with a
 five-second watchdog and a root-owned runtime directory. Password policy,
 credential boundaries, authenticated PTY sessions, kernel/module management and
 persistent service overrides are specified in [root-access.md](root-access.md).
+The independent `authentication` / `authd` service owns device credentials and
+one-use unlock grants at `/run/leon-auth/control.sock`; its public protocol and
+persistence rules are specified in [device-authentication.md](device-authentication.md).
+
 Root elevation starts disabled; PID 1 and privileged system services keep their
 required UID 0 identity.
 

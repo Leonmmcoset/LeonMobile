@@ -8,6 +8,9 @@ if [ ! -x "$compiler" ]; then
 fi
 mkdir -p "$repo/build"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/auth.c" "$repo/tests/target/system_transport.c" \
+    -o "$repo/build/auth-probe"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/notifications.c" -o "$repo/build/notifications-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
@@ -25,4 +28,4 @@ mkdir -p "$repo/build"
     "$repo/tests/terminal.cpp" "$repo/src/apps/terminal/screen.cpp" \
     "$repo/src/apps/terminal/session.cpp" "$repo/src/apps/terminal/input.cpp" \
     -lvterm -lxkbcommon -lutil -o "$repo/build/terminal-probe"
-echo 'AArch64 notification, system, root and terminal probes compiled under build/; no image was changed.'
+echo 'AArch64 authentication, notification, system, root and terminal probes compiled under build/; no image was changed.'

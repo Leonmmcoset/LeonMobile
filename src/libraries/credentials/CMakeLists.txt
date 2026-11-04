@@ -1,0 +1,5 @@
+find_package(OpenSSL REQUIRED)
+add_library(leon-credentials STATIC credentials.c)
+target_compile_definitions(leon-credentials PRIVATE _GNU_SOURCE)
+target_include_directories(leon-credentials PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(leon-credentials PUBLIC OpenSSL::Crypto)

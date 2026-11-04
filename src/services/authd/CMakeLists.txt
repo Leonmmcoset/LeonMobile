@@ -1,0 +1,5 @@
+find_package(Threads REQUIRED)
+add_executable(authd main.c server.c policy.c service.c)
+target_compile_definitions(authd PRIVATE _GNU_SOURCE)
+target_link_libraries(authd PRIVATE leon-system leon-auth-client leon-credentials Threads::Threads)
+install(TARGETS authd RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR} COMPONENT Runtime)

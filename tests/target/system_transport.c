@@ -18,6 +18,8 @@ static int call(const char *service, const char *request) {
     struct sockaddr_un address = {.sun_family = AF_UNIX};
     if (!strcmp(service, "root"))
         snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon-root/control.sock");
+    else if (!strcmp(service, "auth"))
+        snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon-auth/control.sock");
     else
         snprintf(address.sun_path, sizeof(address.sun_path), "/run/leon/%s.sock", service);
     struct timeval timeout = {.tv_sec = 6};

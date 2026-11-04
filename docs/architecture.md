@@ -48,6 +48,7 @@ session lifetime are documented in [terminal.md](terminal.md).
 | `src/services/serviced` | Service configuration, dependency graph, process lifecycle, scheduling and local control |
 | `src/services/appd` | Socket server, peer-authorized broker, application process registry and preferences/audio operations |
 | `src/services/notificationd` | Independent notification socket, peer authorization, bounded queue and shared catalog adapter |
+| `src/services/authd` | Independent device credentials, durable retry limits and one-use session grants |
 | `src/services/rootd` | Durable root opt-in/password policy, isolated root PTYs and developer management |
 | `src/services/common` | Bounded C service transport, durable state helpers and private JSON/catalog adapter |
 | `src/services/{memd,powerd,storaged,netd,timed,crashd,portald}` | Independent system operations and policies described in core-services.md |

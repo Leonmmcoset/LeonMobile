@@ -1,0 +1,8 @@
+name = "authentication"
+command = ["/usr/sbin/authd"]
+after = ["prepare"]
+type = "notify"
+ready_timeout_ms = 15000
+watchdog_ms = 5000
+restart = "always"
+restart_limit = 10

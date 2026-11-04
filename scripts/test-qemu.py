@@ -211,9 +211,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not notification_probe and not system_probe and not terminal_probe and not root_probe:
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -226,6 +226,18 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         put(notification_probe, "/usr/bin/leon-test-notifications")
     if terminal_probe:
         put(terminal_probe, "/usr/bin/leon-test-terminal")
+    if auth_probe:
+        put(auth_probe, "/usr/bin/leon-test-auth")
+        unit = temporary / "auth-test.toml"
+        unit.write_text('name="authentication-test"\ncommand=["/usr/bin/leon-test-auth"]\n'
+                        'after=["authentication"]\ntype="oneshot"\nrestart="never"\n')
+        put(unit, "/etc/leon/services/19-auth-test.toml")
+        # Complete destructive protocol checks before the compositor attaches.
+        unit = temporary / "compositor.toml"
+        unit.write_text((REPO / "distro/rootfs-overlay/etc/leon/services/20-compositor.toml").read_text()
+                        .replace('"prepare", "seat"', '"prepare", "seat", "authentication-test"'))
+        commands.append("rm /etc/leon/services/20-compositor.toml")
+        put(unit, "/etc/leon/services/20-compositor.toml")
     if root_probe:
         put(root_probe, "/usr/bin/leon-test-root")
         unit = temporary / "root-test.toml"
@@ -481,6 +493,8 @@ def main():
                         help="AArch64 terminal VT/PTY probe plus interactive shell/vi/top/clipboard tests")
     parser.add_argument("--root-probe", type=Path,
                         help="AArch64 root protocol/cgroup/module probe, only on a disposable disk")
+    parser.add_argument("--auth-probe", type=Path,
+                        help="AArch64 authentication probe, only on a disposable disk")
     parser.add_argument("--root-only", action="store_true",
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
@@ -491,6 +505,8 @@ def main():
         parser.error("--root-only requires --root-probe and excludes --core-only")
     if args.root_probe and not args.root_probe.is_file():
         parser.error("--root-probe must name a compiled AArch64 probe")
+    if args.auth_probe and not args.auth_probe.is_file():
+        parser.error("--auth-probe must name a compiled AArch64 probe")
     if args.package and not args.package.is_file():
         parser.error("--package must name a compiled SDK hello package")
     if args.notification_probe and not args.notification_probe.is_file():
@@ -509,7 +525,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -558,6 +574,12 @@ def main():
                 if args.root_probe:
                     from root_qemu import wait_probe
                     wait_probe(guest, artifacts, 1)
+                if args.auth_probe:
+                    result = guest.run("cat /run/leon/auth-tests.txt")
+                    if "AUTH_TESTS_PASSED" not in result:
+                        raise RuntimeError("Authentication target tests failed:\n" + result)
+                    (artifacts / "authentication.txt").write_text(result + "\n")
+                    print(result, flush=True)
                 if args.system_probe:
                     limit = time.monotonic() + 150
                     result = ""
@@ -571,9 +593,13 @@ def main():
                     (artifacts / "system-services.txt").write_text(result + "\n")
                     print(result, flush=True)
                 services = guest.run("leonctl status")
+                service_deadline = time.monotonic() + 15
+                while "\tstarting\t" in services and time.monotonic() < service_deadline:
+                    time.sleep(.2)
+                    services = guest.run("leonctl status")
                 (artifacts / "notifications-service.txt").write_text(services + "\n")
                 service_pids = {}
-                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root"):
+                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root", "authentication"):
                     running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
                     if not running:
                         raise RuntimeError("Required service is not running: " + service)
