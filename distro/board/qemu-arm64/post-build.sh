@@ -23,7 +23,7 @@ ln -s /run/localtime "$target/etc/localtime"
 mkdir -p "$target/etc/fonts/conf.d"
 cat > "$target/etc/fonts/local.conf" <<'EOF'
 <?xml version="1.0"?><!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig><cachedir>/var/cache/fontconfig</cachedir><alias><family>sans-serif</family><prefer><family>DejaVu Sans</family><family>WenQuanYi Zen Hei</family></prefer></alias></fontconfig>
+<fontconfig><cachedir>/var/cache/fontconfig</cachedir><alias><family>sans-serif</family><prefer><family>DejaVu Sans</family><family>WenQuanYi Zen Hei</family></prefer></alias><alias><family>monospace</family><prefer><family>DejaVu Sans Mono</family><family>WenQuanYi Zen Hei Mono</family><family>WenQuanYi Zen Hei</family></prefer></alias></fontconfig>
 EOF
 
 # Retire the prototype dispatcher when rebuilding an existing output tree.

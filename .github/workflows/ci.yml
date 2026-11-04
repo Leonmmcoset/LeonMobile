@@ -16,11 +16,13 @@ jobs:
       - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build pkg-config libarchive-dev libssl-dev nlohmann-json3-dev libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev libvterm-dev libjpeg-dev weston fonts-wqy-zenhei
+          sudo apt-get install -y cmake ninja-build pkg-config libarchive-dev libssl-dev nlohmann-json3-dev libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev libvterm-dev libjpeg-dev weston fonts-wqy-zenhei fonts-dejavu-core xvfb xdotool vim-tiny python3-pil
       - run: make test
       - name: Verify privileged service and identity boundaries
         run: sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v
       - run: ./scripts/test-wayland.sh
+      - run: python3 scripts/test-wayland-input.py
+      - run: python3 scripts/test-wayland-input.py --terminal
       - uses: actions/upload-artifact@v4
         with:
           name: native-ui-frames
@@ -42,7 +44,7 @@ jobs:
       - run: make image
       - run: ./scripts/build-example.sh
       - run: ./scripts/build-target-probes.sh
-      - run: python3 scripts/test-qemu.py --timeout 240 --system-probe build/system-probe --notification-probe build/notifications-probe --package build/hello/org.example.hello-1.0.0.lmpkg
+      - run: python3 scripts/test-qemu.py --timeout 240 --system-probe build/system-probe --notification-probe build/notifications-probe --terminal-probe build/terminal-probe --package build/hello/org.example.hello-1.0.0.lmpkg
       - uses: actions/upload-artifact@v4
         if: always()
         with:

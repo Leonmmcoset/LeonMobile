@@ -17,10 +17,11 @@ Native component development additionally uses:
 ```sh
 sudo apt-get install cmake ninja-build pkg-config libarchive-dev nlohmann-json3-dev \
   libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev \
-  libvterm-dev libjpeg-dev weston fonts-wqy-zenhei
+  libvterm-dev libjpeg-dev weston fonts-wqy-zenhei fonts-dejavu-core \
+  xvfb xdotool vim-tiny python3-pil
 ```
 
-No system-wide installation of LeonMobile is required for native tests. `make test` builds native core/LMUI/apps and runs component, package and image update tests. Identity-transition tests require root; run them in the disposable CI environment or with `sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v`. The tests redirect stores, sockets and runtime directories into temporary paths. Native rendering can be checked using `scripts/test-wayland.sh`; it uses Weston as an independent protocol peer, not the target compositor, and captures PNGs under `build/screenshots`.
+No system-wide installation of LeonMobile is required for native tests. `make test` builds native core/LMUI/apps and runs component, package and image update tests. Identity-transition tests require root; run them in the disposable CI environment or with `sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v`. The tests redirect stores, sockets and runtime directories into temporary paths. Native rendering can be checked using `scripts/test-wayland.sh`; it uses Weston as an independent protocol peer, not the target compositor, and captures PNGs under `build/screenshots`. `python3 scripts/test-wayland-input.py` verifies real keyboard/repeat/clipboard events; adding `--terminal` exercises the interactive shell, Ctrl-C, vi save, selection/paste and restart through Weston on an isolated Xvfb display.
 
 ## Build the reference image
 
@@ -108,6 +109,7 @@ isolation, notification and input-method check:
 python3 scripts/test-qemu.py --timeout 240 \
   --system-probe build/system-probe \
   --notification-probe build/notifications-probe \
+  --terminal-probe build/terminal-probe \
   --package build/hello/org.example.hello-1.0.0.lmpkg
 ```
 
@@ -118,6 +120,10 @@ processes, capture a fatal core, mount a temporary USB ext4 device, exercise
 RTC/local UDP SNTP and test authorization. UI checks choose Chinese candidates,
 delete a UTF-8 character, save an exact note, deny/approve a permission and pick
 a file; after clean shutdown the private data partition is checked offline.
+`--terminal-probe` additionally tests the sandboxed terminal with a VT/PTY
+probe, ANSI RGB rendering, real Ctrl-C, vi editing, top, selection/clipboard
+and shell restart. It checks exact saved files from ext4 after clean shutdown;
+see [terminal.md](terminal.md) for controls and compatibility limits.
 `--core-only --system-probe build/system-probe` runs the focused service/IME/
 portal sequence. CI's optional image job runs the full command above. All
 mutations occur inside QEMU; existing user disks are not used.

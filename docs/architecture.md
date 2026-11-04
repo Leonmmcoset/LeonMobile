@@ -29,6 +29,12 @@ The `leon-ipc` client library implements the local JSON transport without linkin
 the privileged package installer, OpenSSL or libarchive into applications.
 Native build executables live in `build/host/bin/`, independent of source paths.
 
+The terminal separates its VT/history model, controlling PTY session, key
+translation, fixed-cell renderer and mobile application/views. Its shell
+inherits the existing app sandbox. The reference image supplies a monospace
+font, xterm terminfo and BusyBox terminal programs; protocol support and
+session lifetime are documented in [terminal.md](terminal.md).
+
 ## Source ownership
 
 | Directory | Responsibility |
@@ -98,7 +104,7 @@ not add radio or brightness hardware support.
 | `lmui` | Shared LMUI runtime; public SDK in staging | Wayland, Cairo/Pango, xkbcommon |
 | `leon-desktop` | Compositor, mobile shell and input method | Installed LMUI SDK, wlroots, JSON |
 | `leon-pinyin` | Deterministically generated Unicode 17 pinyin candidates and license | Pinned Unihan archive, host Python |
-| `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG |
+| `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG, DejaVu Mono, ncurses terminfo |
 | `leonmobile` | Product dependency selection; no executable payload | All four components |
 
 Each unit uses the shared pinned source/version and keeps its own source list,

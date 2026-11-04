@@ -148,6 +148,31 @@ class QMP:
                  "key": {"type": "qcode", "data": code}}}]})
             time.sleep(.05)
 
+    def chord(self, modifiers, code):
+        def event(key, down):
+            self.command("input-send-event", {"events": [{"type": "key", "data": {
+                "down": down, "key": {"type": "qcode", "data": key}}}]})
+        for modifier in modifiers:
+            event(modifier, True)
+        self.key(code)
+        for modifier in reversed(modifiers):
+            event(modifier, False)
+
+    def type_text(self, text):
+        plain = dict(zip("`-=[]\\;',./ ", ("grave_accent", "minus", "equal", "bracket_left",
+                         "bracket_right", "backslash", "semicolon", "apostrophe", "comma", "dot", "slash", "spc")))
+        shifted = dict(zip('~!@#$%^&*()_+{}|:"<>?', ("grave_accent", "1", "2", "3", "4", "5", "6",
+                            "7", "8", "9", "0", "minus", "equal", "bracket_left", "bracket_right",
+                            "backslash", "semicolon", "apostrophe", "comma", "dot", "slash")))
+        for character in text:
+            code = plain.get(character, character.lower())
+            modifiers = []
+            if character in shifted:
+                code, modifiers = shifted[character], ["shift"]
+            elif character.isupper():
+                modifiers = ["shift"]
+            self.chord(modifiers, code)
+
     def capture(self, path, allow_blank=False):
         self.command("screendump", {"filename": str(path)})
         with path.open("rb") as stream:
@@ -186,9 +211,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not notification_probe and not system_probe:
+    if not notification_probe and not system_probe and not terminal_probe:
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -199,6 +224,8 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe):
         commands.append("set_inode_field " + destination + " mode 0100755")
     if notification_probe:
         put(notification_probe, "/usr/bin/leon-test-notifications")
+    if terminal_probe:
+        put(terminal_probe, "/usr/bin/leon-test-terminal")
     if system_probe:
         put(system_probe, "/usr/bin/leon-test-system")
         unit = temporary / "test-service.toml"
@@ -335,6 +362,81 @@ def exercise_core_ui(guest,qmp,artifacts,preferences):
     print("Target IME/portal: Chinese candidates, UTF-8 delete, service restart, explicit checkpoint, "
           "permission denial/approval and file selection exercised",flush=True)
 
+def exercise_terminal_ui(guest, qmp, artifacts):
+    # This path uses real compositor input and the terminal's sandboxed shell.
+    # Files stay private and are inspected from ext4 after clean shutdown.
+    def command(text):
+        qmp.type_text(text)
+        qmp.key("ret")
+        time.sleep(.3)
+    command("/usr/bin/leon-test-terminal > terminal-tests.txt")
+    time.sleep(2)
+    command("printf '\\033[2J\\033[H\\033[48;2;12;34;56m    \\033[0mANSI_READY\\n'")
+    qmp.wait_frame(artifacts / "terminal-truecolor.ppm",
+                   lambda frame: frame[(142 * 480 + 28) * 3:(142 * 480 + 28) * 3 + 3]
+                                 == bytes((12, 34, 56)),
+                   "Terminal did not render an ANSI RGB background on blank cells")
+    command("sleep 60")
+    qmp.chord(["ctrl"], "c")
+    command("printf interrupted > terminal-interrupt.txt")
+    command("vi terminal-edited.txt")
+    time.sleep(.8)
+    qmp.type_text("iLeonMobile terminal")
+    qmp.key("esc")
+    command(":wq")
+    time.sleep(.8)
+    command("top")
+    time.sleep(1)
+    qmp.capture(artifacts / "terminal-top.ppm")
+    qmp.key("q")
+    time.sleep(.5)
+    command("printf '\\033[2J\\033[HCLIP_TEXT\\n'")
+    time.sleep(.5)
+    # Select an entire grid line; trailing blanks are removed by copy.
+    qmp.click(54, 840)  # Select (app origin 42, height 854)
+    qmp.drag(27, 149, 450, 149)
+    qmp.click(130, 840)  # Copy
+    command("read value; printf '%s' \"$value\" > terminal-pasted.txt")
+    qmp.chord(["ctrl", "shift"], "v")
+    time.sleep(.4)
+    qmp.key("ret")
+    time.sleep(.3)
+    qmp.capture(artifacts / "terminal-clipboard.ppm")
+    command("exit 7")
+    time.sleep(.5)
+    qmp.click(424, 840)  # Restart session
+    time.sleep(.5)
+    command("printf restarted > terminal-restarted.txt")
+    qmp.capture(artifacts / "terminal-restarted.ppm")
+    print("Target terminal: PTY/VT probe, RGB blank cells, Ctrl-C, vi, top, clipboard and restart exercised", flush=True)
+
+def verify_terminal_data(disk, temp):
+    table = json.loads(subprocess.check_output(["sfdisk", "--json", disk]))["partitiontable"]
+    partition = table["partitions"][1]
+    datafs = temp / "terminal-data.ext4"
+    with disk.open("rb") as source, datafs.open("wb") as destination:
+        source.seek(partition["start"] * table.get("sectorsize", 512))
+        remaining = partition["size"] * table.get("sectorsize", 512)
+        while remaining:
+            block = source.read(min(1024 * 1024, remaining))
+            if not block:
+                raise RuntimeError("Short terminal data partition")
+            destination.write(block)
+            remaining -= len(block)
+    def read(name):
+        return subprocess.check_output(["debugfs", "-R", "cat /leon/data/org.leon.terminal/" + name,
+                                        datafs], stderr=subprocess.DEVNULL).decode()
+    report = read("terminal-tests.txt")
+    if "PASS terminal ANSI/VT" not in report or "PASS terminal real PTY" not in report:
+        raise RuntimeError("Target terminal probe did not pass: " + report)
+    for name, expected in (("terminal-interrupt.txt", "interrupted"),
+                            ("terminal-edited.txt", "LeonMobile terminal\n"),
+                            ("terminal-pasted.txt", "CLIP_TEXT"), ("terminal-restarted.txt", "restarted")):
+        actual = read(name)
+        if actual != expected:
+            raise RuntimeError(name + " contains " + repr(actual) + ", expected " + repr(expected))
+    print("Offline terminal data: VT/PTY probe, interrupt, vi edit, clipboard and restarted shell verified", flush=True)
+
 def verify_core_data(disk,temp):
     table=json.loads(subprocess.check_output(["sfdisk","--json",disk]))["partitiontable"]
     data_partition=table["partitions"][1]
@@ -365,6 +467,8 @@ def main():
                         help="AArch64 tests/target/notifications.c executable for live notification checks")
     parser.add_argument("--system-probe", type=Path,
                         help="AArch64 system service/sandbox probe, injected only into a private disk")
+    parser.add_argument("--terminal-probe", type=Path,
+                        help="AArch64 terminal VT/PTY probe plus interactive shell/vi/top/clipboard tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
@@ -375,6 +479,10 @@ def main():
         parser.error("--notification-probe must name a compiled AArch64 probe")
     if args.system_probe and not args.system_probe.is_file():
         parser.error("--system-probe must name a compiled AArch64 probe")
+    if args.terminal_probe and not args.terminal_probe.is_file():
+        parser.error("--terminal-probe must name a compiled AArch64 probe")
+    if args.terminal_probe and args.core_only:
+        parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
     artifacts = REPO / "build/qemu-test"
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -383,7 +491,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -510,8 +618,7 @@ def main():
                     print("Core service, isolation, IME and permission UI target validation passed",flush=True)
                     return
                 notification_terminal = None
-                if args.notification_probe:
-                    guest.run("test -x /usr/bin/leon-test-notifications")
+                if args.notification_probe or args.terminal_probe:
                     qmp.click(240, 838)  # All apps
                     time.sleep(.5)
                     qmp.click(240, 426)  # Terminal
@@ -520,20 +627,30 @@ def main():
                         lambda frame: frame[(180 * 480 + 24) * 3:(180 * 480 + 24) * 3 + 3]
                                       == bytes.fromhex("19151f"),
                         "Terminal did not render for notification probe")
+                    if args.terminal_probe:
+                        guest.run("test -x /usr/bin/leon-test-terminal && test -r /usr/share/terminfo/x/xterm-256color")
+                        exercise_terminal_ui(guest, qmp, artifacts)
+                if args.notification_probe:
+                    guest.run("test -x /usr/bin/leon-test-notifications")
                     for code in "/usr/bin/leon-test-notifications":
                         qmp.key({"/": "slash", "-": "minus"}.get(code, code))
                     qmp.key("ret")
-                    time.sleep(1)
-                    notifications = json.loads(guest.run("/usr/bin/leon-test-notifications --list"))["notifications"]
-                    legacy = json.loads(guest.run("/usr/bin/leon-test-notifications --legacy-list"))["notifications"]
                     expected = [{"app": "org.leon.terminal",
                                  "title": f"LeonMobile 测试通知 {index:02d}"}
                                 for index in range(1, 13)]
+                    deadline = time.monotonic() + 15
+                    while True:
+                        notifications = json.loads(guest.run("/usr/bin/leon-test-notifications --list"))["notifications"]
+                        if notifications == expected or time.monotonic() >= deadline:
+                            break
+                        time.sleep(.2)
+                    legacy = json.loads(guest.run("/usr/bin/leon-test-notifications --legacy-list"))["notifications"]
                     if notifications != expected or legacy != notifications:
                         raise RuntimeError("Direct/legacy notifications lost their peer identity or shared queue")
                     (artifacts / "notifications.json").write_text(
                         json.dumps(notifications, ensure_ascii=False, indent=2) + "\n")
                     notification_terminal = qmp.capture(artifacts / "shade-notification-terminal.ppm")
+                if args.notification_probe or args.terminal_probe:
                     qmp.click(240, 940)
                     time.sleep(.5)
                 qmp.click(96, 410)
@@ -595,8 +712,10 @@ def main():
                 guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
                 qmp.wait_frame(
                     artifacts / "lifecycle-before-close.ppm",
-                    lambda frame: frame[(180 * 480 + 30) * 3:(180 * 480 + 30) * 3 + 3]
-                                  == bytes.fromhex("eaddff"),
+                    lambda frame: (frame[(180 * 480 + 30) * 3:(180 * 480 + 30) * 3 + 3]
+                                   == bytes.fromhex("eaddff") and
+                                   frame[(140 * 480 + 240) * 3:(140 * 480 + 240) * 3 + 3]
+                                   == bytes.fromhex("fff8ff")),
                     "Recent tasks did not settle before cooperative close")
                 qmp.click(432, 190)
                 closed = guest.wait_lifecycle(None, absent=(calculator_id,))
@@ -775,13 +894,16 @@ def main():
                 time.sleep(.5)
                 qmp.capture(artifacts / "settings-search.ppm")
                 qmp.click(180, 296)  # Matching Sound result
-                time.sleep(.5)
-                qmp.click(146, 346)  # 25% of the playback slider
-                time.sleep(.5)
+                qmp.wait_frame(
+                    artifacts / "settings-sound-ready.ppm",
+                    lambda frame: frame[(300 * 480 + 20) * 3:(300 * 480 + 20) * 3 + 3]
+                                  == bytes.fromhex("30293c"),
+                    "Sound page did not settle at its slider coordinates")
+                # Choose a new value so the old shade volume cannot satisfy
+                # this check before the settings client's request completes.
+                qmp.click(240, 346)  # 50% of the playback slider
+                guest.wait_setting("volume", 50)
                 qmp.capture(artifacts / "settings-sound.ppm")
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
-                if preferences.get("volume") != 25:
-                    raise RuntimeError("Settings UI did not apply the playback volume")
                 qmp.click(36, 75)
                 time.sleep(.3)
                 qmp.click(436, 206)  # Clear search, restore all categories
@@ -838,7 +960,7 @@ def main():
                 (artifacts / "network.txt").write_text(network + "\n")
                 audio = guest.run("XDG_RUNTIME_DIR=/run/user/1000 wpctl status")
                 volume = guest.run("XDG_RUNTIME_DIR=/run/user/1000 wpctl get-volume @DEFAULT_AUDIO_SINK@")
-                if "Volume: 0.25" not in volume:
+                if "Volume: 0.50" not in volume:
                     raise RuntimeError("PipeWire sink volume does not match the UI setting")
                 (artifacts / "audio.txt").write_text(audio + "\n" + volume + "\n")
                 # Refactored built-ins must launch the ELF named in their
@@ -965,6 +1087,8 @@ def main():
                     raise RuntimeError("Compositor did not shut down cleanly")
                 if args.system_probe:
                     verify_core_data(disk,temp)
+                if args.terminal_probe:
+                    verify_terminal_data(disk, temp)
                 passed = True
                 print("QEMU boot, native apps, shade drag/controls/focus, settings and clean UI poweroff passed")
                 print("Artifacts:", artifacts)

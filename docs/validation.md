@@ -288,3 +288,48 @@ wake sources, battery gauges and phone peripherals require hardware validation.
 The pinyin engine is a bounded basic candidate engine, and the network manager
 currently manages one Ethernet interface. Exact supported operations and limits
 remain specified in [core-services.md](core-services.md).
+
+## Interactive terminal rewrite validation (2026-11-04)
+
+The terminal now separates VT/history, PTY session, input translation, fixed-cell
+rendering and mobile controls. Ten native CTest checks and 37 Python integration
+checks passed. The two terminal CTest checks also passed with explicit assertion
+flags, which keep assertions active in Release builds too. The VT/PTY probe covers SGR attributes,
+indexed/RGB colors and blank-cell backgrounds, cursor/erase/insert/delete,
+alternate screen, split UTF-8, CJK/combining/emoji cells, DEC line drawing,
+cursor/status replies, modified/application/function keys, bracketed paste,
+mouse/focus reports and bounded scrollback with a width change. A real controlling
+PTY transferred a hash-checked 512 KiB payload under backpressure, rejected an
+oversized queued write, delivered resized dimensions, closed inherited FDs and
+kept the shell usable after interrupting a foreground task with Ctrl-C.
+
+Independent headless Weston rendered all eight apps, the shell and shade stages;
+lifecycle, nonblocking I/O and motion checks passed. The independent X11 Weston
+seat on Xvfb passed actual physical modifiers, key repeat and a 256 KiB UTF-8
+clipboard transfer. Its terminal sequence executed shell commands, interrupted
+sleep, saved a file through vi, selected/copied/pasted exact text and restarted
+an exited shell in the same application.
+
+The AArch64/musl app, BusyBox tools, DejaVu monospace fonts and terminfo were
+rebuilt into the default image. The complete QEMU command in [building.md](building.md)
+passed with system, notification and terminal probes and the SDK package.
+The terminal probe ran through the sandboxed app's PTY under UID 11005. Real
+compositor input exercised RGB blank backgrounds, Ctrl-C, BusyBox vi and top,
+selection/clipboard and exit/restart. After clean UI poweroff, offline ext4
+inspection verified both probe success records and the exact interruption marker,
+vi file (`LeonMobile terminal\n`), pasted text (`CLIP_TEXT`) and restarted-shell
+marker. The existing service fault/isolation, lifecycle, 12 notifications,
+settings/audio, app identities, SDK installation/removal, IME, file permission,
+saved editor data and clean compositor exit checks also passed.
+
+The combined sequence waits for completed notification submissions, distinguishes
+the task page from a calculator frame and waits for settled sound-page geometry
+and a newly persisted volume before checking PipeWire. These observations replace
+timing assumptions exposed by the longer terminal interaction sequence.
+
+Evidence remains ignored in `build/terminal-lmui-*.log`,
+`build/terminal-rewrite-*.log`, `build/screenshots/` and
+`build/qemu-test/terminal-*.{ppm,png}` with the final serial/audio/network logs.
+The default `output/images/` image was regenerated; the older assembled `dist/`
+bundle was not regenerated. Compatibility follows the libvterm subset described
+in [terminal.md](terminal.md), with QEMU developer-prototype scope.

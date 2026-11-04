@@ -13,4 +13,9 @@ mkdir -p "$repo/build"
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
     "$repo/tests/target/system_sandbox.c" "$repo/src/services/appd/sandbox.c" \
     -o "$repo/build/system-probe"
-echo 'AArch64 notification and system probes compiled under build/; no image was changed.'
+"${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Os \
+    -I"$repo/src/apps/terminal" \
+    "$repo/tests/terminal.cpp" "$repo/src/apps/terminal/screen.cpp" \
+    "$repo/src/apps/terminal/session.cpp" "$repo/src/apps/terminal/input.cpp" \
+    -lvterm -lxkbcommon -lutil -o "$repo/build/terminal-probe"
+echo 'AArch64 notification, system and terminal probes compiled under build/; no image was changed.'
