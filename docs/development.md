@@ -14,7 +14,7 @@ do not add unrelated component implementation directories to include paths.
 | Option | Meaning |
 | --- | --- |
 | `LEON_SYSTEM` | PID 1, manager, application/notification brokers and independent system daemons |
-| `LEON_TOOLS` | `leonctl`, `lmpkg` and `lmsys` |
+| `LEON_TOOLS` | `leonctl`, `lmpkg`, `lmsys` and non-setuid `leonsu` |
 | `LEON_GRAPHICS` | Master switch for graphical components |
 | `LEON_LMUI` | Build LMUI locally; when off, graphical clients use the installed SDK |
 | `LEON_APPS` | Eight independently linked built-ins |
@@ -76,6 +76,11 @@ Shared UI support belongs in `src/libraries/app-support` only when multiple
 built-ins need it. Public UI functionality belongs in LMUI. Ordinary clients
 use the IPC transport, while privileged installation and identity policy stay
 in `src/libraries/package` and `src/services/appd`.
+
+The root credential/FD transport is private to `src/libraries/root-client`.
+Settings requests mutations through rootd; its own UID stays unprivileged.
+The internal C service/JSON runtime is also available to tools-only builds,
+without enabling the system daemons or graphics.
 
 The settings app keeps its page/search catalog, navigation state, preference
 views, device views and read-only device queries in separate private modules.

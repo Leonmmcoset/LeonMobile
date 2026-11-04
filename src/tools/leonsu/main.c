@@ -24,6 +24,7 @@ static int password(char *out, size_t size) {
     }
     struct termios original, hidden;
     if (tcgetattr(tty, &original)) {
+        perror("su: terminal attributes");
         close(tty);
         return -1;
     }
@@ -42,8 +43,11 @@ static int password(char *out, size_t size) {
         while (!interrupted) {
             char byte;
             ssize_t count = read(tty, &byte, 1);
-            if (count <= 0)
+            if (count <= 0) {
+                if (count < 0 && !interrupted)
+                    perror("su: password input");
                 break;
+            }
             if (byte == '\n' || byte == '\r') {
                 out[used] = 0;
                 result = overflow ? -1 : 0;
@@ -95,12 +99,16 @@ static int relay(int socket, int master) {
     int tty = isatty(STDIN_FILENO), result = 1, ended = 0, drained = 0;
     struct termios original;
     if (tty) {
-        if (tcgetattr(STDIN_FILENO, &original))
+        if (tcgetattr(STDIN_FILENO, &original)) {
+            perror("su: relay terminal attributes");
             return 1;
+        }
         struct termios raw = original;
         cfmakeraw(&raw);
-        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw))
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw)) {
+            perror("su: relay terminal mode");
             return 1;
+        }
     }
     int original_flags = fcntl(STDOUT_FILENO, F_GETFL);
     fcntl(master, F_SETFL, fcntl(master, F_GETFL) | O_NONBLOCK);
@@ -237,6 +245,7 @@ int main(int argc, char **argv) {
     }
     socket = root_connect(path ? path : LEON_ROOT_SOCKET);
     if (socket < 0) {
+        perror("su: root service");
         root_clear(secret, sizeof(secret));
         lm_free(request);
         return 1;
@@ -251,6 +260,8 @@ int main(int argc, char **argv) {
     root_clear(secret, sizeof(secret));
     int master = -1;
     int result = exchange(socket, request, reply, &master);
+    if (result)
+        fputs("su: root session request failed\n", stderr);
     char *stored = (char *)lm_string(lm_get(request, "password"), "");
     root_clear(stored, strlen(stored));
     lm_free(request);
