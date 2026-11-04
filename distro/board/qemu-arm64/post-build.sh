@@ -28,3 +28,11 @@ EOF
 
 # Retire the prototype dispatcher when rebuilding an existing output tree.
 rm -f "$target/usr/bin/leon-app"
+
+# Root login stays locked even when rebuilding an older output directory.
+# User elevation is mediated by rootd, never by a distro password or sudo.
+sed -i 's/^root:[^:]*:/root:!:/' "$target/etc/shadow"
+chmod 0600 "$target/etc/shadow"
+rm -f "$target/bin/su" "$target/sbin/sulogin" "$target/usr/bin/sudoedit"
+chmod 0755 "$target/usr/bin/sudo"
+ln -s sudo "$target/usr/bin/sudoedit"

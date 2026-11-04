@@ -617,6 +617,9 @@ def main():
                     passed=True
                     print("Core service, isolation, IME and permission UI target validation passed",flush=True)
                     return
+                guest.run("sudo id >/dev/null 2>&1; test $? -eq 126")
+                guest.run("sudoedit /etc/shadow >/dev/null 2>&1; test $? -eq 126")
+                guest.run("! busybox --list | grep -E '^(su|sulogin)$'")
                 notification_terminal = None
                 if args.notification_probe or args.terminal_probe:
                     qmp.click(240, 838)  # All apps

@@ -1,0 +1,3 @@
+#!/bin/sh
+echo 'LeonMobile: sudo is disabled by system policy; use the password-authenticated root interface.' >&2
+exit 126
