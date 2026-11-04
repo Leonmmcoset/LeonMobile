@@ -185,3 +185,24 @@ The reference SDK example is `examples/hello`. Debug-only environment convention
 For independent shell rendering, `LEON_SHELL_CAPTURE_SHADE=compact` or `expanded`
 selects a settled shade stage only when `LMUI_CAPTURE_FRAME` is also set. This
 capture convention does not open the shade during normal startup.
+
+### Generation 1 system service transport
+
+The private C service runtime in `src/services/common` hosts one JSON object
+request followed by `\n` per Unix stream connection. Replies contain `ok` and,
+on failure, `error`; they end with a newline and EOF. Requests are at most
+8,191 bytes, have at most 32 levels of JSON nesting and cannot contain embedded
+NULs. Sixteen concurrent clients have absolute one-second read/write deadlines;
+partial I/O and clients that stop reading cannot hold the event loop indefinitely.
+The server checks `SO_PEERCRED` and never treats client-supplied identity as the
+peer. Root and desktop UID 1000 are trusted; each operation specifies any other
+allowed identities. A stale socket is replaced only after confirming no live
+listener owns it. Readiness and watchdog packets use leond's private channel.
+
+All policy replacements fsync a private temporary file, rename it and fsync the
+parent directory. Helpers have bounded waits, reset inherited signal masks and
+are killed when their service parent dies. `--test` plus temporary state/proc/sys
+roots permits protocol tests without changing the host's mounts, clock, network,
+core pattern or power state. The C++ JSON/package adapter is internal; domain and
+transport code uses C17. This transport is separate from the existing app and
+notification protocols.
