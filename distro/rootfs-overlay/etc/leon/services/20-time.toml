@@ -1,0 +1,6 @@
+name = "time"
+command = ["/usr/sbin/timed"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare", "network"]
+restart = "always"

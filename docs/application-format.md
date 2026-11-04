@@ -64,3 +64,13 @@ lmpkg remove org.example.hello --purge-data
 ```
 
 On-device installation/removal by the trusted `leon` desktop user goes through the broker. UID 0 may also operate locally. `--root DIR` creates an isolated offline store for tooling and tests and uses `DIR/builtin` for any built-in test manifests.
+
+## Declared capabilities
+
+An optional `permissions` array may contain `network` and `files.import`, at most
+once each. Unknown values, duplicate entries and non-string values are rejected.
+An omitted permission is denied. Declaring a capability does not grant it; an
+installed app requests it from the independent permission portal and the desktop
+confirms it. See [core-services.md](core-services.md) for requests, decisions,
+revocation and selected-file copies. The terminal declares network access, and
+the editor declares file import; neither declaration is an automatic grant.

@@ -1,0 +1,7 @@
+name = "memory"
+command = ["/usr/sbin/memd"]
+type = "notify"
+ready_timeout_ms = 10000
+watchdog_ms = 10000
+after = ["prepare", "apps"]
+restart = "always"

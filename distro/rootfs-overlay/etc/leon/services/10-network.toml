@@ -1,4 +1,6 @@
 name = "network"
-command = ["/usr/libexec/leon/network"]
+command = ["/usr/sbin/netd"]
+type = "notify"
+watchdog_ms = 10000
 after = ["prepare"]
 restart = "always"

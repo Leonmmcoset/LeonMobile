@@ -1,0 +1,6 @@
+name = "crash"
+command = ["/usr/sbin/crashd"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare"]
+restart = "always"

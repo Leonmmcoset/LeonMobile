@@ -3,14 +3,20 @@ case "$1" in
     deconfig)
         /sbin/ip addr flush dev "$interface"
         /sbin/ip link set "$interface" up
+        : > /run/resolv.conf
         ;;
     bound|renew)
         /sbin/ip addr flush dev "$interface"
         /sbin/ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" up
         /sbin/ip route flush default dev "$interface"
         for gateway in $router; do /sbin/ip route add default via "$gateway" dev "$interface" && break; done
-        : > /run/resolv.conf
-        for server in $dns; do echo "nameserver $server" >> /run/resolv.conf; done
+        : > /run/resolv.conf.new
+        for server in $dns; do
+            case "$server" in *[!0-9a-fA-F.:]*|'') continue;; esac
+            echo "nameserver $server" >> /run/resolv.conf.new
+        done
+        chmod 0644 /run/resolv.conf.new
+        mv /run/resolv.conf.new /run/resolv.conf
         echo "LeonMobile: network ready $ip"
         ;;
 esac

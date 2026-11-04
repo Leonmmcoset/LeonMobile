@@ -1,7 +1,9 @@
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstring>
 #include <leon/ipc.hpp>
+#include <leon/system.hpp>
 #include <stdexcept>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -55,6 +57,15 @@ std::string request(const std::string &socket_path, const Json &message) {
         require(result.size() < 1024 * 1024, "response too large");
     }
     require(n == 0, "service response timed out");
+    return result;
+}
+Json system_request(const std::string &service, const Json &message) {
+    static const std::array<std::string, 7> names{"memory", "power", "network", "storage",
+                                                  "time",   "crash", "portal"};
+    require(std::find(names.begin(), names.end(), service) != names.end(),
+            "unknown system service");
+    auto result = Json::parse(request("/run/leon/" + service + ".sock", message));
+    require(result.value("ok", false), result.value("error", "system request failed"));
     return result;
 }
 } // namespace leon

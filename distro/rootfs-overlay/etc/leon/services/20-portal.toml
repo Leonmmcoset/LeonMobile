@@ -1,0 +1,6 @@
+name = "portal"
+command = ["/usr/sbin/portald"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare"]
+restart = "always"

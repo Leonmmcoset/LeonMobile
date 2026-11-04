@@ -1,5 +1,6 @@
 #include "internal.hpp"
 #include <regex>
+#include <set>
 #include <sstream>
 namespace leon::detail {
 std::array<unsigned, 3> version(const std::string &s) {
@@ -36,6 +37,16 @@ void validate_manifest(const Json &m, bool builtin) {
     if (m.contains("lifecycle"))
         require(m.at("lifecycle").is_number_integer() && m.at("lifecycle") == 1,
                 "unsupported application lifecycle protocol");
+    if (m.contains("permissions")) {
+        require(m["permissions"].is_array() && m["permissions"].size() <= 2, "invalid permissions");
+        std::set<std::string> seen;
+        for (const auto &permission : m["permissions"]) {
+            require(permission.is_string(), "invalid permission");
+            auto value = permission.get<std::string>();
+            require((value == "network" || value == "files.import") && seen.insert(value).second,
+                    "unknown or duplicate permission");
+        }
+    }
     require(m.at("name").is_string() && !m.at("name").get<std::string>().empty(),
             "missing application name");
     std::string entry = m.at("entry");

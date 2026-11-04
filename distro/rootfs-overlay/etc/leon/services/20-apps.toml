@@ -1,4 +1,4 @@
 name = "apps"
 command = ["/usr/sbin/leon-launchd"]
-after = ["prepare"]
+after = ["prepare", "portal", "crash"]
 restart = "always"

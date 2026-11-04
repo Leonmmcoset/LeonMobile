@@ -3,6 +3,7 @@
 #include <fstream>
 #include <ifaddrs.h>
 #include <iomanip>
+#include <leon/system.hpp>
 #include <net/if.h>
 #include <sstream>
 #include <sys/statvfs.h>
@@ -24,27 +25,15 @@ DeviceInfo read_device_info() {
         info.kernel = system.release;
         info.architecture = system.machine;
     }
-    ifaddrs *interfaces = nullptr;
-    if (!getifaddrs(&interfaces)) {
-        for (auto *item = interfaces; item; item = item->ifa_next) {
-            if (!item->ifa_name || !item->ifa_addr || (item->ifa_flags & IFF_LOOPBACK))
-                continue;
-            if (info.interface.empty())
-                info.interface = item->ifa_name;
-            if (item->ifa_addr->sa_family != AF_INET)
-                continue;
-            bool connected = (item->ifa_flags & IFF_UP) && (item->ifa_flags & IFF_RUNNING);
-            if (info.address.empty() || (!info.connected && connected)) {
-                char address[INET_ADDRSTRLEN]{};
-                auto *ipv4 = reinterpret_cast<sockaddr_in *>(item->ifa_addr);
-                if (inet_ntop(AF_INET, &ipv4->sin_addr, address, sizeof(address))) {
-                    info.interface = item->ifa_name;
-                    info.address = address;
-                    info.connected = connected;
-                }
+    try {
+        auto network = system_request("network", {{"op", "status"}});
+        info.interface = network.value("managed_interface", "");
+        for (const auto &item : network.at("interfaces"))
+            if (item.value("name", "") == info.interface) {
+                info.address = item.value("ipv4", "");
+                info.connected = item.value("up", false) && item.value("running", false);
             }
-        }
-        freeifaddrs(interfaces);
+    } catch (...) {
     }
     if (!info.interface.empty()) {
         std::ifstream mac("/sys/class/net/" + info.interface + "/address");

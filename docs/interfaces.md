@@ -206,3 +206,8 @@ roots permits protocol tests without changing the host's mounts, clock, network,
 core pattern or power state. The C++ JSON/package adapter is internal; domain and
 transport code uses C17. This transport is separate from the existing app and
 notification protocols.
+
+The generation-1 memory, power, storage, network, time, crash and permission
+operations, authorization rules and recovery limits are specified in
+[core-services.md](core-services.md). Service names in that document are the
+actual leond units; `lmsys` talks directly to each independent daemon.

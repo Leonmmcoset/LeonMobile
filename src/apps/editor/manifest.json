@@ -8,5 +8,8 @@
   "name_en": "Editor",
   "lmui": 1,
   "icon": "editor",
-  "lifecycle": 1
+  "lifecycle": 1,
+  "permissions": [
+    "files.import"
+  ]
 }
