@@ -17,6 +17,7 @@ config BR2_PACKAGE_LEONMOBILE
 	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_4_14
 	select BR2_PACKAGE_LEON_CORE
 	select BR2_PACKAGE_LMUI
+	select BR2_PACKAGE_LEON_PINYIN
 	select BR2_PACKAGE_LEON_DESKTOP
 	select BR2_PACKAGE_LEON_APPS
 	help
@@ -32,3 +33,5 @@ source "$BR2_EXTERNAL_LEON_PATH/package/leon-apps/Config.in"
 config BR2_PACKAGE_LIBVTERM_LEON
 	bool "libvterm (LeonMobile terminal dependency)"
 	select BR2_PACKAGE_LIBICONV if !BR2_ENABLE_LOCALE
+
+source "$BR2_EXTERNAL_LEON_PATH/package/leon-pinyin/Config.in"

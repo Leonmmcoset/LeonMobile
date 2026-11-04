@@ -1,0 +1,4 @@
+config BR2_PACKAGE_LEON_PINYIN
+	bool "LeonMobile pinyin dictionary"
+	help
+	  Deterministic candidates generated from Unicode 17.0.0 Unihan.
