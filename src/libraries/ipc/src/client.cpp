@@ -39,7 +39,10 @@ std::string request(const std::string &socket_path, const Json &message) {
     Fd fd(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0));
     auto op = message.value("op", "");
     timeval timeout{op == "install"                                       ? 60
-                    : (op == "stop" || op == "remove" || op == "reclaim") ? 5
+                    : (op == "app_stop" || op == "app_clear" || op == "app_uninstall" ||
+                       op == "remove")                                   ? 15
+                    : op == "app_info"                                   ? 8
+                    : (op == "stop" || op == "reclaim")                   ? 5
                                                                           : 3,
                     0};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));

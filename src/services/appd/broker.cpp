@@ -1,5 +1,6 @@
 #include "broker.hpp"
 #include "internal.hpp"
+#include "management.hpp"
 #include "sandbox.h"
 #include <csignal>
 #include <leon/ipc.hpp>
@@ -17,7 +18,18 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
     auto op = request.at("op").get<std::string>();
     bool shell = caller == 0 || caller == 1000;
     bool settings = shell || caller == 11000;
-    if (op == "list") {
+    if (op == "app_list" || op == "app_info" || op == "app_stop" || op == "app_clear" ||
+        op == "app_uninstall") {
+        fail(settings, "permission denied");
+        if (op == "app_list")
+            response = managed_list(packages_, processes_);
+        else if (op == "app_info")
+            response = managed_info(packages_, processes_, options_, request.at("id"));
+        else {
+            manage_application(packages_, processes_, options_, op, request.at("id"));
+            response = {{"completed", op}, {"id", request.at("id")}};
+        }
+    } else if (op == "list") {
         fail(shell, "permission denied");
         response = {{"apps", packages_.list()},
                     {"running", processes_.running()},
@@ -43,8 +55,8 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
     } else if (op == "remove") {
         fail(shell, "permission denied");
         std::string id = request.at("id");
-        processes_.stop(id);
-        packages_.remove(id, request.value("purge", false));
+        manage_application(packages_, processes_, options_, "app_uninstall", id,
+                           request.value("purge", false));
     } else if (op == "close" || op == "stop") {
         fail(shell, "permission denied");
         std::string id = request.at("id");

@@ -27,6 +27,55 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
     for (size_t i = 0; i < 32; ++i)
         if (s->pending[i].token && lm_now_ms() >= s->pending[i].expires)
             s->pending[i].token = 0;
+    if (!strcmp(op, "app_permissions") || !strcmp(op, "reset_app")) {
+        // The application broker is the only unprivileged UI's entry point.
+        // reset_app deliberately never calls apps.sock; its caller first stops
+        // every app process and serializes reset with launches/uninstallation.
+        if (uid != 0)
+            return lm_failure("permission denied");
+        const char *id = lm_string(lm_get(r, "app"), "");
+        lm_json *app = lm_app_by_id(d->options.root, d->options.builtin, id);
+        if (!app)
+            return lm_failure("unknown application");
+        if (!strcmp(op, "reset_app")) {
+            lm_json *next = lm_copy(s->grants);
+            lm_set(next, id, lm_object());
+            if (lm_write_json(d->options.state, next)) {
+                lm_free(next);
+                lm_free(app);
+                return lm_failure("cannot persist permission reset");
+            }
+            lm_free(s->grants);
+            s->grants = next;
+            for (size_t i = 0; i < 32; ++i)
+                if (s->pending[i].token && !strcmp(s->pending[i].app, id))
+                    memset(&s->pending[i], 0, sizeof(s->pending[i]));
+            lm_free(app);
+            return lm_success();
+        }
+        lm_json *out = lm_success(), *permissions = lm_array();
+        const lm_json *list = lm_get(app, "permissions");
+        for (size_t i = 0; i < lm_size(list); ++i) {
+            const char *name = lm_string(lm_at(list, i), "");
+            int pending = 0;
+            for (size_t j = 0; j < 32; ++j)
+                if (s->pending[j].token && !s->pending[j].file_request &&
+                    !s->pending[j].completed && !strcmp(s->pending[j].app, id) &&
+                    !strcmp(s->pending[j].permission, name))
+                    pending = 1;
+            lm_json *item = lm_object();
+            lm_set_string(item, "name", name);
+            const lm_json *decision = lm_get(lm_get(s->grants, id), name);
+            lm_set_string(item, "state", portal_granted(s, app, name) ? "allowed"
+                                            : pending                  ? "pending"
+                                            : decision                 ? "denied"
+                                                                       : "not-requested");
+            lm_append(permissions, item);
+        }
+        lm_set(out, "permissions", permissions);
+        lm_free(app);
+        return out;
+    }
     if (!strcmp(op, "pending")) {
         if (!lm_trusted(uid))
             return lm_failure("permission denied");

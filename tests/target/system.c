@@ -314,6 +314,68 @@ static int cleanup(void) {
            "cgroup members");
     return 0;
 }
+static int app_management(void) {
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_list\"}", 11000) && probe_has("\"ok\":true") &&
+          probe_has("\"source\":\"system-image\""));
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_list\"}", 11002) && probe_has("\"ok\":false"));
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_clear\",\"id\":\"org.leon.settings\"}", 11000) &&
+          probe_has("\"ok\":false"));
+    CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.gallery\"}"));
+    pid_t app = (pid_t)probe_integer("pid");
+    CHECK(app > 1);
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_uninstall\",\"id\":\"org.leon.gallery\"}", 11000) &&
+          probe_has("\"ok\":false"));
+    CHECK(!kill(app, 0));
+    const char *home = "/data/leon/data/org.leon.gallery";
+    const char *secret = "/data/leon/shared/management-keep.txt";
+    int fd = open(secret, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    CHECK(fd >= 0 && write(fd, "keep", 4) == 4);
+    close(fd);
+    CHECK(!symlink(secret, "/data/leon/data/org.leon.gallery/external"));
+    int gate[2];
+    CHECK(!pipe(gate));
+    pid_t child = fork();
+    CHECK(child >= 0);
+    if (!child) {
+        close(gate[1]);
+        char go;
+        if (read(gate[0], &go, 1) != 1 || setgid(11002) || setuid(11002) || setsid() < 0)
+            _exit(2);
+        close(gate[0]);
+        for (;;) {
+            int writer = open("/data/leon/data/org.leon.gallery/late-writer", O_WRONLY | O_CREAT, 0600);
+            if (writer >= 0) {
+                (void)write(writer, "x", 1);
+                close(writer);
+            }
+            usleep(10000);
+        }
+    }
+    close(gate[0]);
+    CHECK(!leon_cgroup(child, 11002));
+    CHECK(write(gate[1], "1", 1) == 1);
+    close(gate[1]);
+    usleep(150000);
+    CHECK(!kill(app, SIGSTOP));
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_info\",\"id\":\"org.leon.gallery\"}", 11000) &&
+          probe_has("\"ok\":true") && probe_has("\"available\":true"));
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_clear\",\"id\":\"org.leon.gallery\"}", 11000) &&
+          probe_has("\"ok\":true"));
+    int status;
+    CHECK(waitpid(child, &status, 0) == child && WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+    CHECK(access(home, F_OK) && errno == ENOENT);
+    CHECK(access("/run/user/11002", F_OK) && errno == ENOENT);
+    CHECK(!access(secret, F_OK));
+    CHECK(!probe_rpc("apps", "{\"op\":\"app_info\",\"id\":\"org.leon.gallery\"}", 11000) &&
+          probe_has("\"running\":false") && probe_has("\"bytes\":0"));
+    CHECK(!probe_rpc("portal", "{\"op\":\"reset_app\",\"app\":\"org.leon.gallery\"}", 11000) &&
+          probe_has("\"ok\":false"));
+    CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.gallery\"}"));
+    CHECK(RPC("apps", "{\"op\":\"app_stop\",\"id\":\"org.leon.gallery\"}"));
+    CHECK(!unlink(secret)); // Do not change the later file-picker fixture.
+    passed("Settings management: real UID authorization, protected apps, bounded storage, forced stop, detached writer cleanup and relaunch");
+    return 0;
+}
 static int crash(void) {
     CHECK(!probe_sandbox());
     int captured = 0;
@@ -338,7 +400,7 @@ int main(void) {
         return 2;
     setbuf(report, NULL);
     if (geteuid() || sample_memory() || power() || storage() || network() || portal() || timed() ||
-        cleanup() || crash()) {
+        cleanup() || app_management() || crash()) {
         fputs("SYSTEM_TESTS_FAILED\n", report);
         fclose(report);
         return 1;

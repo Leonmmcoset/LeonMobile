@@ -57,6 +57,9 @@ and developer operations are specified in [root-access.md](root-access.md).
 | `background`, `lifecycle` | none | root/desktop |
 | `install` | absolute `file` path | root/desktop |
 | `remove` | `id`, optional `purge` | root/desktop |
+| `app_list` | none | root/desktop/settings app |
+| `app_info` | installed `id` | root/desktop/settings app |
+| `app_stop`, `app_clear`, `app_uninstall` | installed `id` | root/desktop/settings app |
 | `settings` | none | any connected local user |
 | `set` | `key`, `value` | root/desktop/settings app |
 | `notify` | `title` up to 160 UTF-8 bytes | installed application identity |
@@ -70,6 +73,11 @@ It holds no notification state and does not queue requests when notificationd
 is unavailable. New clients should connect to the notification endpoint below.
 `leon-launchd --notifications-socket PATH` selects an isolated relay destination
 for development; the default is `/run/leon/notifications.sock`.
+
+The application management operations, their storage accounting and destructive
+action semantics are specified in [application-management.md](application-management.md).
+`leon-launchd --portal-socket PATH` selects an isolated permission service for
+development. The production default is `/run/leon/portal.sock`.
 
 Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
 
