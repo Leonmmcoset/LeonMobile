@@ -1,6 +1,6 @@
 # LeonMobile 1.0.0 validation
 
-The developer prototype was built and tested on 2026-11-03 using an x86_64 Linux host and QEMU software emulation of AArch64. This record describes observed behavior; it does not certify a physical phone or a production release.
+The developer prototype was built and tested on 2026-11-03 and 2026-11-04 using an x86_64 Linux host and QEMU software emulation of AArch64. This record describes observed behavior; it does not certify a physical phone or a production release.
 
 | Check | Evidence |
 | --- | --- |
@@ -190,3 +190,66 @@ The video, preview, chapter timeline and serial/encoder logs are ignored under
 requirements are documented in [building.md](building.md#record-a-system-tour).
 The recording includes the actual graphical startup wait and application
 animations, with no playback acceleration or audio track.
+
+## Core platform and shared input method (2026-11-04)
+
+The default AArch64/musl distribution now integrates lifecycle/checkpoint
+coordination, authenticated service readiness and watchdogs, seven independent
+system daemons, kernel application resource/isolation policy and `imed`.
+Eight CTest checks and 33 Python integration checks passed. They include real
+Unix UID boundaries, durable policies, expired inhibitors, malformed/slow peers,
+stale sockets, permission decisions and traversal/symlink denial, bounded crash
+retention, exit history and service/app timeout escalation. The extended portal
+fixture also confirmed that a pending file picker cannot substitute for a new
+permission confirmation after revocation.
+
+Independent Weston rendered all eight applications, shell and both shade
+stages. Its motion fixture observed intermediate frames, no settled repainting
+and only two frames with reduced motion. Separate clients acknowledged every
+lifecycle callback and dispatched external FD readiness on the UI loop.
+
+The final default-image QEMU run included both test probes and the existing
+generation-1 SDK example package. The root system probe reported eight passed
+stages:
+
+| Stage | Observed target behavior |
+| --- | --- |
+| Memory | Real allocation pressure reclaimed a background app while retaining the foreground app |
+| Power | Idle lock requests, expiring inhibitors and peer authorization |
+| Storage | Real USB ext4 mount, read-only write denial, busy unmount failure and recovery |
+| Network | Interface disable/enable, DHCP address/DNS renewal and recovery after killing udhcpc |
+| Permissions | Confirmation, selected-file private copy, traversal denial and grant revocation |
+| Time | Timezone switching, RTC write/read and a correlated local UDP SNTP exchange |
+| Process cleanup | Detached app cgroup members killed on stop; observed exit records retained |
+| Isolation/crash | Landlock/seccomp denials, allowed network grant, real cgroup PID/OOM limits and kernel fatal-core capture |
+
+The full interactive sequence also passed twelve live notifications, both
+shade stages and input restoration, returning through recent tasks with correct
+foreground priority, settings/theme/language/navigation, actual PipeWire sink
+volume, every built-in ELF/UID, SDK installation/launch/removal, locking and
+clean UI poweroff. New input checks typed `nihao`, selected `你好`, deleted the
+last UTF-8 character and restored it, killed/restarted imed while the field was
+enabled, then denied and approved file import through the trusted shell picker.
+After shutdown, offline ext4 inspection verified the exact saved UTF-8 note
+`你好` and the selected document text `LeonMobile 中文\n` in the editor's private
+saved state.
+
+Readiness checks wait for modal-specific controls and settled panel handles;
+editor backgrounds and transient client frames cannot pass those checks.
+Permission-dialog input is restricted in the compositor as well as the shell.
+The status bar reads netd/powerd state and displays unknown supply information
+when the guest exposes no power supply.
+
+Reproduce with `make test`, `./scripts/test-wayland.sh`,
+`./scripts/build-target-probes.sh` and the full target command in
+[building.md](building.md#target-validation). CI's optional image job includes
+both probes. Evidence remains ignored under `build/core-suite-*.log`,
+`build/screenshots/` and `build/qemu-test/`, including `system-services.txt`,
+`ime-*.ppm`, `permission-*.ppm` and serial output. The default image was rebuilt;
+the previously assembled `dist/` bundle was not regenerated.
+
+These checks establish behavior on the reference emulator. Physical suspend,
+wake sources, battery gauges and phone peripherals require hardware validation.
+The pinyin engine is a bounded basic candidate engine, and the network manager
+currently manages one Ethernet interface. Exact supported operations and limits
+remain specified in [core-services.md](core-services.md).

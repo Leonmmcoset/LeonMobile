@@ -1,6 +1,7 @@
 /* Run inside the terminal's existing application identity in QEMU. */
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -78,11 +79,14 @@ int main(int argc, char **argv) {
             !strstr(reply, "\"ok\":true"))
             return 4;
     }
-    FILE *result = fopen("/tmp/shade-notify.result", "w");
+    char result_path[4096];
+    const char *home = getenv("HOME");
+    if (!home || snprintf(result_path, sizeof(result_path), "%s/notification-test.result", home) >= (int)sizeof(result_path)) return 5;
+    FILE *result = fopen(result_path, "w");
     if (!result)
         return 5;
     fputs("12 notifications submitted as terminal UID (11 direct, 1 legacy)\n", result);
     if (fclose(result))
         return 6;
-    return chmod("/tmp/shade-notify.result", 0644) != 0;
+    return 0;
 }

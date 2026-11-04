@@ -34,14 +34,15 @@ jobs:
       - name: Install cross-build host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils
+          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils e2fsprogs fdisk
       - uses: actions/cache@v4
         with:
           path: .cache/downloads
           key: leon-sources-buildroot-2026.08.1-${{ hashFiles('distro/configs/*', 'distro/package/**/*.hash') }}
       - run: make image
       - run: ./scripts/build-example.sh
-      - run: python3 scripts/test-qemu.py --timeout 240 --package build/hello/org.example.hello-1.0.0.lmpkg
+      - run: ./scripts/build-target-probes.sh
+      - run: python3 scripts/test-qemu.py --timeout 240 --system-probe build/system-probe --notification-probe build/notifications-probe --package build/hello/org.example.hello-1.0.0.lmpkg
       - uses: actions/upload-artifact@v4
         if: always()
         with:

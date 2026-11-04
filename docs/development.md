@@ -13,12 +13,12 @@ do not add unrelated component implementation directories to include paths.
 
 | Option | Meaning |
 | --- | --- |
-| `LEON_SYSTEM` | PID 1, service manager, application broker and notification daemon |
-| `LEON_TOOLS` | `leonctl` and `lmpkg` |
+| `LEON_SYSTEM` | PID 1, manager, application/notification brokers and independent system daemons |
+| `LEON_TOOLS` | `leonctl`, `lmpkg` and `lmsys` |
 | `LEON_GRAPHICS` | Master switch for graphical components |
 | `LEON_LMUI` | Build LMUI locally; when off, graphical clients use the installed SDK |
 | `LEON_APPS` | Eight independently linked built-ins |
-| `LEON_SHELL` | Trusted mobile shell |
+| `LEON_SHELL` | Trusted mobile shell and independent input method |
 | `LEON_COMPOSITOR` | wlroots compositor |
 | `BUILD_TESTING` | Native component checks |
 
@@ -64,6 +64,13 @@ in `src/apps/NAME/`. Register sources through `leon_add_application` in that
 directory's CMake file. The helper installs one named ELF and its manifest;
 it never generates a selector executable. Application IDs, stable UIDs and
 private data directories must survive source refactors.
+
+Core-service ownership, operations and test-mode constraints are specified in
+[core-services.md](core-services.md). `imed` keeps its C17 engine and Wayland
+backend separate from its C++20 keyboard view. Changes to that protocol bridge,
+permission overlays or application priorities require real target interaction;
+Weston alone cannot verify the target compositor policy. The complete probe
+build and QEMU command are in [building.md](building.md#target-validation).
 
 Shared UI support belongs in `src/libraries/app-support` only when multiple
 built-ins need it. Public UI functionality belongs in LMUI. Ordinary clients

@@ -1,6 +1,6 @@
 # LeonMobile 1.0.0 architecture
 
-LeonMobile is a developer graphics prototype for QEMU ARM64, structured as a standalone distribution. It is not yet a production phone release. The reference platform has no modem, camera, battery, Wi-Fi or Bluetooth support. The status bar reports external power rather than a simulated battery percentage.
+LeonMobile is a developer graphics prototype for QEMU ARM64, structured as a standalone distribution. It is not yet a production phone release. The reference platform has no modem, camera, battery, Wi-Fi or Bluetooth support. The status bar uses powerd's detected supplies and reports unavailable information when QEMU exposes none.
 
 ## Layers and ownership
 
@@ -9,11 +9,11 @@ LeonMobile is a developer graphics prototype for QEMU ARM64, structured as a sta
 | Kernel | Linux 7.3.1, ARM64 QEMU configuration and LeonMobile fragment |
 | Toolchain | Buildroot-pinned Bootlin AArch64 musl GCC 14 toolchain |
 | Build integration | Buildroot 2026.08.1 and the `distro` BR2_EXTERNAL tree |
-| PID 1 and services | C17 `leon-init`, `leond`, `leonctl` |
+| PID 1 and services | C17 `leon-init`, `leond`, independent system daemons; administration through `leonctl`, `lmsys` |
 | Graphics | wlroots 0.20 C adapter and C++20 LeonMobile shell |
 | UI | C++20 LMUI 1, Cairo/Pango, shared-memory Wayland buffers |
 | Applications | Native AArch64 ELF executables, built-in manifests and local `.lmpkg` archives |
-| Network/audio | BusyBox DHCP, iproute2, PipeWire, WirePlumber, ALSA |
+| Network/audio | `netd` supervises BusyBox DHCP/iproute2; PipeWire, WirePlumber, ALSA |
 
 The compositor is derived from the CC0 tinywl reference implementation, then adapted for fixed mobile window geometry, a privileged shell overlay, pointer and single-contact touch input. The trusted C++ shell runs as a separate Wayland client to isolate shell failures from the wlroots event loop. LMUI uses the same theme and rendering code for shell and applications. wlroots remains a C integration boundary rather than exposing unstable C headers to C++ applications.
 
@@ -22,7 +22,9 @@ view under `src/apps/NAME/`. Calculation, document I/O, directory operations,
 image decoding, terminal emulation and stopwatch state belong to their respective
 application, rather than a shared mode dispatcher. Only the terminal links
 libvterm; only the image viewer links libjpeg. Internal `leon-app-support` owns
-the common window chrome, preferences, hit handling and on-screen keyboard.
+the common window chrome, preferences, hit handling and fallback keyboard.
+The independent `imed` session service owns the shared Wayland keyboard, pinyin
+engine and candidate view. The compositor routes it to the focused text field.
 The `leon-ipc` client library implements the local JSON transport without linking
 the privileged package installer, OpenSSL or libarchive into applications.
 Native build executables live in `build/host/bin/`, independent of source paths.
@@ -39,8 +41,10 @@ Native build executables live in `build/host/bin/`, independent of source paths.
 | `src/services/serviced` | Service configuration, dependency graph, process lifecycle, scheduling and local control |
 | `src/services/appd` | Socket server, peer-authorized broker, application process registry and preferences/audio operations |
 | `src/services/notificationd` | Independent notification socket, peer authorization, bounded queue and shared catalog adapter |
+| `src/services/common` | Bounded C service transport, durable state helpers and private JSON/catalog adapter |
+| `src/services/{memd,powerd,storaged,netd,timed,crashd,portald}` | Independent system operations and policies described in core-services.md |
 | `src/tools` | Service and package command-line clients |
-| `src/desktop` | Separate compositor and shell processes |
+| `src/desktop` | Separate compositor, shell and input method processes |
 | `src/apps/NAME` | Application entry point, view, private model/backend and manifest |
 | `distro` | Buildroot recipes, board definition, image layout and system policy |
 
@@ -90,9 +94,10 @@ not add radio or brightness hardware support.
 
 | Buildroot package | Payload | Principal dependencies |
 | --- | --- | --- |
-| `leon-core` | PID 1, service manager, application broker, notification daemon and administration tools | JSON, libarchive, OpenSSL |
+| `leon-core` | PID 1, manager, app/notification broker, seven system daemons and administration tools | JSON, libarchive, OpenSSL |
 | `lmui` | Shared LMUI runtime; public SDK in staging | Wayland, Cairo/Pango, xkbcommon |
-| `leon-desktop` | Compositor and mobile shell | Installed LMUI SDK, wlroots, JSON |
+| `leon-desktop` | Compositor, mobile shell and input method | Installed LMUI SDK, wlroots, JSON |
+| `leon-pinyin` | Deterministically generated Unicode 17 pinyin candidates and license | Pinned Unihan archive, host Python |
 | `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG |
 | `leonmobile` | Product dependency selection; no executable payload | All four components |
 

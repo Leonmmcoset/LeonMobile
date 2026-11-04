@@ -9,7 +9,7 @@ On Debian/Ubuntu, install the cross-build prerequisites:
 ```sh
 sudo apt-get install build-essential bison flex gawk gettext texinfo libssl-dev \
   libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils \
-  qemu-system-arm qemu-utils
+  qemu-system-arm qemu-utils e2fsprogs fdisk
 ```
 
 Native component development additionally uses:
@@ -99,6 +99,28 @@ Include the cross-compiled example to exercise package transfer, checksum valida
 ./scripts/build-example.sh
 python3 scripts/test-qemu.py --package build/hello/org.example.hello-1.0.0.lmpkg
 ```
+
+Compile and include the target fault probes for the complete system-service,
+isolation, notification and input-method check:
+
+```sh
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 240 \
+  --system-probe build/system-probe \
+  --notification-probe build/notifications-probe \
+  --package build/hello/org.example.hello-1.0.0.lmpkg
+```
+
+Probes are injected into a private cloned ext4 image and run with controlled
+guest identities; they are not shipped in the default image. These checks
+create real guest memory pressure and cgroup OOM, kill DHCP and input-method
+processes, capture a fatal core, mount a temporary USB ext4 device, exercise
+RTC/local UDP SNTP and test authorization. UI checks choose Chinese candidates,
+delete a UTF-8 character, save an exact note, deny/approve a permission and pick
+a file; after clean shutdown the private data partition is checked offline.
+`--core-only --system-probe build/system-probe` runs the focused service/IME/
+portal sequence. CI's optional image job runs the full command above. All
+mutations occur inside QEMU; existing user disks are not used.
 
 `--images dist/leonmobile-1.0.0-qemu-aarch64` validates an assembled release. CI runs native checks on every change; the full image/QEMU job is available through workflow dispatch. See [validation evidence](validation.md) for the tested scope and limits.
 

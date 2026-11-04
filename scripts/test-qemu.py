@@ -10,6 +10,7 @@ import shlex
 import socket
 import subprocess
 import tempfile
+import shutil
 import time
 
 REPO = Path(__file__).resolve().parents[1]
@@ -129,7 +130,7 @@ class QMP:
                  "key": {"type": "qcode", "data": code}}}]})
             time.sleep(.05)
 
-    def capture(self, path):
+    def capture(self, path, allow_blank=False):
         self.command("screendump", {"filename": str(path)})
         with path.open("rb") as stream:
             if stream.readline().strip() != b"P6":
@@ -139,19 +140,191 @@ class QMP:
             pixels = stream.read()
         if size != b"480 960" or maximum != b"255" or len(pixels) != 480 * 960 * 3:
             raise RuntimeError("Expected a complete 480x960 portrait display")
-        if len({pixels[i:i + 3] for i in range(0, len(pixels), 48)}) < 16:
+        if not allow_blank and len({pixels[i:i + 3] for i in range(0, len(pixels), 48)}) < 16:
             raise RuntimeError("QEMU display is blank")
         return pixels
 
     def wait_frame(self, path, predicate, description):
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
-            frame = self.capture(path)
+            # New windows and transparent page transitions may expose a blank
+            # frame before the client commits. The expected geometry below,
+            # rather than a premature screenshot error, defines readiness.
+            frame = self.capture(path, allow_blank=True)
             if predicate(frame):
                 return frame
             time.sleep(.15)
         raise RuntimeError(description)
 
+    def wait_shade(self, path, bottom, dark=False):
+        background = bytes.fromhex("15121b" if dark else "fff8ff")
+        outline = bytes.fromhex("4a4258" if dark else "d5cadd")
+        def pixel(frame, x, y):
+            offset = (y * 480 + x) * 3
+            return frame[offset:offset + 3]
+        return self.wait_frame(
+            path, lambda frame: (pixel(frame, 240, bottom - 17) == background and
+                                 pixel(frame, 240, bottom - 15) == outline),
+            "Notification shade did not settle to " + str(bottom))
+
+
+def inject_probes(images, disk, temporary, notification_probe, system_probe):
+    """Inject test-only helpers into the cloned disk; release images stay intact."""
+    if not notification_probe and not system_probe:
+        return
+    rootfs = temporary / "test-root.ext4"
+    subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
+    commands = []
+    def put(source, destination):
+        # debugfs has its own command parser; no shell interprets these paths.
+        commands.append("write " + json.dumps(str(source.resolve())) + " " + destination)
+        commands.append("set_inode_field " + destination + " mode 0100755")
+    if notification_probe:
+        put(notification_probe, "/usr/bin/leon-test-notifications")
+    if system_probe:
+        put(system_probe, "/usr/bin/leon-test-system")
+        unit = temporary / "test-service.toml"
+        unit.write_text('name = "system-test"\ncommand = ["/usr/bin/leon-test-system"]\n'
+                        'after = ["apps", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"]\n'
+                        'type = "oneshot"\nrestart = "never"\n')
+        put(unit, "/etc/leon/services/99-system-test.toml")
+    batch = temporary / "debugfs.commands"
+    batch.write_text("\n".join(commands) + "\n")
+    result = subprocess.run(["debugfs", "-w", "-f", batch, rootfs], capture_output=True, text=True, check=True)
+    if "File not found" in result.stderr or "not found" in result.stderr or "already exists" in result.stderr:
+        raise RuntimeError("Could not inject target test helpers: " + result.stderr)
+    table = json.loads(subprocess.check_output(["sfdisk", "--json", disk]))["partitiontable"]
+    partition = table["partitions"][0]
+    sector_size = table.get("sectorsize", 512)
+    if rootfs.stat().st_size > partition["size"] * sector_size:
+        raise RuntimeError("Test filesystem is larger than the system partition")
+    with disk.open("r+b") as destination, rootfs.open("rb") as source:
+        destination.seek(partition["start"] * sector_size)
+        shutil.copyfileobj(source, destination)
+
+
+def exercise_core_ui(guest,qmp,artifacts,preferences):
+    # Exercise the real text-input-v3 -> input-method-v2 -> LMUI
+    # path with pointer events, then inspect the saved UTF-8 file.
+    qmp.click(240, 940)
+    primary=bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
+    qmp.wait_frame(artifacts / "ime-home-ready.ppm",
+                   lambda frame: frame[(210*480+240)*3:(210*480+240)*3+3]==primary,
+                   "Home did not finish its entrance before opening the editor")
+    time.sleep(.2)
+    qmp.click(384, 410)  # Editor on home
+    save_color=bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
+    qmp.wait_frame(artifacts / "editor-ready.ppm",
+                   lambda frame: frame[(844*480+24)*3:(844*480+24)*3+3]==save_color,
+                   "Editor did not reach full-height controls")
+    time.sleep(.5)
+    qmp.click(180, 250)  # Text field
+    expected_keyboard=bytes.fromhex("30293c" if preferences.get("dark") else "eaddff")
+    qmp.wait_frame(artifacts / "ime-open.ppm",
+                   lambda frame: frame[(604*480+3)*3:(604*480+3)*3+3]==expected_keyboard,
+                   "Shared input method did not appear")
+    time.sleep(.5)
+    positions={'n':(346,805),'i':(356,703),'h':(292,754),'a':(34,754),'o':(402,703)}
+    for code in "nihao":
+        qmp.click(*positions[code]);time.sleep(.25)
+    qmp.capture(artifacts / "ime-pinyin-candidates.ppm")
+    qmp.click(35,652)  # 你好
+    time.sleep(.3)
+    qmp.click(357,864)  # UTF-8 backspace removes 好
+    time.sleep(.3)
+    for code in "hao":
+        qmp.click(*positions[code]);time.sleep(.25)
+    qmp.click(35,652)
+    time.sleep(.4)
+    qmp.capture(artifacts / "ime-committed-chinese.ppm")
+    # The trusted desktop owns imed's UID; killing it is an
+    # actual service failure, followed by leond recovery.
+    old=guest.run("pidof imed")
+    guest.run("kill -KILL " + old)
+    limit=time.monotonic()+12
+    while time.monotonic()<limit:
+        current=guest.run("pidof imed || true")
+        if current and current!=old:break
+        time.sleep(.2)
+    else:raise RuntimeError("Input method did not restart")
+    time.sleep(.8)
+    qmp.wait_frame(artifacts / "ime-restarted.ppm",
+                   lambda frame: frame[(604*480+3)*3:(604*480+3)*3+3]==expected_keyboard,
+                   "Restarted IME did not restore the active text field")
+    qmp.key("esc")
+    save_color=bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
+    qmp.wait_frame(artifacts / "ime-hidden.ppm",
+                   lambda frame: frame[(844*480+24)*3:(844*480+24)*3+3]==save_color,
+                   "Editor did not restore full-height controls after hiding IME")
+    time.sleep(.25)
+    qmp.click(180,844)  # Save the Chinese note
+    time.sleep(.6)
+
+    def wait_permission(file_request):
+        limit=time.monotonic()+8
+        while time.monotonic()<limit:
+            pending=json.loads(guest.run("lmsys portal '{\"op\":\"pending\"}'"))["requests"]
+            if pending and pending[0].get("file_request",False)==file_request:
+                # The editor's document and the modal share the surface color.
+                # Observe a modal-specific button instead of that background.
+                expected=bytes.fromhex(
+                    ("30293c" if preferences.get("dark") else "eaddff") if file_request
+                    else ("d0bcff" if preferences.get("dark") else "6750a4"))
+                px,py=(180,376) if file_request else (60,542)
+                qmp.wait_frame(artifacts / ("picker-ready.ppm" if file_request else "permission-ready.ppm"),
+                               lambda frame: frame[(py*480+px)*3:(py*480+px)*3+3]==expected,
+                               "Permission modal did not render")
+                time.sleep(.2);return pending[0]
+            time.sleep(.2)
+        raise RuntimeError("Permission dialog did not reach the expected stage")
+    qmp.click(410,844)  # Import
+    wait_permission(False)
+    qmp.capture(artifacts / "permission-request.ppm")
+    qmp.click(240,602)  # Deny
+    qmp.wait_frame(artifacts / "permission-denied.ppm",
+                   lambda frame: frame[(844*480+24)*3:(844*480+24)*3+3]==save_color,
+                   "Permission denial did not restore editor")
+    time.sleep(.3)
+    qmp.click(410,844)  # Retry
+    wait_permission(False)
+    qmp.click(240,542)  # Allow
+    wait_permission(True)
+    qmp.capture(artifacts / "permission-file-picker.ppm")
+    qmp.click(180,376)  # target-note.txt, selected by the user
+    limit=time.monotonic()+8
+    while time.monotonic()<limit:
+        pending=json.loads(guest.run("lmsys portal '{\"op\":\"pending\"}'"))["requests"]
+        if not pending:break
+        time.sleep(.2)
+    else:raise RuntimeError("Selected document did not complete")
+    time.sleep(.7)
+    qmp.capture(artifacts / "permission-imported-editor.ppm")
+    qmp.key("esc")
+    time.sleep(.2)
+    qmp.click(436,84)  # Close editor; saves lifecycle state
+    time.sleep(.5)
+    print("Target IME/portal: Chinese candidates, UTF-8 delete, service restart, "
+          "permission denial/approval and file selection exercised",flush=True)
+
+def verify_core_data(disk,temp):
+    table=json.loads(subprocess.check_output(["sfdisk","--json",disk]))["partitiontable"]
+    data_partition=table["partitions"][1]
+    datafs=temp/"verified-data.ext4"
+    with disk.open("rb") as source,datafs.open("wb") as destination:
+        source.seek(data_partition["start"]*table.get("sectorsize",512))
+        remaining=data_partition["size"]*table.get("sectorsize",512)
+        while remaining:
+            block=source.read(min(1024*1024,remaining))
+            if not block:raise RuntimeError("Short data partition")
+            destination.write(block);remaining-=len(block)
+    def private_file(path):
+        return subprocess.check_output(["debugfs","-R","cat "+path,datafs],stderr=subprocess.DEVNULL).decode()
+    note=private_file("/leon/data/org.leon.editor/note.txt")
+    if note!="你好":raise RuntimeError("Wayland IME saved unexpected UTF-8 note: "+repr(note))
+    session=json.loads(private_file("/leon/data/org.leon.editor/.session.json"))["state"]
+    if "/imports/document-" not in session["path"] or session["text"]!="LeonMobile 中文\n":
+        raise RuntimeError("Selected file did not reach the editor's private saved state")
+    print("Offline private data: exact Chinese note and imported editor state verified",flush=True)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -161,11 +334,18 @@ def main():
     parser.add_argument("--package", type=Path, help="also install, launch and remove the SDK hello package")
     parser.add_argument("--notification-probe", type=Path,
                         help="AArch64 tests/target/notifications.c executable for live notification checks")
+    parser.add_argument("--system-probe", type=Path,
+                        help="AArch64 system service/sandbox probe, injected only into a private disk")
+    parser.add_argument("--core-only",action="store_true",
+                        help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
+    if args.core_only and not args.system_probe:parser.error("--core-only requires --system-probe")
     if args.package and not args.package.is_file():
         parser.error("--package must name a compiled SDK hello package")
     if args.notification_probe and not args.notification_probe.is_file():
         parser.error("--notification-probe must name a compiled AArch64 probe")
+    if args.system_probe and not args.system_probe.is_file():
+        parser.error("--system-probe must name a compiled AArch64 probe")
     images = args.images.resolve()
     artifacts = REPO / "build/qemu-test"
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -174,6 +354,11 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe)
+        media = temp / "removable.ext4"
+        if args.system_probe:
+            with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
+            subprocess.run(["mkfs.ext4", "-q", "-F", media], check=True)
         endpoint = temp / "qmp.sock"
         command = ["qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "4",
                    "-m", "2048", "-kernel", str(images / "Image"), "-initrd",
@@ -186,6 +371,9 @@ def main():
                    "-audiodev", "none,id=audio", "-device", "intel-hda", "-device",
                    "hda-duplex,audiodev=audio", "-display", "none", "-monitor", "none",
                    "-serial", "stdio", "-qmp", f"unix:{endpoint},server=on,wait=off"]
+        if args.system_probe:
+            command += ["-drive", f"if=none,file={media},format=raw,id=removable",
+                        "-device", "usb-storage,drive=removable,removable=on"]
         log = artifacts / "serial.log"
         with log.open("wb") as output:
             proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=output,
@@ -212,10 +400,22 @@ def main():
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":
                     raise RuntimeError("Guest kernel version mismatch")
+                if args.system_probe:
+                    limit = time.monotonic() + 150
+                    result = ""
+                    while time.monotonic() < limit:
+                        result = guest.run("cat /run/leon/system-tests.txt 2>/dev/null || true")
+                        if "SYSTEM_TESTS_FAILED" in result:
+                            raise RuntimeError("Target system tests failed:\n" + result)
+                        if "SYSTEM_TESTS_PASSED" in result: break
+                        time.sleep(.3)
+                    else: raise RuntimeError("Target system tests timed out:\n" + result)
+                    (artifacts / "system-services.txt").write_text(result + "\n")
+                    print(result, flush=True)
                 services = guest.run("leonctl status")
                 (artifacts / "notifications-service.txt").write_text(services + "\n")
                 service_pids = {}
-                for service in ("apps", "notifications"):
+                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"):
                     running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
                     if not running:
                         raise RuntimeError("Required service is not running: " + service)
@@ -268,30 +468,35 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.core_only:
+                    preferences=json.loads(guest.run("cat /data/leon/settings.json"))
+                    exercise_core_ui(guest,qmp,artifacts,preferences)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode:raise RuntimeError("QEMU core test shutdown failed")
+                    if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
+                        raise RuntimeError("Compositor did not stop cleanly after core tests")
+                    verify_core_data(disk,temp)
+                    passed=True
+                    print("Core service, isolation, IME and permission UI target validation passed",flush=True)
+                    return
                 notification_terminal = None
                 if args.notification_probe:
-                    guest.upload(args.notification_probe, "/tmp/shade-notify")
-                    guest.run("chmod 755 /tmp/shade-notify")
+                    guest.run("test -x /usr/bin/leon-test-notifications")
                     qmp.click(240, 838)  # All apps
                     time.sleep(.5)
                     qmp.click(240, 426)  # Terminal
-                    for attempt in range(40):
-                        terminal = qmp.capture(artifacts / "shade-notification-terminal.ppm")
-                        point = (180 * 480 + 24) * 3
-                        if terminal[point:point + 3] == bytes.fromhex("19151f"):
-                            break
-                        time.sleep(.25)
-                    else:
-                        raise RuntimeError("Terminal did not render for notification probe")
-                    for code in "/tmp/shade-notify":
+                    qmp.wait_frame(
+                        artifacts / "shade-notification-terminal.ppm",
+                        lambda frame: frame[(180 * 480 + 24) * 3:(180 * 480 + 24) * 3 + 3]
+                                      == bytes.fromhex("19151f"),
+                        "Terminal did not render for notification probe")
+                    for code in "/usr/bin/leon-test-notifications":
                         qmp.key({"/": "slash", "-": "minus"}.get(code, code))
                     qmp.key("ret")
                     time.sleep(1)
-                    result = guest.run("cat /tmp/shade-notify.result")
-                    if "12 notifications submitted" not in result:
-                        raise RuntimeError("Notification probe failed")
-                    notifications = json.loads(guest.run("/tmp/shade-notify --list"))["notifications"]
-                    legacy = json.loads(guest.run("/tmp/shade-notify --legacy-list"))["notifications"]
+                    notifications = json.loads(guest.run("/usr/bin/leon-test-notifications --list"))["notifications"]
+                    legacy = json.loads(guest.run("/usr/bin/leon-test-notifications --legacy-list"))["notifications"]
                     expected = [{"app": "org.leon.terminal",
                                  "title": f"LeonMobile 测试通知 {index:02d}"}
                                 for index in range(1, 13)]
@@ -314,16 +519,35 @@ def main():
                 time.sleep(.3)
                 calculator = qmp.capture(artifacts / "calculator-result.ppm")
                 calculator_pid = running["org.leon.calculator"]
+                # Returning through Recents must also update broker priority;
+                # otherwise memory pressure could reclaim the visible app.
+                qmp.click(80, 940)
+                qmp.wait_frame(
+                    artifacts / "lifecycle-recent-tasks.ppm",
+                    lambda frame: (frame[(180 * 480 + 30) * 3:(180 * 480 + 30) * 3 + 3]
+                                   == bytes.fromhex("eaddff") and
+                                   frame[(140 * 480 + 240) * 3:(140 * 480 + 240) * 3 + 3]
+                                   == bytes.fromhex("fff8ff")),
+                    "Recent tasks did not become interactive")
+                qmp.click(120, 190)
+                qmp.wait_frame(
+                    artifacts / "lifecycle-resumed-calculator.ppm",
+                    lambda frame: frame[160 * 480 * 3:220 * 480 * 3]
+                                  == calculator[160 * 480 * 3:220 * 480 * 3],
+                    "Recent tasks did not restore the calculator")
+                states = json.loads(guest.run("lmpkg lifecycle"))["applications"]
+                if not states["org.leon.calculator"]["foreground"]:
+                    raise RuntimeError("Recent task activation did not restore foreground priority")
                 # Hold the pointer across the status/app input boundary. The
                 # shade must follow before release, then snap to stage 1.
                 held = qmp.drag(240, 20, 240, 300, artifacts / "shade-dragging.ppm")
-                compact = qmp.capture(artifacts / "shade-compact.ppm")
+                compact = qmp.wait_shade(artifacts / "shade-compact.ppm", 700)
                 point = (380 * 480 + 8) * 3
                 if (held[point:point + 3] == bytes.fromhex("fff8ff") or
                         compact[point:point + 3] != bytes.fromhex("fff8ff")):
                     raise RuntimeError("Shade did not follow the drag and settle to compact")
                 qmp.drag(240, 110, 240, 450)
-                expanded = qmp.capture(artifacts / "shade-expanded.ppm")
+                expanded = qmp.wait_shade(artifacts / "shade-expanded.ppm", 896)
                 point = (820 * 480 + 8) * 3
                 if (compact[point:point + 3] == bytes.fromhex("fff8ff") or
                         expanded[point:point + 3] != bytes.fromhex("fff8ff")):
@@ -352,7 +576,9 @@ def main():
                     qmp.click(96, 410)
                     time.sleep(.5)
                     qmp.drag(240, 20, 240, 300)
+                    qmp.wait_shade(artifacts / "shade-return-compact.ppm", 700)
                     qmp.drag(240, 110, 240, 450)
+                    qmp.wait_shade(artifacts / "shade-return-expanded.ppm", 896)
                 qmp.click(350, 200)  # Theme tile
                 time.sleep(.5)
                 if not json.loads(guest.run("cat /data/leon/settings.json"))["dark"]:
@@ -374,19 +600,22 @@ def main():
                 qmp.click(240, 586)  # Cancel
                 time.sleep(.3)
                 qmp.drag(240, 880, 240, 100)  # Close and restore the app
-                restored = qmp.capture(artifacts / "shade-restored-app.ppm")
                 def result_region(frame):
                     return b"".join(frame[(y * 480 + 320) * 3:(y * 480 + 444) * 3]
                                     for y in range(160, 220))
-                if result_region(calculator) != result_region(restored):
-                    raise RuntimeError("Closing the shade did not preserve calculator contents")
+                restored = qmp.wait_frame(
+                    artifacts / "shade-restored-app.ppm",
+                    lambda frame: (result_region(calculator) == result_region(frame) and
+                                   frame[(300 * 480 + 8) * 3:(300 * 480 + 8) * 3 + 3]
+                                   == bytes.fromhex("fff8ff")),
+                    "Closing the shade did not restore the calculator contents and input area")
                 processes = json.loads(guest.run("lmpkg running"))
                 if processes.get("org.leon.calculator") != calculator_pid:
                     raise RuntimeError("Shade changed the underlying application process")
                 qmp.click(72, 384)  # Input reaches the restored calculator
-                time.sleep(.3)
-                if result_region(qmp.capture(artifacts / "shade-restored-input.ppm")) == result_region(restored):
-                    raise RuntimeError("Shade closure did not restore application pointer input")
+                qmp.wait_frame(artifacts / "shade-restored-input.ppm",
+                               lambda frame: result_region(frame)!=result_region(restored),
+                               "Shade closure did not restore application pointer input")
                 qmp.click(240, 940)
                 time.sleep(.5)
                 qmp.click(400, 22)
@@ -520,6 +749,8 @@ def main():
                     uid = re.search(r"^Uid:\s+(\d+)", identity, re.M)
                     if not uid or int(uid[1]) != app["uid"]:
                         raise RuntimeError("Built-in identity changed: " + app_id)
+                if args.system_probe:
+                    exercise_core_ui(guest,qmp,artifacts,preferences)
                 if args.package:
                     path = "/data/home/leon/hello.lmpkg"
                     guest.upload(args.package, path)
@@ -558,17 +789,12 @@ def main():
                     raise RuntimeError("Recent tasks dismissal did not stop the selected app")
                 background = bytes.fromhex("15121b" if preferences.get("dark") else "fff8ff")
                 primary = bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
-                outline = bytes.fromhex("4a4258" if preferences.get("dark") else "d5cadd")
 
                 def pixel(frame, x, y):
                     return frame[(y * 480 + x) * 3:(y * 480 + x) * 3 + 3]
 
                 def wait_shade_stage(name, bottom):
-                    return qmp.wait_frame(
-                        artifacts / name,
-                        lambda frame: (pixel(frame, 240, bottom - 17) == background and
-                                       pixel(frame, 240, bottom - 15) == outline),
-                        "Notification shade did not settle to " + str(bottom))
+                    return qmp.wait_shade(artifacts / name, bottom, preferences.get("dark"))
 
                 qmp.click(400, 22)
                 wait_shade_stage("shade-before-lock-compact.ppm", 700)
@@ -620,6 +846,8 @@ def main():
                     raise RuntimeError("QEMU exited with status " + str(proc.returncode))
                 if "leond: exited compositor status=0 retry=0" not in log.read_text(errors="replace"):
                     raise RuntimeError("Compositor did not shut down cleanly")
+                if args.system_probe:
+                    verify_core_data(disk,temp)
                 passed = True
                 print("QEMU boot, native apps, shade drag/controls/focus, settings and clean UI poweroff passed")
                 print("Artifacts:", artifacts)
