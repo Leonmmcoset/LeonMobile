@@ -453,6 +453,14 @@ The focused `--applications-only` run drove the same management actions under
 the real compositor, rebooted the kernel, verified reset/uninstall persistence,
 relaunched the cleared builtin and shut down the compositor cleanly.
 
+The final combined QEMU run also passed authentication/root protocol probes,
+core services, cgroup/sandbox/crash handling, terminal VT/PTY/vi/top/clipboard,
+live notifications, input method restart, permission/file selection, all builtins,
+SDK package install/remove, shade/navigation/lifecycle, the new application
+management UI, offline editor/terminal state inspection and clean UI poweroff.
+The harness observes page/keyboard/shade readiness and lock-hint settling before
+sending dependent input, rather than assuming fixed rendering delays under TCG.
+
 Reproduction and operation semantics are in
 [application-management.md](application-management.md). Evidence remains ignored
 under `build/app-management-*.log`, `build/screenshots/applications-*` and

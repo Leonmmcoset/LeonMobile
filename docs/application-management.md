@@ -151,3 +151,8 @@ input: search, details, stop, cancel/confirm clear and uninstall, permission res
 SIGSTOP-broker back navigation, daemon exit and refresh after restart. The focused
 QEMU management run passed all UI actions, actual reboot persistence, builtin
 relaunch and clean compositor shutdown on the rebuilt AArch64/musl image.
+The final combined QEMU suite passed management alongside authentication/root,
+core service/sandbox/crash, notifications, terminal, IME/portal, Settings,
+navigation/lifecycle and SDK installation checks, followed by offline private
+state inspection and clean UI poweroff. Logs are `build/app-management-qemu-full.log`
+and `build/app-management-qemu-reboot-passed.log`.
