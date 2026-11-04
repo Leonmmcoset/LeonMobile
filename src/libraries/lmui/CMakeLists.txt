@@ -5,11 +5,15 @@ pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
 set(XDG_SHELL_XML "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
 add_custom_command(OUTPUT xdg-shell-client-protocol.h COMMAND ${WAYLAND_SCANNER} client-header ${XDG_SHELL_XML} xdg-shell-client-protocol.h DEPENDS ${XDG_SHELL_XML})
 add_custom_command(OUTPUT xdg-shell-protocol.c COMMAND ${WAYLAND_SCANNER} private-code ${XDG_SHELL_XML} xdg-shell-protocol.c DEPENDS ${XDG_SHELL_XML})
+set(TEXT_INPUT_XML "${WAYLAND_PROTOCOLS_DIR}/unstable/text-input/text-input-unstable-v3.xml")
+add_custom_command(OUTPUT text-input-client-protocol.h COMMAND ${WAYLAND_SCANNER} client-header ${TEXT_INPUT_XML} text-input-client-protocol.h DEPENDS ${TEXT_INPUT_XML})
+add_custom_command(OUTPUT text-input-protocol.c COMMAND ${WAYLAND_SCANNER} private-code ${TEXT_INPUT_XML} text-input-protocol.c DEPENDS ${TEXT_INPUT_XML})
 add_library(lmui SHARED src/theme.cpp src/canvas.cpp src/widgets.cpp src/application.cpp
             src/motion.cpp src/touch.cpp src/transition.cpp
-            src/wayland/connection.cpp src/wayland/input.cpp src/wayland/lifecycle.cpp
+            src/wayland/connection.cpp src/wayland/input.cpp src/wayland/lifecycle.cpp src/wayland/text-input.cpp
             src/wayland/buffers.cpp src/wayland/render.cpp
-            xdg-shell-protocol.c xdg-shell-client-protocol.h)
+            xdg-shell-protocol.c xdg-shell-client-protocol.h
+            text-input-protocol.c text-input-client-protocol.h)
 add_library(LMUI::LMUI ALIAS lmui)
 target_compile_features(lmui PUBLIC cxx_std_20)
 target_include_directories(lmui PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -40,6 +44,8 @@ if(BUILD_TESTING)
   add_test(NAME lmui-motion-and-touch COMMAND lmui-motion-test)
   add_executable(lmui-wayland-motion-test ${PROJECT_SOURCE_DIR}/tests/wayland_motion.cpp)
   target_link_libraries(lmui-wayland-motion-test PRIVATE lmui)
+  add_executable(lmui-wayland-io-test ${PROJECT_SOURCE_DIR}/tests/wayland_io.cpp)
+  target_link_libraries(lmui-wayland-io-test PRIVATE lmui)
   add_executable(lmui-wayland-lifecycle-test ${PROJECT_SOURCE_DIR}/tests/wayland_lifecycle.cpp)
   target_link_libraries(lmui-wayland-lifecycle-test PRIVATE lmui)
 endif()

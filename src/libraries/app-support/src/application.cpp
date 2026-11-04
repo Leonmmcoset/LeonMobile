@@ -1,7 +1,10 @@
 #include <cmath>
+#include <cstdlib>
+#include <ctime>
 #include <fcntl.h>
 #include <fstream>
 #include <leon/mobile/application.hpp>
+#include <leon/system.hpp>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
 namespace mobile {
@@ -32,6 +35,15 @@ ApplicationWindow::ApplicationWindow(std::string id, std::string chinese, std::s
     };
     app.on_pointer_event([this](const PointerEvent &event) { pointer(event); });
     app.paint = [this](Canvas &c) { paint(c); };
+    app.on_text_input(
+        [this](const std::string &text) {
+            perform([&] { text_input(text == "\n" ? enter_text() : text); });
+        },
+        {},
+        [this](uint32_t before, uint32_t) {
+            if (before)
+                perform([&] { text_input("\b"); });
+        });
     app.on_lifecycle([this](LifecycleEvent event) {
         if (event == LifecycleEvent::background || event == LifecycleEvent::save ||
             event == LifecycleEvent::shutdown)
@@ -102,6 +114,18 @@ void ApplicationWindow::perform(const std::function<void()> &action) {
     app.redraw();
 }
 void ApplicationWindow::poll_preferences() {
+    if (++timezone_ticks_ % 5 == 0)
+        try {
+            auto zone = leon::system_request("time", {{"op", "status"}}).value("timezone", "");
+            if (!zone.empty() && zone != timezone_) {
+                timezone_ = zone;
+                setenv("TZ", zone.c_str(), 1);
+                tzset();
+                app.redraw();
+            }
+        } catch (...) {
+        }
+
     try {
         auto previous = prefs;
         prefs = rpc({{"op", "settings"}}).at("settings");
@@ -137,7 +161,9 @@ void ApplicationWindow::paint(Canvas &c) {
     auto t = c.theme;
     double w = c.width, h = c.height;
     reduced_motion_ = c.reduced_motion();
-    double keyboard_fraction = c.animate("window/keyboard", keyboard ? 1 : 0, motion::enter);
+    double keyboard_fraction = c.animate(
+        "window/keyboard", (keyboard && !app.text_input_available()) ? 1 : 0, motion::enter);
+    app.text_input(keyboard);
     double bottom = h - 16 - 234 * keyboard_fraction;
     content_transition_.begin(c);
     paint_header(c);

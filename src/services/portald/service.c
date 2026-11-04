@@ -104,7 +104,8 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
         if (!allowed && !strcmp(op, "request")) {
             size_t slot = 32;
             for (size_t i = 0; i < 32; ++i)
-                if (s->pending[i].token && s->pending[i].uid == subject &&
+                if (s->pending[i].token && !s->pending[i].file_request &&
+                    !s->pending[i].completed && s->pending[i].uid == subject &&
                     !strcmp(s->pending[i].permission, permission)) {
                     slot = i;
                     break;

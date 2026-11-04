@@ -1,4 +1,4 @@
-add_executable(leon-shell main.cpp session.cpp navigation.cpp render.cpp control.cpp shade.cpp
+add_executable(leon-shell main.cpp session.cpp system.cpp navigation.cpp render.cpp control.cpp shade.cpp
                 views/status.cpp views/lock.cpp views/home.cpp views/tasks.cpp
                 views/shade.cpp views/shade_widgets.cpp views/quick.cpp
                 views/notifications.cpp views/navigation.cpp)

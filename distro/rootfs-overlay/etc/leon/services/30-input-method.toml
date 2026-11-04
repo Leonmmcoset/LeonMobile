@@ -1,0 +1,9 @@
+name = "input-method"
+command = ["/usr/libexec/leon/input-method"]
+after = ["prepare", "compositor"]
+uid = 1000
+gid = 1000
+restart = "always"
+type = "notify"
+ready_timeout_ms = 15000
+watchdog_ms = 5000

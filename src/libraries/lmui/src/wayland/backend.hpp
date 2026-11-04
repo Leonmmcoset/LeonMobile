@@ -1,4 +1,5 @@
 #pragma once
+#include "text-input-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <chrono>
 #include <lmui/lmui.hpp>
@@ -32,6 +33,23 @@ struct Application::Impl {
     MotionContext motion;
     std::function<void(double, double)> motion_callback;
     std::function<void(const PointerEvent &)> event_callback;
+    zwp_text_input_manager_v3 *text_manager{};
+    zwp_text_input_v3 *text_input{};
+    bool text_entered{}, text_wanted{}, text_enabled{};
+    uint32_t text_serial{}, delete_before{}, delete_after{};
+    std::string pending_text, pending_preedit;
+    bool got_text{}, got_preedit{}, got_delete{};
+    std::function<void(const std::string &)> text_commit, text_preedit;
+    std::function<void(uint32_t, uint32_t)> text_delete;
+    void text_open();
+    void text_update();
+    struct FdWatch {
+        int fd;
+        uint64_t generation;
+        std::function<void()> callback;
+    };
+    uint64_t watch_generation{};
+    std::vector<FdWatch> watched_fds;
     int lifecycle_fd{-1};
     std::function<bool(LifecycleEvent)> lifecycle_callback;
     void lifecycle_open();

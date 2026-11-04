@@ -40,9 +40,15 @@
 
 /* For brevity's sake, struct members are annotated where they are used. */
 struct leon_server {
-    struct leon_toplevel *shell;
+    struct leon_toplevel *shell, *ime;
+    struct wlr_input_method_v2 *input_method;
+    struct wlr_text_input_v3 *active_text;
+    struct wl_list text_inputs;
+    struct wl_listener new_text_input, new_input_method, text_focus, method_commit, method_destroy;
     struct wlr_keyboard fallback_keyboard;
     struct wl_listener touch_down, touch_up, touch_motion;
+    bool session_locked, session_modal;
+    long long last_activity;
     int wm_fd;
     struct wl_event_source *wm_source;
     int width, height;
@@ -89,7 +95,7 @@ struct leon_output {
 };
 
 struct leon_toplevel {
-    bool is_shell;
+    bool is_shell, is_ime;
     struct wl_list link;
     struct leon_server *server;
     struct wlr_xdg_toplevel *xdg_toplevel;
@@ -137,5 +143,9 @@ void leon_outputs_init(struct leon_server *server);
 void leon_outputs_finish(struct leon_server *server);
 void leon_windows_init(struct leon_server *server);
 void leon_windows_finish(struct leon_server *server);
+void leon_text_init(struct leon_server *server);
+void leon_text_finish(struct leon_server *server);
+void leon_text_geometry(struct leon_server *server);
+void leon_activity(struct leon_server *server);
 bool leon_control_init(struct leon_server *server);
 void leon_control_finish(struct leon_server *server);

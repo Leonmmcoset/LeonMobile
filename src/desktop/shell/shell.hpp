@@ -1,6 +1,7 @@
 #pragma once
 #include "shade.hpp"
 #include <leon/mobile/ui.hpp>
+#include <leon/system.hpp>
 namespace leon::shell {
 enum class Page { lock, home, apps, tasks, active };
 class Shell {
@@ -15,13 +16,25 @@ class Shell {
     leon::Json apps = Json::array(), running = Json::object(), notifications = Json::array();
     leon::Json prefs = {
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
-    std::string error, active_id;
+    std::string error, active_id, timezone;
     bool en{}, connected{}, pressed{}, notifications_available{};
     Shade shade;
     bool shade_gesture{}, shade_focused{}, volume_gesture{}, notification_gesture{}, power_menu{};
     int volume_preview{-1}, unmuted_volume{70};
     double notification_scroll{}, notification_start{}, notification_limit{};
     mobile::Rect volume_track{}, notification_bounds{};
+    int reported_locked{-1};
+    Json permission = Json::object(), power_state = Json::object();
+    std::string power_label(bool compact = false) const;
+    bool permission_focused{};
+    Json picker_files = Json::array();
+    std::string picker_directory;
+    size_t picker_page{};
+    void picker_open(const std::string &directory);
+    void picker_choose(const std::string &file);
+    void system_refresh();
+    void paint_permission(lmui::Canvas &);
+    void permission_decide(bool allow);
     int ticks{};
     double down_x{}, down_y{};
     double lock_drag{};

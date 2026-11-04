@@ -97,7 +97,15 @@ apps. It returns the reclaimed ID or an empty string when no candidate exists.
 Foreground/background transitions also adjust Linux `oom_score_adj` on target
 so background processes are preferred by the kernel OOM selector.
 
-The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `shell` or `focus APP_ID`. The compositor also checks peer UID. Ordinary application users cannot invoke these operations. Normal Wayland clients receive assigned mobile window bounds, rather than implementing arbitrary interactive move/resize.
+The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using
+`shell` or `focus APP_ID`. `lock` / `unlock` and `modal` / `unmodal` enforce
+session-lock and permission-dialog input routing in the compositor. While either
+restriction is set, application focus requests and new windows cannot take
+keyboard focus, and hit testing routes to the trusted shell. The compositor also
+checks peer UID. Ordinary application users cannot invoke these operations.
+Normal Wayland clients receive assigned mobile window bounds, rather than
+implementing arbitrary interactive move/resize. Returning through recent tasks
+also restores the application's broker foreground priority.
 
 ## Notification daemon
 
@@ -211,3 +219,25 @@ The generation-1 memory, power, storage, network, time, crash and permission
 operations, authorization rules and recovery limits are specified in
 [core-services.md](core-services.md). Service names in that document are the
 actual leond units; `lmsys` talks directly to each independent daemon.
+
+### LMUI text input and external event descriptors
+
+`Application::text_input_available()` detects text-input-v3. A client enables it
+with `text_input(true)` while an editable field is selected, disables it when
+leaving that field, and registers `on_text_input(commit, preedit, erase)`. Commit
+and preedit are UTF-8; erase lengths are bytes before/after the cursor as defined
+by Wayland. Events are applied together on a matching `done` serial and only to
+the entered/enabled surface. Physical keys still arrive through `key`; clients
+must avoid committing them twice if they implement an IME keyboard grab.
+Built-ins preserve their local keyboard fallback on compositors without v3.
+Target applications reserve space through compositor-owned window resizing.
+The protocol state and callbacks live in the private implementation, preserving
+LMUI generation-1 public object layout.
+
+`watch_fd(fd, callback)` integrates up to 16 caller-owned descriptors into the
+LMUI event loop; `unwatch_fd(fd)` removes one. Readable, hangup and error events
+invoke the callback on the UI thread. Callbacks must use bounded/nonblocking I/O
+and remove their watch before closing the FD. Replacing a watch carries a new
+generation so an old poll result cannot dispatch to a reused descriptor. This is
+used by the input method's separate Wayland protocol connection, avoiding
+200-millisecond keyboard dispatch delays. The library never closes watched FDs.

@@ -72,8 +72,9 @@ void Shell::paint(Canvas &c) {
     if (!error.empty() && overlay && !shade.visible())
         c.text(tr(en, "系统服务暂未就绪", "System services are starting"),
                {20, h - 200, w - 40, 44}, 13, t.muted);
+    paint_permission(c);
     touch_feedback.draw(c);
-    app.input_region(overlay || shade.visible()
+    app.input_region(overlay || shade.visible() || (!permission.empty() && page != Page::lock)
                          ? std::vector<Rect>{{0, 0, w, h}}
                          : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});
     if (shade.animating())

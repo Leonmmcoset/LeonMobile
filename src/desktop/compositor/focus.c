@@ -3,10 +3,12 @@
 #include "server.h"
 void focus_toplevel(struct leon_toplevel *toplevel) {
     /* Note: this function only deals with keyboard focus. */
-    if (toplevel == NULL) {
+    if (toplevel == NULL || toplevel->is_ime) {
         return;
     }
     struct leon_server *server = toplevel->server;
+    if ((server->session_locked || server->session_modal) && !toplevel->is_shell)
+        return;
     struct wlr_seat *seat = server->seat;
     struct wlr_surface *prev_surface = seat->keyboard_state.focused_surface;
     struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
@@ -49,6 +51,14 @@ void focus_toplevel(struct leon_toplevel *toplevel) {
 
 struct leon_toplevel *desktop_toplevel_at(struct leon_server *server, double lx, double ly,
                                           struct wlr_surface **surface, double *sx, double *sy) {
+    if (server->session_locked || server->session_modal) {
+        if (!server->shell)
+            return NULL;
+        *surface = server->shell->xdg_toplevel->base->surface;
+        *sx = lx;
+        *sy = ly;
+        return server->shell;
+    }
     /* This returns the topmost node in the scene at the given layout coords.
      * We only care about surface nodes as we are specifically looking for a
      * surface in the surface tree of a leon_toplevel. */

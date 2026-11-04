@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+export XDG_RUNTIME_DIR=/run/user/1000
+export WAYLAND_DISPLAY=/run/leon/wayland/wayland-0
+while [ ! -S "$WAYLAND_DISPLAY" ]; do sleep 1; done
+exec /usr/bin/imed

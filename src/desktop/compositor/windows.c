@@ -7,7 +7,10 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 
     wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
-    focus_toplevel(toplevel);
+    if (toplevel->is_ime)
+        leon_text_geometry(toplevel->server);
+    else
+        focus_toplevel(toplevel);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -15,6 +18,8 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
     struct leon_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
 
     wl_list_remove(&toplevel->link);
+    if (toplevel->server->ime == toplevel)
+        toplevel->server->ime = NULL;
     if (toplevel->server->shell == toplevel)
         toplevel->server->shell = NULL;
 }
@@ -35,12 +40,20 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
                                   &pid, &uid, &gid);
         const char *id = toplevel->xdg_toplevel->app_id;
         toplevel->is_shell = uid == getuid() && id && !strcmp(id, "org.leon.shell");
+        toplevel->is_ime = uid == getuid() && id && !strcmp(id, "org.leon.ime");
+        if (toplevel->is_ime)
+            toplevel->server->ime = toplevel;
         if (toplevel->is_shell)
             toplevel->server->shell = toplevel;
         int height = toplevel->server->height;
-        wlr_scene_node_set_position(&toplevel->scene_tree->node, 0, toplevel->is_shell ? 0 : 42);
+        wlr_scene_node_set_position(&toplevel->scene_tree->node, 0,
+                                    toplevel->is_shell ? 0
+                                    : toplevel->is_ime ? height - 364
+                                                       : 42);
         wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, toplevel->server->width,
-                                  toplevel->is_shell ? height : height - 106);
+                                  toplevel->is_shell ? height
+                                  : toplevel->is_ime ? 300
+                                                     : height - 106);
         wlr_xdg_toplevel_set_maximized(toplevel->xdg_toplevel, true);
     }
 }

@@ -179,6 +179,13 @@ class SystemServices(unittest.TestCase):
             shared=self.root/'shared';shared.mkdir();(shared/'note').write_text('selected')
             token=rpc(s,{'op':'choose'},11002)['token']
             self.assertTrue(rpc(s,{'op':'pending'},1000)['requests'][0]['file_request'])
+            # A pending file picker cannot substitute for a new permission
+            # confirmation after revocation; each has its own token and state.
+            self.assertTrue(rpc(s,{'op':'revoke','app':'org.leon.gallery','permission':'files.import'},1000)['ok'])
+            self.assertFalse(rpc(s,{'op':'query','permission':'files.import'},11002)['pending'])
+            confirmation=rpc(s,{'op':'request','permission':'files.import'},11002)['token']
+            self.assertNotEqual(confirmation,token)
+            self.assertTrue(rpc(s,{'op':'decide','token':confirmation,'allow':True},1000)['ok'])
             self.assertFalse(rpc(s,{'op':'selection','token':token},11000)['ok'])
             self.assertFalse(rpc(s,{'op':'pick','token':token,'file':'note'},11002)['ok'])
             self.assertTrue(rpc(s,{'op':'pick','token':token,'file':'note'},1000)['ok'])

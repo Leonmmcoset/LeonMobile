@@ -30,6 +30,10 @@ Application::Impl::~Impl() {
         wl_pointer_destroy(pointer);
     if (keyboard)
         wl_keyboard_destroy(keyboard);
+    if (text_input)
+        zwp_text_input_v3_destroy(text_input);
+    if (text_manager)
+        zwp_text_input_manager_v3_destroy(text_manager);
     if (seat)
         wl_seat_destroy(seat);
     if (toplevel)
@@ -55,6 +59,9 @@ void Application::Impl::global(void *data, wl_registry *reg, uint32_t name, cons
     if (!strcmp(interface, "wl_compositor"))
         s.compositor = static_cast<wl_compositor *>(
             wl_registry_bind(reg, name, &wl_compositor_interface, std::min(version, 4u)));
+    else if (!strcmp(interface, "zwp_text_input_manager_v3"))
+        s.text_manager = static_cast<zwp_text_input_manager_v3 *>(
+            wl_registry_bind(reg, name, &zwp_text_input_manager_v3_interface, 1));
     else if (!strcmp(interface, "wl_shm"))
         s.shm = static_cast<wl_shm *>(wl_registry_bind(reg, name, &wl_shm_interface, 1));
     else if (!strcmp(interface, "xdg_wm_base")) {
@@ -82,6 +89,7 @@ int Application::Impl::run() {
     wl_registry_add_listener(registry, &globals, this);
     if (wl_display_roundtrip(display) < 0 || !compositor || !shm || !wm)
         throw std::runtime_error("Wayland compositor lacks required globals");
+    text_open();
     surface = wl_compositor_create_surface(compositor);
     xdg = xdg_wm_base_get_xdg_surface(wm, surface);
     static const xdg_surface_listener surface_events = {
@@ -131,12 +139,27 @@ int Application::Impl::run() {
         draw();
         if (wl_display_flush(display) < 0 && errno != EAGAIN)
             break;
-        pollfd fds[] = {{wl_display_get_fd(display), POLLIN, 0}, {lifecycle_fd, POLLIN, 0}};
+        std::vector<pollfd> fds{{wl_display_get_fd(display), POLLIN, 0}, {lifecycle_fd, POLLIN, 0}};
+        auto watched = watched_fds;
+        for (const auto &entry : watched)
+            fds.push_back({entry.fd, POLLIN, 0});
         // Frame callbacks wake animations; idle clients only wake for their tick.
         int timeout = std::max(0, 200 - int(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                 std::chrono::steady_clock::now() - last)
                                                 .count()));
-        int rc = poll(fds, 2, timeout);
+        int rc = poll(fds.data(), fds.size(), timeout);
+        for (size_t i = 0; i < watched.size(); ++i)
+            if (fds[i + 2].revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)) {
+                auto current =
+                    std::find_if(watched_fds.begin(), watched_fds.end(), [&](const auto &entry) {
+                        return entry.fd == watched[i].fd &&
+                               entry.generation == watched[i].generation;
+                    });
+                if (current != watched_fds.end()) {
+                    auto callback = current->callback;
+                    callback();
+                }
+            }
         if (fds[1].revents & POLLIN)
             lifecycle_dispatch();
         if (fds[1].revents & (POLLERR | POLLHUP)) {

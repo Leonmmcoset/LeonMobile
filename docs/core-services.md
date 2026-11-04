@@ -168,3 +168,24 @@ app's ownership prevent symlink replacement from redirecting root writes. The
 portal returns the private copy path. It never hands the app a broader filesystem
 grant. The editor's Import action exercises this flow; its text loader separately
 limits documents to 1 MiB. This portal is not a general device/camera/location API.
+
+## Independent input method
+
+`imed` is an independently supervised desktop-session service. Its engine and
+Wayland input-method-v2 backend use C17; the keyboard uses C++20 LMUI and the
+Material theme. The compositor bridges input-method-v2 to focused text-input-v3
+clients, restricts input-method ownership to the desktop UID and one active
+instance, keeps the keyboard from stealing keyboard focus, and reserves a
+300-pixel bottom area above navigation. Focus changes, app exit, shell navigation
+and lock deactivate the method; a restarted method can reactivate an enabled
+field. Ordinary application UIDs cannot impersonate the trusted keyboard.
+
+The shared keyboard has English, symbols, shift, backspace, enter and tone-free
+pinyin (`v` for ü), preedit, exact-syllable/word candidates and candidate pages.
+Unicode 17.0.0 Unihan generates 52,720 candidates across 451 syllables, plus an
+original common-word supplement. Data and license hashes are pinned in the
+Buildroot `leon-pinyin` package; downloaded/generated data stays out of Git. This
+is basic pinyin candidate input, without adaptive phrase prediction, cloud
+suggestions, handwriting or a full production language model. Password/PIN
+purposes do not use the pinyin preedit engine. Applications retain responsibility
+for correct UTF-8 cursor/selection editing through text-input-v3.

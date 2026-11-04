@@ -26,7 +26,17 @@ static int mobile_control(int fd, uint32_t mask, void *data) {
     setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     ssize_t n = read(client, command, sizeof(command) - 1);
     if (n > 0) {
-        if (!strncmp(command, "shell", 5))
+        if (!strcmp(command, "modal")) {
+            server->session_modal = true;
+            focus_toplevel(server->shell);
+        } else if (!strcmp(command, "unmodal"))
+            server->session_modal = false;
+        else if (!strcmp(command, "lock")) {
+            server->session_locked = true;
+            focus_toplevel(server->shell);
+        } else if (!strcmp(command, "unlock"))
+            server->session_locked = false;
+        else if (!strcmp(command, "shell"))
             focus_toplevel(server->shell);
         else if (!strncmp(command, "focus ", 6)) {
             struct leon_toplevel *view;

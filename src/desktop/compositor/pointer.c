@@ -29,6 +29,7 @@ static void seat_pointer_focus_change(struct wl_listener *listener, void *data) 
 }
 
 void process_cursor_motion(struct leon_server *server, uint32_t time) {
+    leon_activity(server);
     struct wlr_seat *seat = server->seat;
     double dx = server->cursor->x - server->pointer_last_x;
     double dy = server->cursor->y - server->pointer_last_y;
@@ -104,6 +105,7 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
      * event. */
     struct leon_server *server = wl_container_of(listener, server, cursor_button);
     struct wlr_pointer_button_event *event = data;
+    leon_activity(server);
     /* Notify the client with pointer focus that a button press has occurred */
     wlr_seat_pointer_notify_button(server->seat, event->time_msec, event->button, event->state);
     if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
@@ -122,6 +124,7 @@ static void server_cursor_axis(struct wl_listener *listener, void *data) {
      * for example when you move the scroll wheel. */
     struct leon_server *server = wl_container_of(listener, server, cursor_axis);
     struct wlr_pointer_axis_event *event = data;
+    leon_activity(server);
     /* Notify the client with pointer focus of the axis event. */
     wlr_seat_pointer_notify_axis(server->seat, event->time_msec, event->orientation, event->delta,
                                  event->delta_discrete, event->source, event->relative_direction);

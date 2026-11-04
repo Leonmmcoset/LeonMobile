@@ -26,7 +26,7 @@ void Shell::paint_shade(Canvas &c, const std::string &time) {
     std::strftime(date, sizeof(date), en ? "%a, %b %d" : "%Y / %m / %d", &tm);
     c.text(date, {28, 112, w - 56, 28}, 14, t.muted);
     c.rounded({w - 154, 62, 130, 36}, t.container, 18);
-    c.text(tr(en, "外部供电", "External power"), {w - 150, 62, 122, 36}, 12, t.text, false, 1);
+    c.text(power_label(), {w - 150, 62, 122, 36}, 12, t.text, false, 1);
     paint_quick(c, expansion);
     paint_notifications(c, 264 + 190 * expansion, bottom - 120);
     double footer = bottom - 96;
@@ -73,11 +73,11 @@ void Shell::paint_power_menu(Canvas &c) {
     button(
         c, hits, {44, top + 88, w - 88, 64}, tr(en, "关机", "Power off"),
         [] {
-            rpc({{"op", "poweroff"}});
+            system_request("power", {{"op", "poweroff"}});
         },
         true);
     button(c, hits, {44, top + 168, w - 88, 64}, tr(en, "重启", "Restart"), [] {
-        rpc({{"op", "reboot"}});
+        system_request("power", {{"op", "reboot"}});
     });
     button(c, hits, {44, top + 252, w - 88, 56}, tr(en, "取消", "Cancel"),
            [this] { power_menu = false; });

@@ -9,6 +9,10 @@ class EditorApplication final : public mobile::ApplicationWindow {
   private:
     Document document;
     int focus{};
+    bool awaiting_import{};
+    long long import_token{};
+    void import_document();
+    void on_tick() override;
     mobile::Json save_state() const override {
         return {{"path", document.path}, {"text", document.text}};
     }

@@ -5,6 +5,8 @@
 using namespace mobile;
 namespace leon::shell {
 Shell::Shell() {
+    control("lock");
+    control("unmodal");
     app.transparent = true;
     refresh();
     app.tick = [this] {
@@ -62,6 +64,7 @@ Shell::Shell() {
 }
 int Shell::run() { return app.run(); }
 void Shell::refresh() {
+    system_refresh();
 
     try {
         auto s = rpc({{"op", "list"}});
@@ -84,6 +87,7 @@ void Shell::refresh() {
     }
 }
 void Shell::home() {
+    control("unlock");
     reset_shade();
     page = Page::home;
     active_id.clear();

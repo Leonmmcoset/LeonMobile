@@ -35,7 +35,7 @@ void Shell::paint_quick(Canvas &c, double expansion) {
         shade_click(lock, [this] {
             reset_shade();
             page = Page::lock;
-            control("shell");
+            control("lock");
         });
     }
     double y = 348;

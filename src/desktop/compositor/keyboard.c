@@ -48,6 +48,7 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
     struct leon_keyboard *keyboard = wl_container_of(listener, keyboard, key);
     struct leon_server *server = keyboard->server;
     struct wlr_keyboard_key_event *event = data;
+    leon_activity(server);
     struct wlr_seat *seat = server->seat;
 
     /* Translate libinput keycode -> xkbcommon */

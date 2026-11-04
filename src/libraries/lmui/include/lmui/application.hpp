@@ -35,6 +35,15 @@ class Application {
     void reduce_motion(bool enabled);
     bool reduced_motion() const;
     void on_lifecycle(std::function<bool(LifecycleEvent)> callback);
+    // Optional Wayland text-input-v3 integration; callbacks run on the UI thread.
+    bool text_input_available() const;
+    void text_input(bool enabled);
+    void on_text_input(std::function<void(const std::string &)> commit,
+                       std::function<void(const std::string &)> preedit = {},
+                       std::function<void(uint32_t, uint32_t)> erase = {});
+    // Readable/error callbacks execute on the UI thread; the caller owns the FD.
+    void watch_fd(int fd, std::function<void()> callback);
+    void unwatch_fd(int fd);
     int width() const;
     int height() const;
 

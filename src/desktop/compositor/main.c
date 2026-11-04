@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
     }
 
     struct leon_server server = {0};
+    server.session_locked = true;
     server.width = 480;
     server.height = 960;
     /* The Wayland display is managed by libwayland. It handles accepting
@@ -101,6 +102,8 @@ int main(int argc, char *argv[]) {
     if (!leon_input_init(&server))
         return 1;
 
+    leon_text_init(&server);
+
     /* Add a Unix socket to the Wayland display. */
     const char *socket_name = wl_display_add_socket_auto(server.wl_display);
     if (!socket_name) {
@@ -145,6 +148,7 @@ int main(int argc, char *argv[]) {
     /* Once wl_display_run returns, we destroy all clients then shut down the
      * server. */
     wl_display_destroy_clients(server.wl_display);
+    leon_text_finish(&server);
     leon_control_finish(&server);
     leon_input_detach(&server);
     leon_windows_finish(&server);

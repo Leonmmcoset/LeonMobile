@@ -1,5 +1,7 @@
 #include "wayland/backend.hpp"
+#include <algorithm>
 #include <iostream>
+#include <stdexcept>
 namespace lmui {
 Application::Application(std::string id, std::string title)
     : impl(std::make_unique<Impl>(this, std::move(id), std::move(title))) {}
@@ -38,6 +40,20 @@ void Application::input_region(const std::vector<Rect> &rectangles) {
         wl_region_add(region, int(r.x), int(r.y), int(r.w), int(r.h));
     wl_surface_set_input_region(impl->surface, region);
     wl_region_destroy(region);
+}
+void Application::watch_fd(int fd, std::function<void()> callback) {
+    if (fd < 0 || !callback)
+        throw std::invalid_argument("invalid FD watch");
+    unwatch_fd(fd);
+    if (impl->watched_fds.size() >= 16)
+        throw std::runtime_error("FD watch limit");
+    impl->watched_fds.push_back({fd, ++impl->watch_generation, std::move(callback)});
+}
+void Application::unwatch_fd(int fd) {
+    auto &fds = impl->watched_fds;
+    fds.erase(
+        std::remove_if(fds.begin(), fds.end(), [&](const auto &entry) { return entry.fd == fd; }),
+        fds.end());
 }
 int Application::width() const { return impl->w; }
 int Application::height() const { return impl->h; }
