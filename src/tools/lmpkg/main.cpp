@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
         }
         if (i >= argc)
             throw std::runtime_error("usage: lmpkg [--root DIR] list | install FILE | remove ID "
-                                     "[--purge-data] | launch ID | running");
+                                     "[--purge-data] | launch ID | save ID | running | lifecycle");
         std::string verb = argv[i++];
         if ((verb == "running" || verb == "lifecycle") && i == argc) {
             auto response = broker({{"op", verb == "running" ? "list" : "lifecycle"}});
@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
         if (i >= argc)
             throw std::runtime_error("missing argument");
         std::string argument = argv[i++];
-        if (verb == "launch" && i == argc)
-            std::cout << broker({{"op", "launch"}, {"id", argument}}).dump() << '\n';
+        if ((verb == "launch" || verb == "save") && i == argc)
+            std::cout << broker({{"op", verb}, {"id", argument}}).dump() << '\n';
         else {
             if (geteuid() && !offline) {
                 if (verb == "install" && i == argc)

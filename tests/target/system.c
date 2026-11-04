@@ -35,7 +35,11 @@ static int sample_memory(void) {
     long long available = probe_integer("available_kb");
     CHECK(available > 0);
     CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.gallery\"}"));
+    pid_t background = (pid_t)probe_integer("pid");
+    CHECK(background > 1);
     CHECK(RPC("apps", "{\"op\":\"launch\",\"id\":\"org.leon.calculator\"}"));
+    pid_t foreground = (pid_t)probe_integer("pid");
+    CHECK(foreground > 1);
     CHECK(RPC("memory", "{\"op\":\"policy\",\"min_available_mb\":1024}"));
     size_t size = available > 800 * 1024 ? (size_t)(available - 800 * 1024) * 1024 : 0;
     CHECK(size < 1600ULL * 1024 * 1024);
@@ -55,8 +59,8 @@ static int sample_memory(void) {
     free((void *)memory);
     CHECK(RPC("memory", "{\"op\":\"policy\",\"min_available_mb\":96}"));
     CHECK(reclaimed);
-    CHECK(RPC("apps", "{\"op\":\"list\"}"));
-    CHECK(probe_has("org.leon.calculator"));
+    CHECK(!kill(foreground, 0));
+    CHECK(kill(background, 0) == -1 && errno == ESRCH);
     CHECK(RPC("apps", "{\"op\":\"lifecycle\"}"));
     CHECK(probe_has("\"foreground\":true"));
     CHECK(RPC("apps", "{\"op\":\"stop\",\"id\":\"org.leon.calculator\"}"));

@@ -25,12 +25,14 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
     } else if (op == "reclaim") {
         fail(caller == 0, "permission denied");
         response = {{"reclaimed", processes_.reclaim()}};
-    } else if (op == "foreground" || op == "background" || op == "lifecycle") {
+    } else if (op == "foreground" || op == "background" || op == "save" || op == "lifecycle") {
         fail(shell, "permission denied");
         if (op == "foreground")
             processes_.foreground(request.at("id"));
         else if (op == "background")
             processes_.background();
+        else if (op == "save")
+            processes_.save(request.at("id"));
         response = processes_.lifecycle();
     } else if (op == "install") {
         fail(shell, "permission denied");

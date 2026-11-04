@@ -35,7 +35,7 @@ class LifecycleTests(unittest.TestCase):
                 "while True:\n"
                 " packet=s.recv(128).decode(); seq,event=packet.split()\n"
                 " with (home/'events').open('a') as f: f.write(event+'\\n')\n"
-                " if event in ('background','shutdown'): (home/'checkpoint').write_text('saved')\n"
+                " if event in ('background','save','shutdown'): (home/'checkpoint').write_text('saved')\n"
                 " s.send((seq+' ok').encode())\n"
                 " if event=='shutdown': break\n")
             helper.chmod(0o644)
@@ -63,16 +63,41 @@ class LifecycleTests(unittest.TestCase):
                 gallery = root / "data/org.leon.gallery"
                 while not (gallery / "events").exists() and time.monotonic() < deadline: time.sleep(.02)
                 self.assertTrue((gallery / "events").exists(), (gallery / "application.log").read_text())
+                self.assertFalse(rpc({"op":"save", "id":"missing.application"})["ok"])
+                saved = rpc({"op":"save", "id":"org.leon.gallery"})
+                self.assertTrue(saved["ok"], saved)
+                while time.monotonic() < deadline:
+                    state = rpc({"op":"lifecycle"})["applications"]["org.leon.gallery"]
+                    if not state["pending"]:
+                        break
+                    time.sleep(.02)
+                self.assertFalse(state["pending"])
+                self.assertTrue(state["responsive"])
+                self.assertTrue(state["foreground"])
+                self.assertEqual(state["event"], "save")
+                self.assertEqual(state["pid"], response["pid"])
+                self.assertIn("save", (gallery / "events").read_text())
+                self.assertEqual((gallery / "checkpoint").read_text(), "saved")
                 self.assertTrue(rpc({"op":"background"})["ok"])
-                while not (gallery / "checkpoint").exists() and time.monotonic() < deadline: time.sleep(.02)
+                while time.monotonic() < deadline:
+                    state = rpc({"op":"lifecycle"})["applications"]["org.leon.gallery"]
+                    if not state["pending"]:
+                        break
+                    time.sleep(.02)
+                self.assertFalse(state["pending"])
+                self.assertTrue(state["responsive"])
+                self.assertEqual(state["event"], "background")
                 self.assertEqual((gallery / "checkpoint").read_text(), "saved")
                 self.assertTrue(rpc({"op":"foreground", "id":"org.leon.gallery"})["ok"])
                 self.assertTrue(rpc({"op":"launch", "id":"org.leon.calculator"})["ok"])
+                self.assertTrue(rpc({"op":"save", "id":"org.leon.calculator"})["ok"])
                 time.sleep(2.4)
                 state = rpc({"op":"lifecycle"})["applications"]
                 self.assertFalse(state["org.leon.gallery"]["foreground"])
                 self.assertTrue(state["org.leon.calculator"]["foreground"])
                 self.assertFalse(state["org.leon.calculator"]["responsive"])
+                self.assertFalse(state["org.leon.calculator"]["pending"])
+                self.assertEqual(state["org.leon.calculator"]["event"], "save")
                 self.assertTrue(rpc({"op":"stop", "id":"org.leon.gallery"})["ok"])
                 self.assertIn("shutdown", (gallery / "events").read_text())
                 begin = time.monotonic()

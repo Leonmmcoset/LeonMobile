@@ -259,6 +259,17 @@ def exercise_core_ui(guest,qmp,artifacts,preferences):
     time.sleep(.25)
     qmp.click(180,844)  # Save the Chinese note
     time.sleep(.6)
+    # A separate broker request must dispatch save without moving the app to
+    # the background or changing its PID, then observe the app's own ack.
+    saved=json.loads(guest.run("lmpkg save org.leon.editor"))["applications"]["org.leon.editor"]
+    limit=time.monotonic()+5
+    while time.monotonic()<limit:
+        state=json.loads(guest.run("lmpkg lifecycle"))["applications"]["org.leon.editor"]
+        if state["event"]=="save" and not state["pending"]:break
+        time.sleep(.1)
+    else:raise RuntimeError("Application did not acknowledge the explicit save request")
+    if not state["responsive"] or not state["foreground"] or state["pid"]!=saved["pid"]:
+        raise RuntimeError("Explicit checkpoint failed or changed the foreground application")
 
     def wait_permission(file_request):
         limit=time.monotonic()+8
@@ -303,7 +314,7 @@ def exercise_core_ui(guest,qmp,artifacts,preferences):
     time.sleep(.2)
     qmp.click(436,84)  # Close editor; saves lifecycle state
     time.sleep(.5)
-    print("Target IME/portal: Chinese candidates, UTF-8 delete, service restart, "
+    print("Target IME/portal: Chinese candidates, UTF-8 delete, service restart, explicit checkpoint, "
           "permission denial/approval and file selection exercised",flush=True)
 
 def verify_core_data(disk,temp):

@@ -109,6 +109,11 @@ void Processes::background() {
             }
         }
 }
+void Processes::save(const std::string &id) {
+    fail(running_.contains(id), "application is not running");
+    fail(clients_.at(id).fd >= 0, "application does not support lifecycle requests");
+    event(id, "save");
+}
 Json Processes::lifecycle() const {
     Json states = Json::object();
     for (const auto &[id, client] : clients_)

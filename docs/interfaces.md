@@ -44,6 +44,7 @@ Oneshots cannot declare watchdogs. Existing simple services remain compatible.
 | `list` | none | root/desktop |
 | `launch`, `stop` | `id` | root/desktop |
 | `foreground` | running `id` | root/desktop |
+| `save` | running cooperative `id` | root/desktop |
 | `background`, `lifecycle` | none | root/desktop |
 | `install` | absolute `file` path | root/desktop |
 | `remove` | `id`, optional `purge` | root/desktop |
@@ -82,6 +83,15 @@ requests first send `shutdown`, allow two seconds for state save and exit, then
 SIGTERM for one second before SIGKILL. Broker shutdown sends all cooperative
 requests together with a two-second aggregate grace. Old manifests remain
 supported through signal-based termination, with no required SDK change.
+
+`lmpkg save APP_ID` dispatches an explicit checkpoint request without changing
+foreground state or restarting the application. Its successful reply confirms
+dispatch and includes lifecycle state; it does not claim the app has already
+saved. Poll `lifecycle` until that app's `event` is `save` and `pending` is false,
+then inspect `responsive` for the acknowledgement result. A later lifecycle
+transition can supersede that observation. Missing apps and legacy manifests
+without a lifecycle channel reject explicit saves. Timeout marks the app
+unresponsive and leaves it running; normal stop retains bounded escalation.
 
 `Application::on_lifecycle(callback)` runs on the LMUI event loop and returns a
 boolean acknowledgement. Default shutdown exits the loop; callbacks can save

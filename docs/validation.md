@@ -234,6 +234,17 @@ After shutdown, offline ext4 inspection verified the exact saved UTF-8 note
 `你好` and the selected document text `LeonMobile 中文\n` in the editor's private
 saved state.
 
+The final protocol-completeness pass added `lmpkg save APP_ID` to dispatch the
+existing save callback. All eight CTest and 33 Python checks passed again,
+including successful checkpoint acknowledgements, missing/legacy/untrusted
+request rejection and an unresponsive save timeout. After rebuilding leon-core
+and regenerating the default image, the complete QEMU command passed again.
+The editor acknowledged the explicit save while retaining foreground state and
+PID; the offline note/import assertions and clean UI shutdown also passed.
+Memory-probe assertions check the actual foreground/background PIDs after
+reclaim, rather than relying on installed-manifest names. Evidence for this
+last run is `build/core-suite-checkpoint-{native,target,image,probes,qemu}.log`.
+
 Readiness checks wait for modal-specific controls and settled panel handles;
 editor backgrounds and transient client frames cannot pass those checks.
 Permission-dialog input is restricted in the compositor as well as the shell.

@@ -77,6 +77,7 @@ class LauncherTests(unittest.TestCase):
                     self.assertFalse(rpc({"op": "set", "key": "reduce_motion", "value": invalid})["ok"])
                 self.assertTrue(rpc({"op": "set", "key": "reduce_motion", "value": False})["ok"])
                 self.assertTrue(rpc({"op": "launch", "id": "org.leon.gallery"})["ok"])
+                self.assertFalse(rpc({"op": "save", "id": "org.leon.gallery"})["ok"])
                 result = root / "data/org.leon.gallery/result"
                 while not result.exists() and time.monotonic() < deadline:
                     time.sleep(.02)
@@ -92,15 +93,17 @@ class LauncherTests(unittest.TestCase):
                     os.setgid(11002)
                     os.setuid(11002)
 
-                request = json.dumps({"op": "set", "key": "dark", "value": True})
-                probe = (
-                    "import socket; s=socket.socket(socket.AF_UNIX); "
-                    f"s.connect({endpoint!r}); s.sendall({(request + chr(10)).encode()!r}); "
-                    "print(s.recv(4096).decode())"
-                )
-                denied = subprocess.run(["python3", "-c", probe], capture_output=True,
-                                        text=True, preexec_fn=drop_identity, timeout=5)
-                self.assertFalse(json.loads(denied.stdout)["ok"])
+                for message in ({"op": "set", "key": "dark", "value": True},
+                                {"op": "save", "id": "org.leon.gallery"}):
+                    request = json.dumps(message)
+                    probe = (
+                        "import socket; s=socket.socket(socket.AF_UNIX); "
+                        f"s.connect({endpoint!r}); s.sendall({(request + chr(10)).encode()!r}); "
+                        "print(s.recv(4096).decode())"
+                    )
+                    denied = subprocess.run(["python3", "-c", probe], capture_output=True,
+                                            text=True, preexec_fn=drop_identity, timeout=5)
+                    self.assertFalse(json.loads(denied.stdout)["ok"])
                 self.assertFalse(rpc({"op": "settings"})["settings"]["dark"])
                 self.assertFalse(rpc({"op": "poweroff"})["ok"])
                 self.assertTrue(rpc({"op": "stop", "id": "org.leon.gallery"})["ok"])

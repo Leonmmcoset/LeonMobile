@@ -16,6 +16,7 @@ class Processes {
     const std::map<std::string, pid_t> &running() const { return running_; }
     void foreground(const std::string &id);
     void background();
+    void save(const std::string &id);
     Json lifecycle() const;
     std::string reclaim();
 
