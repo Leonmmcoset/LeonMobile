@@ -219,6 +219,22 @@ class RootAccess(unittest.TestCase):
         self.assertFalse(self.call("disable", password=SECRET)["ok"])
         self.assertGreater(self.call("status")["retry_after_ms"], 27000)
 
+    def test_session_limit_preserves_control_and_revocation_capacity(self):
+        self.enable()
+        with contextlib.ExitStack() as stack:
+            sessions = [stack.enter_context(self.session("printf ROOT_READY; exec sleep 60")) for _ in range(6)]
+            for connection, master, reply in sessions:
+                self.assertIn(b"ROOT_READY", self.read_terminal(master, b"ROOT_READY"))
+            rejected = self.call("exec", uid=0, password=SECRET, command="id -u")
+            self.assertFalse(rejected["ok"])
+            self.assertIn("limit", rejected["error"])
+            self.assertTrue(self.call("status")["ok"])
+            self.assertTrue(self.call("disable", password=SECRET)["ok"])
+            deadline = time.monotonic() + 3
+            while any(Path(f"/proc/{reply['pid']}").exists() for _, _, reply in sessions) and time.monotonic() < deadline:
+                time.sleep(.02)
+            self.assertFalse(any(Path(f"/proc/{reply['pid']}").exists() for _, _, reply in sessions))
+
     def test_su_client_password_not_echoed_and_terminal_restored(self):
         self.enable()
         pid, master = pty.fork()

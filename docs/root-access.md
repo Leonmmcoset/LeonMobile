@@ -78,7 +78,8 @@ contain `ok`, with `error` on failure. Unknown operations and bad fields fail.
 `exec` returns a PTY FD in the first successful reply, followed by a second JSON
 frame containing `status` on command exit. Keep the connection open for the
 session; incoming descriptors are never accepted by the server. The daemon caps
-workers at eight, bounds initial request I/O, and applies a 15-second control
+workers at eight and active root sessions at six, leaving two workers for control
+and revocation. It bounds initial request I/O and applies a 15-second control
 deadline; long-running authenticated sessions keep the watchdog responsive.
 There is no password/session cache. `LEON_ROOT_SOCKET` selects an isolated test
 endpoint for clients; the UID 0 peer check still applies.

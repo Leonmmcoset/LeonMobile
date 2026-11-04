@@ -158,11 +158,10 @@ static int first_boot(void) {
           strstr(response, "\"status\":7"));
     close(master);
     close(connection);
-    CHECK(!session(
-        FIRST,
-        "setsid sh -c 'echo $$ > /run/leon-root/detached.pid; exec sleep 600' "
-        "</dev/null >/dev/null 2>&1 & printf ROOT_READY; wait",
-        &connection, &master, &pid));
+    CHECK(!session(FIRST,
+                   "setsid sh -c 'echo $$ > /run/leon-root/detached.pid; exec sleep 600' "
+                   "</dev/null >/dev/null 2>&1 & printf ROOT_READY; wait",
+                   &connection, &master, &pid));
     CHECK(!terminal(master, "ROOT_READY"));
     int detached = read_pid();
     CHECK(detached > 1 && !isolated(pid) && !isolated(detached));
@@ -185,6 +184,24 @@ static int first_boot(void) {
     close(master);
     passed("root PTY UID/size/exit status, dedicated cgroups, detached descendant revocation, "
            "disable and disconnect cleanup");
+    int connections[6], masters[6];
+    pid_t children[6];
+    for (int i = 0; i < 6; ++i) {
+        CHECK(!session(SECOND, "printf ROOT_READY; exec sleep 600", &connections[i], &masters[i],
+                       &children[i]));
+        CHECK(!terminal(masters[i], "ROOT_READY"));
+    }
+    CHECK(session(SECOND, "id -u", &connection, &master, &pid));
+    close(connection);
+    CHECK(OK("{\"op\":\"status\"}"));
+    CHECK(OK("{\"op\":\"disable\",\"password\":\"" SECOND "\"}"));
+    for (int i = 0; i < 6; ++i) {
+        CHECK(!gone(children[i]));
+        close(connections[i]);
+        close(masters[i]);
+    }
+    CHECK(OK("{\"op\":\"enable\",\"password\":\"" SECOND "\"}"));
+    passed("six-session capacity limit reserves control workers; all sessions remain revocable");
     return 0;
 }
 static int later_boot(int phase) {
