@@ -68,13 +68,19 @@ void Shell::refresh() {
         apps = s.at("apps");
         running = s.at("running");
         prefs = rpc({{"op", "settings"}}).at("settings");
-        notifications = rpc({{"op", "notifications"}}).at("notifications");
         app.dark = prefs.value("dark", false);
         app.reduce_motion(prefs.value("reduce_motion", false));
         en = prefs["language"] == "en";
         error.clear();
     } catch (const std::exception &e) {
         error = e.what();
+    }
+    try {
+        notifications = notification_rpc({{"op", "notifications"}}).at("notifications");
+        notifications_available = true;
+    } catch (const std::exception &) {
+        notifications = Json::array();
+        notifications_available = false;
     }
 }
 void Shell::home() {

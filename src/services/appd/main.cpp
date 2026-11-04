@@ -21,6 +21,8 @@ int main(int argc, char **argv) {
             options.builtin = value;
         else if (option == "--socket")
             options.socket_name = value;
+        else if (option == "--notifications-socket")
+            options.notifications_socket = value;
         else if (option == "--runtime-dir")
             options.runtime_prefix = value;
         else if (option == "--wayland")

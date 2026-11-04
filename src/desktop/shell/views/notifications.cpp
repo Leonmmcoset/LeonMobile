@@ -16,8 +16,10 @@ void Shell::paint_notifications(Canvas &c, double top, double bottom) {
         double center = top + 112;
         c.circle(w / 2, center, 26, t.container);
         shade_ui::icon(c, shade_ui::Icon::bell, w / 2, center, t.primary, t.container);
-        c.text(tr(en, "暂时没有新通知", "You're all caught up"), {24, center + 40, w - 48, 40}, 17,
-               t.muted, false, 1);
+        c.text(notifications_available
+                   ? tr(en, "暂时没有新通知", "You're all caught up")
+                   : tr(en, "通知服务暂时不可用", "Notifications are temporarily unavailable"),
+               {24, center + 40, w - 48, 40}, 17, t.muted, false, 1);
     }
     double y = top + 44 - notification_scroll;
     for (auto it = notifications.rbegin(); it != notifications.rend(); ++it) {

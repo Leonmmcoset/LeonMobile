@@ -70,6 +70,10 @@ extern "C" char *notification_dispatch(notification_store *store,
         require(title.size() <= NOTIFICATION_TITLE_LIMIT, "notification too long");
         notification_store_add(store, app.c_str(), title.data(), title.size());
         return encode({{"ok", true}});
+    } catch (const Json::parse_error &) {
+        // A parser diagnostic may contain invalid input bytes, which cannot
+        // themselves be encoded as a JSON error string.
+        return notification_error("invalid JSON request");
     } catch (const std::exception &error) {
         return notification_error(error.what());
     } catch (...) {

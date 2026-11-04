@@ -1,6 +1,7 @@
 #include "broker.hpp"
 #include "internal.hpp"
 #include <csignal>
+#include <leon/ipc.hpp>
 #include <unistd.h>
 namespace leon::appd {
 Broker::Broker(const Options &options)
@@ -38,20 +39,18 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
         fail(shell, "permission denied");
         fail(!options_.development, "power operations disabled for development roots");
         kill(1, op == "reboot" ? SIGUSR2 : SIGUSR1);
-    } else if (op == "notifications") {
-        fail(shell, "permission denied");
-        response = {{"notifications", notifications_}};
-    } else if (op == "notify") {
-        std::string id;
-        for (const auto &m : packages_.list())
-            if (m.at("uid").get<unsigned>() == caller)
-                id = m.at("id");
-        fail(!id.empty(), "unknown application identity");
-        auto title = request.at("title").get<std::string>();
-        fail(title.size() <= 160, "notification too long");
-        notifications_.push_back({{"app", id}, {"title", title}});
-        if (notifications_.size() > 64)
-            notifications_.erase(notifications_.begin());
+    } else if (op == "notifications" || op == "notify") {
+        // Keep the v1 application endpoint as a relay; notificationd alone
+        // owns the queue and validates the original peer's app identity.
+        Json relay;
+        if (op == "notifications") {
+            fail(shell, "permission denied");
+            relay = {{"op", "notifications"}};
+        } else
+            relay = {{"op", "notify_for"}, {"uid", caller}, {"title", request.at("title")}};
+        response = Json::parse(leon::request(options_.notifications_socket, relay));
+        if (!response.value("ok", false))
+            throw std::runtime_error(response.value("error", "notification service error"));
     } else
         throw std::runtime_error("unknown operation");
     response["ok"] = true;

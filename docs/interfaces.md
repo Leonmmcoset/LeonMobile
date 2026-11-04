@@ -38,6 +38,14 @@ autostart = true
 | `notifications` | none | root/desktop |
 | `poweroff`, `reboot` | none | root/desktop |
 
+`notify` and `notifications` on this endpoint are compatibility relays to
+notificationd. The broker forwards the original socket peer UID through the
+root-only `notify_for` operation and never accepts a claimed UID from the app.
+It holds no notification state and does not queue requests when notificationd
+is unavailable. New clients should connect to the notification endpoint below.
+`leon-launchd --notifications-socket PATH` selects an isolated relay destination
+for development; the default is `/run/leon/notifications.sock`.
+
 Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
 
 The trusted shell controls focus through `/run/leon/wm.sock`, mode 0600, using `shell` or `focus APP_ID`. The compositor also checks peer UID. Ordinary application users cannot invoke these operations. Normal Wayland clients receive assigned mobile window bounds, rather than implementing arbitrary interactive move/resize.
@@ -50,8 +58,8 @@ one newline-terminated JSON object per connection, at most 8191 bytes before
 the newline, and replies with newline-terminated JSON followed by EOF. Every
 reply includes `ok`; failures also include `error`. Partial reads/writes are
 supported, with sixteen concurrent connections and a one-second absolute
-deadline for each request and response phase. Local peer credentials determine
-authorization; request fields cannot override an ordinary application's UID.
+transport deadline for each request and response phase. Local peer credentials
+determine authorization; request fields cannot override an ordinary application's UID.
 
 | Operation | Fields | Caller |
 | --- | --- | --- |
@@ -74,6 +82,17 @@ The root daemon accepts `--root DIR`, `--builtin DIR` and `--socket PATH` for
 isolated development. Its C17 entry point, concurrent socket loop and bounded
 store use a private C++ JSON/catalog adapter to reuse the existing manifest and
 identity policy; no new third-party JSON parser or public SDK is introduced.
+
+Buildroot installs the daemon through `leon-core`. The supervised service is
+named `notifications`, starts after `prepare`, and restarts on exit. The shell
+starts after it and polls the endpoint approximately once per second. It clears
+stale rows and shows an unavailable state on connection failure, then recovers
+on the next successful poll. Application/settings refresh remains independent
+of notification availability. The application broker and notification daemon
+do not depend on one another's service lifecycle; either can be restarted
+without restarting the other. Notification storage remains volatile.
+`leonctl status notifications` reports the service; restarting it requires root
+and clears its in-memory queue.
 
 ## LMUI
 

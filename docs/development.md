@@ -13,7 +13,7 @@ do not add unrelated component implementation directories to include paths.
 
 | Option | Meaning |
 | --- | --- |
-| `LEON_SYSTEM` | PID 1, service manager and application broker |
+| `LEON_SYSTEM` | PID 1, service manager, application broker and notification daemon |
 | `LEON_TOOLS` | `leonctl` and `lmpkg` |
 | `LEON_GRAPHICS` | Master switch for graphical components |
 | `LEON_LMUI` | Build LMUI locally; when off, graphical clients use the installed SDK |
@@ -97,9 +97,12 @@ python3 scripts/test-qemu.py --notification-probe build/notifications-probe \
 ```
 
 The probe runs from the terminal under its established app UID and submits
-twelve notifications through the public broker operation. It is never installed
-in the system image. The target check also verifies shade drag/snap, theme,
-volume/mute restoration, app preservation and input recovery, settings launch,
+twelve notifications (eleven directly to notificationd and one through the
+legacy broker relay). It also checks that an app cannot list notifications.
+The desktop console compares both endpoints' queue contents and source IDs,
+and the target check verifies a separate supervised daemon PID. The probe is
+never installed in the system image. The target check also verifies shade
+drag/snap, theme, volume/mute restoration, app preservation and input recovery, settings launch,
 power-menu cancellation, screen locking and final power-off. The lock screen
 remains an unauthenticated developer convenience.
 

@@ -136,3 +136,41 @@ already passed the private-image run. Final evidence is in
 `build/qemu-test/`, `build/screenshots/` and the ignored
 `build/motion-{distribution,image,native,example}-build.log` files. The default
 image used by a new `make run` disk includes the integrated motion changes.
+
+## Independent notification daemon validation (2026-11-04)
+
+The notification split passed six native CTest checks and sixteen Python
+integration checks. Real UID tests cover direct submissions, desktop-only
+listing, forged source fields, the root-only legacy relay, installed/removal
+identity changes, UTF-8 byte limits, 64-entry eviction, fragmented/malformed
+requests (including invalid UTF-8 and raw NUL), slow concurrent clients and
+crash/socket recovery. Restarting the application broker preserved the separate
+notification queue; stopping notificationd left application listing and settings
+available, and restarting notificationd cleared its volatile queue as specified.
+The staged Runtime check verified the separate daemon ELF. A system-only native
+build also succeeded with graphics and tools disabled.
+
+Independent headless Weston rendered all eight apps, the shell and both shade
+stages. Material motion checks observed 32 intermediate frames, no settled
+repaints, and two requested final frames with reduced motion. The four Buildroot
+source units were rebuilt, with the final notification service rebuilt after
+protocol validation, and the complete default image was regenerated. The new
+daemon is AArch64 ELF with `/lib/ld-musl-aarch64.so.1` as its interpreter.
+
+The full QEMU test passed against `output/images/` with the notification probe
+and the existing generation 1 SDK example package. Service status and process
+identity confirmed notificationd running independently of the application
+broker. The terminal UID submitted eleven notifications directly and one via
+the compatibility relay; ordinary app listing was rejected, all twelve sources
+remained the terminal despite forged request identity fields, and the desktop
+observed the same queue through both endpoints. Notification drag scrolling
+and tapping to open the owning app passed, along with the existing calculator,
+shade controls/focus, settings/audio, all built-in identities, SDK
+install/launch/remove, networking and clean UI poweroff checks.
+
+Evidence remains ignored in `build/notificationd-*.log`,
+`build/qemu-test/notifications-service.txt`, `notifications.json`, serial logs
+and shade display captures. The daemon remains a volatile local notification
+service for the QEMU developer prototype; persistence, clear/update operations,
+channels, alert hardware and network push are outside this change. The local
+`dist/` release bundle was not regenerated.

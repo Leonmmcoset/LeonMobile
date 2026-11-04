@@ -134,7 +134,8 @@ class NotificationTests(unittest.TestCase):
                         {"op": "notify_for", "uid": 11002, "title": 42}):
             self.assertFalse(self.rpc(message)["ok"])
         for payload in (b"not json\n", b'{"op":"notifications"}',
-                        b'{"op":"notifications"}\x00\n', b" " * 8192 + b"\n"):
+                        b'{"op":"notifications"}\x00\n', b'{"op":"\xff"}\n',
+                        b'{"op":"notify","title":"\xff"}\n', b" " * 8192 + b"\n"):
             self.assertFalse(json.loads(self.raw(payload))["ok"])
         self.assertTrue(json.loads(self.raw(b" " * (8191 - 22) +
                                             b'{"op":"notifications"}\n'))["ok"])
@@ -164,6 +165,56 @@ class NotificationTests(unittest.TestCase):
         refused = subprocess.run(self.command, capture_output=True, text=True, timeout=5)
         self.assertNotEqual(refused.returncode, 0)
         self.assertEqual(Path(self.endpoint).read_text(), "unrelated file")
+
+    def test_broker_compatibility_and_independent_lifecycles(self):
+        apps_endpoint = str(self.path / "apps.sock")
+
+        def start_broker():
+            broker = subprocess.Popen(
+                [BUILD / "bin/leon-launchd", "--root", self.root, "--builtin", self.builtin,
+                 "--socket", apps_endpoint, "--notifications-socket", self.endpoint],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.addCleanup(self.stop, broker)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if broker.poll() is not None:
+                    self.fail("broker exited: " + broker.communicate()[1].decode())
+                if Path(apps_endpoint).exists():
+                    try:
+                        if self.rpc({"op": "list"}, endpoint=apps_endpoint)["ok"]:
+                            return broker
+                    except (OSError, ValueError):
+                        pass
+                time.sleep(.02)
+            self.fail("broker did not become ready")
+
+        broker = start_broker()
+        self.assertTrue(self.rpc({"op": "notify", "title": "legacy", "uid": 11000},
+                                 uid=11002, endpoint=apps_endpoint)["ok"])
+        self.assertFalse(self.rpc({"op": "notifications"}, uid=11002,
+                                  endpoint=apps_endpoint)["ok"])
+        self.assertFalse(self.rpc({"op": "notify", "title": "unknown"}, uid=11999,
+                                  endpoint=apps_endpoint)["ok"])
+        self.stop(broker)
+        self.assertTrue(self.rpc({"op": "notify", "title": "without broker"}, uid=11002)["ok"])
+        broker = start_broker()
+        direct = self.rpc({"op": "notifications"})["notifications"]
+        self.assertEqual(direct, [{"app": "org.leon.gallery", "title": "legacy"},
+                                  {"app": "org.leon.gallery", "title": "without broker"}])
+        self.assertEqual(self.rpc({"op": "notifications"}, uid=1000,
+                                  endpoint=apps_endpoint)["notifications"], direct)
+
+        self.stop(self.daemon)
+        self.assertFalse(self.rpc({"op": "notify", "title": "unavailable"}, uid=11002,
+                                  endpoint=apps_endpoint)["ok"])
+        self.assertFalse(self.rpc({"op": "notifications"}, endpoint=apps_endpoint)["ok"])
+        self.assertTrue(self.rpc({"op": "settings"}, endpoint=apps_endpoint)["ok"])
+        self.assertTrue(self.rpc({"op": "list"}, endpoint=apps_endpoint)["ok"])
+        self.daemon = self.start()
+        self.assertEqual(self.rpc({"op": "notifications"},
+                                  endpoint=apps_endpoint)["notifications"], [])
+        self.assertTrue(self.rpc({"op": "notify", "title": "after restart"}, uid=11002,
+                                 endpoint=apps_endpoint)["ok"])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+name = "notifications"
+command = ["/usr/sbin/notificationd"]
+after = ["prepare"]
+restart = "always"

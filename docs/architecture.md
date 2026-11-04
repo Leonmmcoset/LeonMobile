@@ -38,6 +38,7 @@ Native build executables live in `build/host/bin/`, independent of source paths.
 | `src/services/init` | Early root setup, PID 1 supervision and final shutdown |
 | `src/services/serviced` | Service configuration, dependency graph, process lifecycle, scheduling and local control |
 | `src/services/appd` | Socket server, peer-authorized broker, application process registry and preferences/audio operations |
+| `src/services/notificationd` | Independent notification socket, peer authorization, bounded queue and shared catalog adapter |
 | `src/tools` | Service and package command-line clients |
 | `src/desktop` | Separate compositor and shell processes |
 | `src/apps/NAME` | Application entry point, view, private model/backend and manifest |
@@ -51,6 +52,14 @@ depend on graphics. The service manager passes an explicit manager instance to
 its graph, process and control modules. The application broker owns separate
 process and settings objects; request dispatch does not implement child setup
 or audio subprocess handling.
+
+The separate `notificationd` process owns notification state. Its entry point,
+nonblocking socket loop and fixed-size store use C17; a private C++ adapter
+reuses the existing JSON parser and validated package catalog, including stable
+built-in and installed application UIDs. It does not call the application broker
+to resolve identities. Shell and built-in notification clients connect directly
+to `/run/leon/notifications.sock`; the original application endpoint relays
+older clients' verified peer UIDs as root and holds no notification queue.
 
 Each component lists its own sources and dependencies in CMake. Installed
 executable paths and the version 1 service protocols do not depend on the
@@ -81,7 +90,7 @@ not add radio or brightness hardware support.
 
 | Buildroot package | Payload | Principal dependencies |
 | --- | --- | --- |
-| `leon-core` | PID 1, service manager, application broker and administration tools | JSON, libarchive, OpenSSL |
+| `leon-core` | PID 1, service manager, application broker, notification daemon and administration tools | JSON, libarchive, OpenSSL |
 | `lmui` | Shared LMUI runtime; public SDK in staging | Wayland, Cairo/Pango, xkbcommon |
 | `leon-desktop` | Compositor and mobile shell | Installed LMUI SDK, wlroots, JSON |
 | `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG |
@@ -108,7 +117,7 @@ System updates replace the whole system partition while QEMU is stopped. There i
 
 The desktop session uses UID 1000. Built-ins have stable UIDs 11000–11007; installed apps receive persistent UIDs starting at 12000. App homes and runtime directories are mode 0700, supplementary groups are cleared, and applications run with `no_new_privs`. Applications do not inherit the supervisor's input descriptor. Installed programs and resources are read-only to application users.
 
-The service manager accepts state-changing commands only from UID 0. The application broker identifies callers with `SO_PEERCRED`; the trusted desktop can launch/install/remove apps and request power operations. The settings app can change the supported preferences. Other applications can read preferences and submit bounded notifications under their own identity.
+The service manager accepts state-changing commands only from UID 0. The application broker identifies callers with `SO_PEERCRED`; the trusted desktop can launch/install/remove apps and request power operations. The settings app can change the supported preferences. Other applications can read preferences. The independent notification daemon also checks `SO_PEERCRED`, accepts bounded notifications under the installed app's own identity, and restricts list access to root/desktop. The broker may relay legacy notification submissions as root with the original peer UID; ordinary clients cannot use that relay operation directly.
 
 This is basic Unix identity isolation. It does not include namespaces, seccomp policies, network restrictions, file portals, an IME, authenticated screen unlocking, package signatures or an application permission prompt system. All apps share the Wayland server. Applications are trusted native Linux programs within those stated limits. ELF architecture checks and SHA-256 package checksums provide compatibility and integrity checks, not publisher authentication.
 

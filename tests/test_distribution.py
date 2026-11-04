@@ -40,6 +40,9 @@ class DistributionTests(unittest.TestCase):
                 entries.add(entry)
             self.assertEqual(len(entries), 8)
             self.assertFalse((stage / "usr/bin/leon-app").exists())
+            notificationd = stage / "usr/sbin/notificationd"
+            self.assertEqual(notificationd.read_bytes()[:4], b"\x7fELF")
+            self.assertTrue(os.access(notificationd, os.X_OK))
 
             # Build from the installed SDK, without any source-tree headers.
             install("Development")

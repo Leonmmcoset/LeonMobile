@@ -12,11 +12,15 @@ namespace fs = std::filesystem;
 using namespace lmui;
 using leon::Json;
 using Hit = lmui::TouchTarget;
-inline Json rpc(const Json &message) {
-    auto response = Json::parse(leon::request("/run/leon/apps.sock", message));
+inline Json service_rpc(const std::string &socket, const Json &message) {
+    auto response = Json::parse(leon::request(socket, message));
     if (!response.value("ok", false))
         throw std::runtime_error(response.value("error", "service error"));
     return response;
+}
+inline Json rpc(const Json &message) { return service_rpc("/run/leon/apps.sock", message); }
+inline Json notification_rpc(const Json &message) {
+    return service_rpc("/run/leon/notifications.sock", message);
 }
 inline std::string tr(bool en, const std::string &zh, const std::string &eng) {
     return en ? eng : zh;

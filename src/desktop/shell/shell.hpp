@@ -16,7 +16,7 @@ class Shell {
     leon::Json prefs = {
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
     std::string error, active_id;
-    bool en{}, connected{}, pressed{};
+    bool en{}, connected{}, pressed{}, notifications_available{};
     Shade shade;
     bool shade_gesture{}, shade_focused{}, volume_gesture{}, notification_gesture{}, power_menu{};
     int volume_preview{-1}, unmuted_volume{70};

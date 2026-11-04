@@ -14,7 +14,6 @@ class Broker {
     Packages packages_;
     Processes processes_;
     Settings settings_;
-    Json notifications_ = Json::array();
 };
 int serve(Broker &broker, const std::string &socket_name);
 } // namespace leon::appd

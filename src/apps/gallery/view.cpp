@@ -12,7 +12,8 @@ void GalleryApplication::paint_content(Canvas &c, double) {
         Column({Button(tr(en, "显示通知", "Show notification"),
                        [&] {
                            perform([&] {
-                               rpc({{"op", "notify"},
+                               notification_rpc(
+                                   {{"op", "notify"},
                                     {"title", tr(en, "你好，LeonMobile！", "Hello, LeonMobile!")}});
                            });
                        }),

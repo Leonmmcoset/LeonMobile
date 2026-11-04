@@ -212,6 +212,19 @@ def main():
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":
                     raise RuntimeError("Guest kernel version mismatch")
+                services = guest.run("leonctl status")
+                (artifacts / "notifications-service.txt").write_text(services + "\n")
+                service_pids = {}
+                for service in ("apps", "notifications"):
+                    running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
+                    if not running:
+                        raise RuntimeError("Required service is not running: " + service)
+                    service_pids[service] = int(running[1])
+                if service_pids["apps"] == service_pids["notifications"]:
+                    raise RuntimeError("Notifications must run in an independent daemon")
+                if guest.run(f"cat /proc/{service_pids['notifications']}/comm") != "notificationd":
+                    raise RuntimeError("Notification service launched an unexpected executable")
+                guest.run("test -x /usr/sbin/notificationd && test -S /run/leon/notifications.sock")
                 apps = json.loads(guest.run("lmpkg list"))
                 if len(apps) != 8 or any(app["arch"] != "aarch64" for app in apps):
                     raise RuntimeError("Native system application manifest checks failed")
@@ -277,6 +290,15 @@ def main():
                     result = guest.run("cat /tmp/shade-notify.result")
                     if "12 notifications submitted" not in result:
                         raise RuntimeError("Notification probe failed")
+                    notifications = json.loads(guest.run("/tmp/shade-notify --list"))["notifications"]
+                    legacy = json.loads(guest.run("/tmp/shade-notify --legacy-list"))["notifications"]
+                    expected = [{"app": "org.leon.terminal",
+                                 "title": f"LeonMobile 测试通知 {index:02d}"}
+                                for index in range(1, 13)]
+                    if notifications != expected or legacy != notifications:
+                        raise RuntimeError("Direct/legacy notifications lost their peer identity or shared queue")
+                    (artifacts / "notifications.json").write_text(
+                        json.dumps(notifications, ensure_ascii=False, indent=2) + "\n")
                     notification_terminal = qmp.capture(artifacts / "shade-notification-terminal.ppm")
                     qmp.click(240, 940)
                     time.sleep(.5)
@@ -323,7 +345,8 @@ def main():
                                         for y in range(60, 110))
                     if app_header(opened) != app_header(notification_terminal):
                         raise RuntimeError("Notification tap did not open its owning app")
-                    print("Target notifications: 12 live notifications, drag scroll and app activation passed")
+                    print("Target notifications: independent daemon, direct/legacy queue, peer identity, "
+                          "12 live notifications, drag scroll and app activation passed")
                     qmp.click(240, 940)
                     time.sleep(.5)
                     qmp.click(96, 410)

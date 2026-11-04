@@ -1,6 +1,6 @@
 name = "shell"
 command = ["/usr/libexec/leon/shell"]
-after = ["compositor", "apps"]
+after = ["compositor", "apps", "notifications"]
 uid = 1000
 gid = 1000
 restart = "always"
