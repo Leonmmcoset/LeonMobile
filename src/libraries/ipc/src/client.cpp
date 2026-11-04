@@ -26,7 +26,7 @@ struct Fd {
 };
 static void write_all(int fd, const char *p, size_t n) {
     while (n) {
-        ssize_t k = write(fd, p, n);
+        ssize_t k = send(fd, p, n, MSG_NOSIGNAL);
         if (k < 0 && errno == EINTR)
             continue;
         require(k > 0, "write failed");

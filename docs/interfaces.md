@@ -47,6 +47,10 @@ and developer operations are specified in [root-access.md](root-access.md).
 
 `/run/leon/apps.sock` accepts one JSON object followed by a newline, up to 8191 bytes. Responses are newline-terminated JSON with `ok`; failures include `error`. Transport callers must handle partial reads/writes and wait for EOF. Credentials come from the socket peer, never request fields.
 
+The shared C++ IPC client sends with `MSG_NOSIGNAL`: a daemon disconnect during
+a send is a request exception, independent of the application's SIGPIPE handler.
+It retains bounded send/receive timeouts and a 1 MiB response limit.
+
 | Operation | Fields | Caller |
 | --- | --- | --- |
 | `list` | none | root/desktop |
