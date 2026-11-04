@@ -18,12 +18,8 @@ void Shell::system_refresh() {
     try {
         auto power = system_request("power", {{"op", "status"}});
         power_state = power;
-        if (power.value("lock_requested", false) && page != Page::lock) {
-            reset_shade();
-            page = Page::lock;
-            active_id.clear();
-            control("shell");
-        }
+        if (power.value("lock_requested", false) && page != Page::lock)
+            show_page(Page::lock);
         int locked = page == Page::lock;
         if (locked != reported_locked) {
             control(locked ? "lock" : "unlock");

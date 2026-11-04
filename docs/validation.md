@@ -261,6 +261,20 @@ Native checks additionally covered concurrent closes, acknowledgement without
 exit, cooperative checkpoints, legacy termination, access denial and exact exit
 history. Evidence is `build/task-lifecycle-step1-{native,wayland,target,image,qemu}.log`.
 
+The shell integration passed the complete QEMU command with both probes and
+the SDK package after rebuilding leon-desktop and regenerating the image.
+Interaction checks now observe lifecycle acknowledgements for home, all-apps,
+recent-task activation and manual lock/unlock, retain the PID when resuming,
+and read target `oom_score_adj` (0 foreground, 500 background). Dismissing the
+calculator produced one status-0 exit; reopening created a different PID and
+restored the exact rendered calculation from its checkpoint. Shade interactions
+preserved foreground priority. The full notification, settings, service-fault,
+IME, permission, package, offline ext4 and clean UI poweroff checks also passed.
+All eight CTest and 37 Python checks, plus the independent Weston smoke, passed
+for the integrated shell. Evidence is
+`build/task-lifecycle-step2-{native,wayland,target,image,qemu}.log` and
+`build/qemu-test/lifecycle-*.{ppm,json}`.
+
 Reproduce with `make test`, `./scripts/test-wayland.sh`,
 `./scripts/build-target-probes.sh` and the full target command in
 [building.md](building.md#target-validation). CI's optional image job includes

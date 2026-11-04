@@ -12,7 +12,10 @@ Shell::Shell() {
     app.tick = [this] {
         if (++ticks % 5 == 0) {
             refresh();
-            if (page == Page::active && !active_id.empty() && !running.contains(active_id))
+            if (page == Page::active && !active_id.empty() &&
+                (!running.contains(active_id) ||
+                 (app_states.contains(active_id) &&
+                  app_states.at(active_id).value("stopping", false))))
                 home();
             app.redraw();
         }
@@ -64,17 +67,20 @@ Shell::Shell() {
 }
 int Shell::run() { return app.run(); }
 void Shell::refresh() {
+    synchronize_background();
     system_refresh();
 
     try {
         auto s = rpc({{"op", "list"}});
         apps = s.at("apps");
         running = s.at("running");
+        app_states = s.at("applications");
         prefs = rpc({{"op", "settings"}}).at("settings");
         app.dark = prefs.value("dark", false);
         app.reduce_motion(prefs.value("reduce_motion", false));
         en = prefs["language"] == "en";
-        error.clear();
+        if (!background_pending)
+            error.clear();
     } catch (const std::exception &e) {
         error = e.what();
     }
@@ -86,17 +92,34 @@ void Shell::refresh() {
         notifications_available = false;
     }
 }
-void Shell::home() {
-    control("unlock");
+void Shell::synchronize_background() {
+    if (!background_pending)
+        return;
+    try {
+        rpc({{"op", "background"}});
+        background_pending = false;
+    } catch (const std::exception &e) {
+        error = e.what();
+    }
+}
+void Shell::show_page(Page destination) {
+    if (destination == Page::lock || page == Page::lock)
+        control(destination == Page::lock ? "lock" : "unlock");
     reset_shade();
-    page = Page::home;
+    page = destination;
     active_id.clear();
     control("shell");
+    // Lifecycle changes belong to navigation, even if no frame is painted
+    // between leaving an app and selecting the next one. Retry lost requests.
+    background_pending = true;
+    synchronize_background();
     app.redraw();
 }
+void Shell::home() { show_page(Page::home); }
 void Shell::launch(std::string id) {
     try {
         rpc({{"op", "launch"}, {"id", id}});
+        background_pending = false;
         reset_shade();
         active_id = id;
         page = Page::active;
@@ -105,6 +128,14 @@ void Shell::launch(std::string id) {
     } catch (const std::exception &e) {
         error = e.what();
     }
+    app.redraw();
+}
+void Shell::dismiss_task(const std::string &id) {
+    auto response = rpc({{"op", "close"}, {"id", id}});
+    app_states = response.at("applications");
+    if (!app_states.contains(id))
+        running.erase(id);
+    refresh();
     app.redraw();
 }
 void Shell::open_shade(Shade::Level level) {

@@ -15,12 +15,6 @@ void Shell::paint(Canvas &c) {
     auto t = c.theme;
     bool overlay = page != Page::active;
     if (page != presented_page) {
-        if (presented_page == Page::active && page != Page::active) {
-            try {
-                rpc({{"op", "background"}});
-            } catch (...) {
-            }
-        }
         double dx = page == Page::tasks ? 32 : 0;
         double dy = page == Page::active                                 ? 0
                     : page == Page::home && presented_page == Page::apps ? -48

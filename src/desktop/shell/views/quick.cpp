@@ -32,11 +32,7 @@ void Shell::paint_quick(Canvas &c, double expansion) {
     if (expansion > .9) {
         shade_click(
             sound, [this] { toggle_mute(); }, muted);
-        shade_click(lock, [this] {
-            reset_shade();
-            page = Page::lock;
-            control("lock");
-        });
+        shade_click(lock, [this] { show_page(Page::lock); });
     }
     double y = 348;
     int volume = volume_preview >= 0 ? volume_preview : prefs.value("volume", 70);

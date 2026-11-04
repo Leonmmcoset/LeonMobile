@@ -14,9 +14,11 @@ class Shell {
     Page page{Page::lock};
     std::vector<mobile::Hit> hits;
     leon::Json apps = Json::array(), running = Json::object(), notifications = Json::array();
+    leon::Json app_states = Json::object();
     leon::Json prefs = {
         {"dark", false}, {"language", "zh-CN"}, {"navigation", "gestures"}, {"volume", 70}};
     std::string error, active_id, timezone;
+    bool background_pending{};
     bool en{}, connected{}, pressed{}, notifications_available{};
     Shade shade;
     bool shade_gesture{}, shade_focused{}, volume_gesture{}, notification_gesture{}, power_menu{};
@@ -42,8 +44,11 @@ class Shell {
     lmui::ContentTransition page_transition;
     Page presented_page{Page::lock};
     void refresh();
+    void synchronize_background();
+    void show_page(Page destination);
     void home();
     void launch(std::string id);
+    void dismiss_task(const std::string &id);
     void pointer(double x, double y, bool down);
     void motion(double x, double y);
     void open_shade(Shade::Level level);

@@ -14,11 +14,8 @@ void Shell::paint_navigation(Canvas &c) {
                 home();
         });
         button(c, hits, {24 + (w - 48) / 3, h - 58, (w - 48) / 3, 48}, "○", [this] { home(); });
-        button(c, hits, {32 + 2 * (w - 48) / 3, h - 58, (w - 48) / 3, 48}, "□", [&] {
-            reset_shade();
-            page = Page::tasks;
-            control("shell");
-        });
+        button(c, hits, {32 + 2 * (w - 48) / 3, h - 58, (w - 48) / 3, 48}, "□",
+               [this] { show_page(Page::tasks); });
     } else {
         double feedback = c.animate("shell/navigation/press", pressed && down_y > h - 64 ? 1 : 0,
                                     motion::feedback);
@@ -30,16 +27,8 @@ void Shell::paint_navigation(Canvas &c) {
             else
                 home();
         });
-        click(hits, {0, h - 64, w / 3, 64}, [&] {
-            reset_shade();
-            page = Page::tasks;
-            control("shell");
-        });
-        click(hits, {w * 2 / 3, h - 64, w / 3, 64}, [&] {
-            reset_shade();
-            page = Page::apps;
-            control("shell");
-        });
+        click(hits, {0, h - 64, w / 3, 64}, [this] { show_page(Page::tasks); });
+        click(hits, {w * 2 / 3, h - 64, w / 3, 64}, [this] { show_page(Page::apps); });
     }
 }
 } // namespace leon::shell

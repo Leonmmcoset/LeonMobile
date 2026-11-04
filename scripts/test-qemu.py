@@ -67,6 +67,24 @@ class Guest:
             time.sleep(.2)
         raise RuntimeError(f"Setting {key} did not reach {expected!r}; observed {actual!r}")
 
+    def wait_lifecycle(self, foreground, pids=None, absent=(), events=None):
+        pids, events = pids or {}, events or {}
+        expected = {foreground} if foreground else set()
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            response = json.loads(self.run("lmpkg lifecycle"))
+            states = response["applications"]
+            active = {app for app, state in states.items() if state["foreground"]}
+            if (active == expected and all(app not in states for app in absent) and
+                    all(app in states and states[app]["pid"] == pid and
+                        not states[app]["stopping"] and not states[app]["pending"] and
+                        states[app]["responsive"] for app, pid in pids.items()) and
+                    all(app in states and states[app]["event"] == event
+                        for app, event in events.items())):
+                return response
+            time.sleep(.1)
+        raise RuntimeError("Application lifecycle did not settle: " + json.dumps(response))
+
 
 class QMP:
     def __init__(self, path):
@@ -530,6 +548,26 @@ def main():
                 time.sleep(.3)
                 calculator = qmp.capture(artifacts / "calculator-result.ppm")
                 calculator_pid = running["org.leon.calculator"]
+                calculator_id = "org.leon.calculator"
+                retained = {calculator_id: calculator_pid}
+                guest.wait_lifecycle(calculator_id, retained)
+                qmp.click(240, 940)  # Home backgrounds without killing the app
+                guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
+                qmp.wait_frame(
+                    artifacts / "lifecycle-home.ppm",
+                    lambda frame: frame[(210 * 480 + 240) * 3:(210 * 480 + 240) * 3 + 3]
+                                  == bytes.fromhex("6750a4"),
+                    "Home did not settle before resuming the calculator")
+                qmp.click(96, 410)
+                guest.wait_lifecycle(calculator_id, retained,
+                                     events={calculator_id: "foreground"})
+                qmp.wait_frame(
+                    artifacts / "lifecycle-home-resumed.ppm",
+                    lambda frame: frame[160 * 480 * 3:220 * 480 * 3]
+                                  == calculator[160 * 480 * 3:220 * 480 * 3],
+                    "Home activation did not preserve the calculator state")
+                qmp.click(400, 940)  # All apps uses the same background path
+                guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
                 # Returning through Recents must also update broker priority;
                 # otherwise memory pressure could reclaim the visible app.
                 qmp.click(80, 940)
@@ -540,15 +578,49 @@ def main():
                                    frame[(140 * 480 + 240) * 3:(140 * 480 + 240) * 3 + 3]
                                    == bytes.fromhex("fff8ff")),
                     "Recent tasks did not become interactive")
+                guest.wait_lifecycle(None, retained)
                 qmp.click(120, 190)
                 qmp.wait_frame(
                     artifacts / "lifecycle-resumed-calculator.ppm",
                     lambda frame: frame[160 * 480 * 3:220 * 480 * 3]
                                   == calculator[160 * 480 * 3:220 * 480 * 3],
                     "Recent tasks did not restore the calculator")
-                states = json.loads(guest.run("lmpkg lifecycle"))["applications"]
-                if not states["org.leon.calculator"]["foreground"]:
-                    raise RuntimeError("Recent task activation did not restore foreground priority")
+                guest.wait_lifecycle(calculator_id, retained,
+                                     events={calculator_id: "foreground"})
+                if guest.run(f"cat /proc/{calculator_pid}/oom_score_adj") != "0":
+                    raise RuntimeError("Recent tasks did not restore foreground OOM priority")
+                # Dismiss through the real task UI, then verify checkpoint
+                # restoration in a new process rather than a cached window.
+                qmp.click(80, 940)
+                guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
+                qmp.wait_frame(
+                    artifacts / "lifecycle-before-close.ppm",
+                    lambda frame: frame[(180 * 480 + 30) * 3:(180 * 480 + 30) * 3 + 3]
+                                  == bytes.fromhex("eaddff"),
+                    "Recent tasks did not settle before cooperative close")
+                qmp.click(432, 190)
+                closed = guest.wait_lifecycle(None, absent=(calculator_id,))
+                if [record for record in closed["exits"] if record["pid"] == calculator_pid] != [
+                        {"app": calculator_id, "pid": calculator_pid, "status": 0}]:
+                    raise RuntimeError("Task checkpoint did not end in one cooperative exit")
+                qmp.click(240, 940)
+                qmp.wait_frame(
+                    artifacts / "lifecycle-before-relaunch.ppm",
+                    lambda frame: frame[(210 * 480 + 240) * 3:(210 * 480 + 240) * 3 + 3]
+                                  == bytes.fromhex("6750a4"),
+                    "Home did not settle before checkpoint relaunch")
+                qmp.click(96, 410)
+                relaunched = guest.wait_lifecycle(calculator_id)["applications"][calculator_id]
+                if relaunched["pid"] == calculator_pid:
+                    raise RuntimeError("Dismissed task unexpectedly retained its old process")
+                calculator_pid = relaunched["pid"]
+                retained = {calculator_id: calculator_pid}
+                guest.wait_lifecycle(calculator_id, retained)
+                qmp.wait_frame(
+                    artifacts / "lifecycle-checkpoint-restored.ppm",
+                    lambda frame: frame[160 * 480 * 3:220 * 480 * 3]
+                                  == calculator[160 * 480 * 3:220 * 480 * 3],
+                    "Relaunched calculator lost its checkpointed calculation")
                 # Hold the pointer across the status/app input boundary. The
                 # shade must follow before release, then snap to stage 1.
                 held = qmp.drag(240, 20, 240, 300, artifacts / "shade-dragging.ppm")
@@ -563,6 +635,29 @@ def main():
                 if (compact[point:point + 3] == bytes.fromhex("fff8ff") or
                         expanded[point:point + 3] != bytes.fromhex("fff8ff")):
                     raise RuntimeError("Second pull did not expand the shade")
+                guest.wait_lifecycle(calculator_id, retained)
+                qmp.click(350, 292)  # Manual lock must background the live app
+                guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
+                qmp.wait_frame(
+                    artifacts / "lifecycle-locked-app.ppm",
+                    lambda frame: (frame[(200 * 480 + 240) * 3:(200 * 480 + 240) * 3 + 3]
+                                   == bytes.fromhex("eaddff") and
+                                   frame[100 * 480 * 3:100 * 480 * 3 + 24 * 3]
+                                   == bytes.fromhex("fff8ff") * 24),
+                    "Manual lock did not settle while the app was backgrounded")
+                qmp.click(240, 790)
+                guest.wait_lifecycle(None, retained)
+                qmp.wait_frame(
+                    artifacts / "lifecycle-unlocked-app.ppm",
+                    lambda frame: frame[(210 * 480 + 240) * 3:(210 * 480 + 240) * 3 + 3]
+                                  == bytes.fromhex("6750a4"),
+                    "Unlock did not return home without stopping the calculator")
+                qmp.click(96, 410)
+                guest.wait_lifecycle(calculator_id, retained)
+                qmp.drag(240, 20, 240, 300)
+                qmp.wait_shade(artifacts / "lifecycle-reopened-compact.ppm", 700)
+                qmp.drag(240, 110, 240, 450)
+                qmp.wait_shade(artifacts / "lifecycle-reopened-expanded.ppm", 896)
                 if notification_terminal:
                     qmp.drag(280, 726, 280, 520)
                     scrolled = qmp.capture(artifacts / "shade-notifications-scrolled.ppm")
@@ -623,11 +718,13 @@ def main():
                 processes = json.loads(guest.run("lmpkg running"))
                 if processes.get("org.leon.calculator") != calculator_pid:
                     raise RuntimeError("Shade changed the underlying application process")
+                guest.wait_lifecycle(calculator_id, retained)
                 qmp.click(72, 384)  # Input reaches the restored calculator
                 qmp.wait_frame(artifacts / "shade-restored-input.ppm",
                                lambda frame: result_region(frame)!=result_region(restored),
                                "Shade closure did not restore application pointer input")
                 qmp.click(240, 940)
+                guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
                 time.sleep(.5)
                 qmp.click(400, 22)
                 time.sleep(.5)
@@ -644,6 +741,9 @@ def main():
                     time.sleep(.25)
                 else:
                     raise RuntimeError("Settings did not render its interactive controls")
+                guest.wait_lifecycle("org.leon.settings", retained)
+                if guest.run(f"cat /proc/{calculator_pid}/oom_score_adj") != "500":
+                    raise RuntimeError("Background calculator retained foreground OOM priority")
                 # Settings now has a category home, separate detail pages and
                 # a real search field. Exercise the same public UI as a user.
                 qmp.click(180, 380)  # Display
@@ -784,6 +884,7 @@ def main():
                     time.sleep(.1)
                 else:
                     raise RuntimeError("Recent tasks did not finish its entrance")
+                guest.wait_lifecycle(None)
                 qmp.click(432, 190)  # Dismiss calculator, allow remaining rows to settle
                 time.sleep(.12)
                 qmp.capture(artifacts / "tasks-dismissing.ppm")
@@ -796,8 +897,11 @@ def main():
                     time.sleep(.1)
                 else:
                     raise RuntimeError("Recent task rows did not settle into the dismissed row")
-                if "org.leon.calculator" in json.loads(guest.run("lmpkg running")):
-                    raise RuntimeError("Recent tasks dismissal did not stop the selected app")
+                closed = guest.wait_lifecycle(None, absent=(calculator_id,))
+                exits = [record for record in closed["exits"] if record["pid"] == calculator_pid]
+                if exits != [{"app": calculator_id, "pid": calculator_pid, "status": 0}]:
+                    raise RuntimeError("Recent tasks did not record one cooperative exit: " + str(exits))
+                (artifacts / "lifecycle-dismissed.json").write_text(json.dumps(closed, indent=2) + "\n")
                 background = bytes.fromhex("15121b" if preferences.get("dark") else "fff8ff")
                 primary = bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")
 
@@ -824,6 +928,7 @@ def main():
                     lambda frame: (lock_header(frame) == background * (176 * 90) and
                                    pixel(frame, 240, 200) == container),
                     "Lock tile did not reach the settled lock screen")
+                guest.wait_lifecycle(None)
                 qmp.click(400, 22)  # Locked session cannot expose the shade
                 time.sleep(.4)
                 still_locked = qmp.capture(artifacts / "shade-locked-top.ppm")
@@ -837,6 +942,7 @@ def main():
                     artifacts / "shade-unlocked-home.ppm",
                     lambda frame: pixel(frame, 240, 210) == primary,
                     "Unlock did not finish the home-page entrance")
+                guest.wait_lifecycle(None)
                 qmp.click(400, 22)
                 wait_shade_stage("shade-before-backdrop.ppm", 700)
                 qmp.click(8, 810)  # Dismiss through the backdrop

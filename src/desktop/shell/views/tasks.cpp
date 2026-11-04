@@ -14,11 +14,16 @@ void Shell::paint_tasks(Canvas &c) {
             continue;
         double position = c.animate("shell/tasks/" + id, y, motion::spatial);
         std::string name = en ? m.value("name_en", "") : m.at("name").get<std::string>();
-        button(c, hits, {24, position, w - 104, 78}, name, [this, id] { launch(id); });
-        button(c, hits, {w - 68, position, 44, 78}, "×", [&, id] {
-            rpc({{"op", "stop"}, {"id", id}});
-            refresh();
-        });
+        bool stopping = app_states.contains(id) && app_states.at(id).value("stopping", false);
+        if (stopping) {
+            c.rounded({24, position, w - 104, 78}, t.container, 20);
+            c.text(name, {40, position + 6, w - 136, 34}, 18, t.text, true);
+            c.text(tr(en, "正在关闭…", "Closing…"), {40, position + 42, w - 136, 26}, 13, t.muted);
+            c.text("…", {w - 68, position, 44, 78}, 22, t.muted, false, 1);
+        } else {
+            button(c, hits, {24, position, w - 104, 78}, name, [this, id] { launch(id); });
+            button(c, hits, {w - 68, position, 44, 78}, "×", [this, id] { dismiss_task(id); });
+        }
         y += 94;
     }
     if (running.empty())

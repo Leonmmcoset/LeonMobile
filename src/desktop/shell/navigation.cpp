@@ -71,10 +71,9 @@ void Shell::pointer(double x, double y, bool down) {
             close_shade();
             return;
         }
-        if (dy < -190) {
-            page = Page::tasks;
-            control("shell");
-        } else
+        if (dy < -190)
+            show_page(Page::tasks);
+        else
             home();
         app.redraw();
         return;

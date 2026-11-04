@@ -44,6 +44,6 @@ void Shell::paint_home(Canvas &c) {
     }
     if (page == Page::home)
         button(c, hits, {48, h - 148, w - 96, 52}, tr(en, "所有应用  ↑", "All apps  ↑"),
-               [&] { page = Page::apps; });
+               [this] { show_page(Page::apps); });
 }
 } // namespace leon::shell

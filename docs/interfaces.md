@@ -133,6 +133,13 @@ checks peer UID. Ordinary application users cannot invoke these operations.
 Normal Wayland clients receive assigned mobile window bounds, rather than
 implementing arbitrary interactive move/resize. Returning through recent tasks
 also restores the application's broker foreground priority.
+The shell dispatches background transitions at navigation time, rather than
+during rendering, and retries a failed background request on refresh. Home,
+all-apps, recent tasks and both manual/idle lock use this path; opening/closing
+the shade alone preserves the app's foreground priority. Recent-task dismissal
+uses asynchronous `close` and shows an inactive closing row until exit is
+observed. Activating another task retains that app's PID and selects it as the
+only foreground app. An externally closed active app returns the shell home.
 
 ## Notification daemon
 
