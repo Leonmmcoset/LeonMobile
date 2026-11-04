@@ -139,6 +139,11 @@ python3 scripts/test-qemu.py --timeout 240 --root-only --root-probe build/root-p
 Only a private disk receives the probe and harmless sleep service. Three boots
 exercise default lock, forged identities, cooldown, real sysctl/module changes,
 service overrides, PTY status, cgroup descendant revocation, enabled/disabled
-policy persistence and retained rotated passwords. The generated reference image
+policy persistence and retained rotated passwords. Interactive checks exercise
+the real Settings root switch, password purpose through the shared Chinese IME,
+kernel/module/core views, service restart and policy save, and repeated `su`
+commands from the sandboxed terminal. Native Weston separately covers first
+password setup, rotation and editing against private kernel fixtures.
+The generated reference image
 and personal `build/leonmobile-user.img` remain untouched. Probe reports and serial
 evidence are ignored under `build/qemu-test/`.

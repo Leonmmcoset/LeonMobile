@@ -40,6 +40,7 @@ class Application {
     // Optional Wayland text-input-v3 integration; callbacks run on the UI thread.
     bool text_input_available() const;
     void text_input(bool enabled);
+    void text_input(bool enabled, bool private_input);
     void on_text_input(std::function<void(const std::string &)> commit,
                        std::function<void(const std::string &)> preedit = {},
                        std::function<void(uint32_t, uint32_t)> erase = {});

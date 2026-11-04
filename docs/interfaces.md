@@ -276,6 +276,14 @@ Target applications reserve space through compositor-owned window resizing.
 The protocol state and callbacks live in the private implementation, preserving
 LMUI generation-1 public object layout.
 
+`text_input(enabled, private_input)` retains the original one-argument overload
+and marks password fields with text-input-v3 `hidden_text`, `sensitive_data` and
+the password content purpose. The input method then commits letters directly
+instead of composing pinyin/candidates. Clients still own masking, clearing
+credential buffers and excluding secrets from saved state. The internal mobile
+window helper exposes `private_text_input()` for this purpose; Settings overrides
+it while an authentication dialog is active.
+
 `watch_fd(fd, callback)` integrates up to 16 caller-owned descriptors into the
 LMUI event loop; `unwatch_fd(fd)` removes one. Readable, hangup and error events
 invoke the callback on the UI thread. Callbacks must use bounded/nonblocking I/O

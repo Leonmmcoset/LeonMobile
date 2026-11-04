@@ -482,7 +482,7 @@ def main():
     parser.add_argument("--root-probe", type=Path,
                         help="AArch64 root protocol/cgroup/module probe, only on a disposable disk")
     parser.add_argument("--root-only", action="store_true",
-                        help="focused root protocol, cgroup and two real reboot tests")
+                        help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
@@ -627,8 +627,8 @@ def main():
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
                 if args.root_only:
-                    from root_qemu import verify_console, reboot_and_probe
-                    verify_console(guest)
+                    from root_qemu import exercise_developer_ui, reboot_and_probe
+                    exercise_developer_ui(guest, qmp, artifacts)
                     for phase in (2, 3):
                         reboot_and_probe(guest, artifacts, phase, args.timeout)
                     guest.run("lmsys power '{\"op\":\"poweroff\"}'")
@@ -636,7 +636,7 @@ def main():
                     if proc.returncode:
                         raise RuntimeError("Root test shutdown failed")
                     passed = True
-                    print("Root protocol, cgroups, modules and two real reboots passed", flush=True)
+                    print("Root protocol, developer UI, sandboxed su and two real reboots passed", flush=True)
                     return
                 if args.core_only:
                     preferences=json.loads(guest.run("cat /data/leon/settings.json"))

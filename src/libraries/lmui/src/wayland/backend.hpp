@@ -50,7 +50,7 @@ struct Application::Impl {
     std::function<void(const PointerEvent &)> event_callback;
     zwp_text_input_manager_v3 *text_manager{};
     zwp_text_input_v3 *text_input{};
-    bool text_entered{}, text_wanted{}, text_enabled{};
+    bool text_entered{}, text_wanted{}, text_enabled{}, text_private{}, text_private_sent{};
     uint32_t text_serial{}, delete_before{}, delete_after{};
     std::string pending_text, pending_preedit;
     bool got_text{}, got_preedit{}, got_delete{};

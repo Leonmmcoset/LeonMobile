@@ -42,16 +42,32 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
         end = top + visible_entries().size() * 84;
     else if (page_ == Page::sound || page_ == Page::navigation)
         end = 500;
-    else if (page_ == Page::system || page_ == Page::language)
+    else if (page_ == Page::system)
+        end = 424;
+    else if (page_ == Page::language)
         end = 340;
-    else if (page_ == Page::display)
+    else if (page_ == Page::developer) {
+        if (root_dialog_)
+            end = 408 + (root_current_required_ ? 94 : 0) + (root_new_required_ ? 188 : 0);
+        else if (developer_view_ == DeveloperView::home)
+            end = 812;
+        else if (developer_view_ == DeveloperView::services && !developer_selection_.empty())
+            end = 804;
+        else if (developer_view_ == DeveloperView::kernel && developer_data_.contains("value"))
+            end = 586;
+        else
+            end = 428 + (developer_view_ == DeveloperView::modules ? 60 : 0) +
+                  developer_data_.value("items", Json::array()).size() * 64;
+    } else if (page_ == Page::display)
         end = 744;
     scroll = std::clamp(scroll, 0.0, std::max(0.0, end - bottom + 16));
     viewport_ = {0, top, double(c.width), std::max(0.0, bottom - top)};
     c.save();
     c.clip(viewport_);
     cairo_translate(c.cr, 0, -scroll);
-    if (page_ == Page::home)
+    if (page_ == Page::developer)
+        paint_developer(c);
+    else if (page_ == Page::home)
         paint_home(c);
     else if (page_ == Page::network || page_ == Page::storage || page_ == Page::about)
         paint_device(c);

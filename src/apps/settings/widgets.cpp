@@ -71,6 +71,11 @@ void icon(Canvas &c, Icon type, double x, double y, Color color) {
     case Icon::navigation:
         c.rounded({2, 10, 20, 4}, color, 2);
         break;
+    case Icon::developer:
+        line(7, 5, 1, 12); line(1, 12, 7, 19);
+        line(17, 5, 23, 12); line(23, 12, 17, 19);
+        line(14, 2, 10, 22);
+        break;
     }
     c.restore();
 }

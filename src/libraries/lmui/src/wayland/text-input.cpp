@@ -1,15 +1,23 @@
 #include "backend.hpp"
 namespace lmui {
 void Application::Impl::text_update() {
-    if (!text_input || !text_entered || text_enabled == text_wanted)
+    if (!text_input || !text_entered ||
+        (text_enabled == text_wanted && (!text_wanted || text_private_sent == text_private)))
         return;
     text_enabled = text_wanted;
     if (text_enabled) {
         zwp_text_input_v3_enable(text_input);
-        zwp_text_input_v3_set_content_type(text_input, 0, 0);
+        zwp_text_input_v3_set_content_type(text_input,
+                                           text_private
+                                               ? ZWP_TEXT_INPUT_V3_CONTENT_HINT_HIDDEN_TEXT |
+                                                     ZWP_TEXT_INPUT_V3_CONTENT_HINT_SENSITIVE_DATA
+                                               : 0,
+                                           text_private ? ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_PASSWORD
+                                                        : ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_NORMAL);
     } else
         zwp_text_input_v3_disable(text_input);
     zwp_text_input_v3_commit(text_input);
+    text_private_sent = text_private;
     ++text_serial;
 }
 void Application::Impl::text_open() {
@@ -62,8 +70,10 @@ void Application::Impl::text_open() {
     zwp_text_input_v3_add_listener(text_input, &events, this);
 }
 bool Application::text_input_available() const { return impl->text_input != nullptr; }
-void Application::text_input(bool enabled) {
+void Application::text_input(bool enabled) { text_input(enabled, false); }
+void Application::text_input(bool enabled, bool private_input) {
     impl->text_wanted = enabled;
+    impl->text_private = private_input;
     impl->text_update();
 }
 void Application::on_text_input(std::function<void(const std::string &)> commit,

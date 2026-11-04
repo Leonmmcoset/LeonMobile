@@ -83,6 +83,7 @@ void SettingsApplication::paint_preferences(Canvas &c) {
     } else if (page_ == Page::system) {
         link(c, {16, 164, w - 32, 76}, Page::language);
         link(c, {16, 248, w - 32, 76}, Page::navigation);
+        link(c, {16, 332, w - 32, 76}, Page::developer);
     } else if (page_ == Page::language) {
         for (bool english : {false, true}) {
             double y = english ? 248 : 164;

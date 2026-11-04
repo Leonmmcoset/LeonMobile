@@ -163,7 +163,7 @@ void ApplicationWindow::paint(Canvas &c) {
     reduced_motion_ = c.reduced_motion();
     double keyboard_fraction = c.animate(
         "window/keyboard", (keyboard && !app.text_input_available()) ? 1 : 0, motion::enter);
-    app.text_input(keyboard);
+    app.text_input(keyboard, private_text_input());
     double bottom = h - 16 - 234 * keyboard_fraction;
     content_transition_.begin(c);
     paint_header(c);

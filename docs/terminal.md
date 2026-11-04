@@ -8,6 +8,13 @@ is its private `HOME`, `/data/leon/data/org.leon.terminal` on the reference imag
 It is an application shell with the permissions described in
 [application-format.md](application-format.md#kernel-enforcement-at-launch).
 
+Root starts disabled. Enable it and create a password through Settings → System
+→ Developer options, then use `su`, `su -` or `su -c 'COMMAND'`. Every session asks
+for that password without echo. `rootd` creates a separate root PTY, with a clean
+environment and its own cgroup; normal terminal commands retain the application
+sandbox. Disabling root or changing its password revokes existing sessions.
+`sudo` and `sudoedit` remain disabled. See [root-access.md](root-access.md).
+
 ## Display and terminal protocol
 
 libvterm owns the incremental UTF-8/VT parser, live screen, alternate screen,

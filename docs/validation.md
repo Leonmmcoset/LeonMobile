@@ -333,3 +333,55 @@ Evidence remains ignored in `build/terminal-lmui-*.log`,
 The default `output/images/` image was regenerated; the older assembled `dist/`
 bundle was not regenerated. Compatibility follows the libvterm subset described
 in [terminal.md](terminal.md), with QEMU developer-prototype scope.
+
+## Developer root policy and Settings
+
+The image explicitly disables conventional root password login and BusyBox
+su/sulogin, retains a locked shadow entry during incremental image finalization,
+and rejects sudo/sudoedit with status 126. The separate non-setuid `leonsu`
+client delegates authenticated elevation to rootd. `make test` passed all ten
+CTest checks and 50 Python tests. Twelve root tests use private stores/proc
+fixtures, real Unix peer credentials and controlling PTYs; they cover password
+storage/modes, durable cooldown, malformed/unsafe policy, executable/UID
+authorization, rotation/revocation, exact terminal size/exit status, echo and
+terminal restoration, service override recovery, path traversal/symlink denial,
+slow clients/ancillary rejection and six-session capacity with reserved control
+workers. A separate tools-only build also passed.
+
+Independent headless Weston rendered all eight applications, shell and shade
+stages and passed lifecycle, motion and event-I/O checks. The Weston input suite
+passed modifiers/repeat/256 KiB clipboard, terminal shell/vi/copy/restart, and the
+Settings developer flow: first password setup, fixture sysctl editing,
+disable/re-enable and password rotation. Passwords are masked, excluded from
+saved state, cleared on dialog completion/cancellation/focus loss and marked
+private through the additive LMUI text-input overload.
+
+The focused AArch64/musl QEMU sequence passed default-deny/executable identity,
+durable authentication, actual `/proc/sys/kernel/hostname` write/restore,
+bridge module load/unload, service control/configuration, root PTY credentials,
+and cgroup revocation of detached descendants. A target capacity probe filled
+all six permitted root sessions and verified a seventh was rejected while
+status and authenticated disable still succeeded. Real compositor input
+exercised the visible System → Developer options entry, the Chinese IME's private
+password path, root disable/re-enable, kernel/module/core pages, notificationd
+restart and retry-limit persistence. Two `su -c` requests from terminal UID 11005
+with `NoNewPrivs:1` each required a password, obtained UID 0, read root-private
+policy and created root-owned proof files; sudo still returned 126. Two actual
+guest reboots verified enabled/disabled state, rotated password retention and
+service boot/restart overrides, including an autostart-disabled service.
+
+The final image passed the combined QEMU run with system, root, notification and
+terminal probes plus the existing SDK package. This also verified service fault
+recovery, permissions/IME, app lifecycles, quick-settings gestures, persistent
+settings, network/audio, package installation/launch/removal, offline editor and
+terminal data, and clean compositor shutdown through the UI. The default
+`output/images/` image was regenerated; the older assembled `dist/` bundle was
+not regenerated.
+
+Reproduction is documented in [root-access.md](root-access.md). Evidence stays
+ignored in `build/root-developer-*.log`, `build/rootd-native-tests.log`,
+`build/root-tools-only.log`, `build/screenshots/developer-*` and
+`build/qemu-test/{root-phase-*,root-ui-proof.txt,developer-*}`. These observations
+apply to the QEMU developer prototype. Kernel image replacement, production
+device support and security against a deliberately unrestricted root user are
+outside this validation.

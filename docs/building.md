@@ -23,6 +23,14 @@ sudo apt-get install cmake ninja-build pkg-config libarchive-dev nlohmann-json3-
 
 No system-wide installation of LeonMobile is required for native tests. `make test` builds native core/LMUI/apps and runs component, package and image update tests. Identity-transition tests require root; run them in the disposable CI environment or with `sudo env LEON_TEST_BIN="$PWD/build/host" python3 -m unittest discover -s tests -v`. The tests redirect stores, sockets and runtime directories into temporary paths. Native rendering can be checked using `scripts/test-wayland.sh`; it uses Weston as an independent protocol peer, not the target compositor, and captures PNGs under `build/screenshots`. `python3 scripts/test-wayland-input.py` verifies real keyboard/repeat/clipboard events; adding `--terminal` exercises the interactive shell, Ctrl-C, vi save, selection/paste and restart through Weston on an isolated Xvfb display.
 
+`python3 scripts/test-wayland-input.py --developer` drives Settings against a
+private rootd/proc fixture: initial password setup, parameter editing, disabling,
+re-enabling and password rotation. It needs root for real peer credentials. No
+host kernel parameters or modules are changed. After building the image and
+`scripts/build-target-probes.sh`, run `python3 scripts/test-qemu.py --timeout 240
+--root-only --root-probe build/root-probe` for actual module/sysctl/session tests,
+developer Settings and sandboxed terminal input, and two real guest reboots.
+
 ## Build the reference image
 
 ```sh

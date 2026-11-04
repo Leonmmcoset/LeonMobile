@@ -14,9 +14,20 @@ void SettingsApplication::open(Page page) {
     keyboard = false;
     scroll = 0;
     error.clear();
+    if (page == Page::developer) {
+        developer_view_ = DeveloperView::home;
+        developer_path_.clear();
+        developer_selection_.clear();
+        developer_offset_ = 0;
+        developer_refresh();
+    }
     app.redraw();
 }
 void SettingsApplication::back() {
+    if (page_ == Page::developer && (root_dialog_ || developer_view_ != DeveloperView::home)) {
+        developer_back();
+        return;
+    }
     if (keyboard)
         keyboard = false;
     else if (!history_.empty()) {
@@ -29,6 +40,10 @@ void SettingsApplication::back() {
     app.redraw();
 }
 void SettingsApplication::text_input(const std::string &text) {
+    if (page_ == Page::developer) {
+        developer_text(text);
+        return;
+    }
     if (page_ != Page::home || !keyboard)
         return;
     if (text == "\n")
@@ -47,6 +62,10 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
     return true;
 }
 void SettingsApplication::on_tick() {
+    if (root_dialog_ && !app.focused()) {
+        clear_root_fields();
+        app.redraw();
+    }
     if (++status_ticks_ < 10)
         return;
     status_ticks_ = 0;
@@ -93,6 +112,8 @@ std::string SettingsApplication::summary(Page page) const {
                    : tr(en, "三键导航", "3-button navigation");
     case Page::about:
         return "LeonMobile 1.0.0";
+    case Page::developer:
+        return tr(en, "Root、内核、模块与服务", "Root, kernel, modules and services");
     default:
         return {};
     }
