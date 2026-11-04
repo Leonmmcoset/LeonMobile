@@ -16,8 +16,14 @@ int main() {
         app.quit();
     });
     assert(write(fds[1], "ime", 3) == 3);
+    int writable = 0;
+    app.watch_fd(fds[1], lmui::fd_writable, [&] {
+        ++writable;
+        app.unwatch_fd(fds[1]);
+    });
     assert(!app.run());
     assert(calls == 1 && ticks == 0);
+    assert(writable == 1);
     close(fds[0]);
     close(fds[1]);
     return 0;

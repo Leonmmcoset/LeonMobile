@@ -8,6 +8,8 @@
 namespace lmui {
 class Canvas;
 enum class LifecycleEvent { foreground, background, save, shutdown };
+enum KeyModifier : unsigned { key_shift = 1, key_alt = 2, key_control = 4, key_super = 8 };
+enum FdInterest : unsigned { fd_readable = 1, fd_writable = 2 };
 struct KeyEvent {
     unsigned symbol{};
     std::string text;
@@ -43,7 +45,12 @@ class Application {
                        std::function<void(uint32_t, uint32_t)> erase = {});
     // Readable/error callbacks execute on the UI thread; the caller owns the FD.
     void watch_fd(int fd, std::function<void()> callback);
+    void watch_fd(int fd, unsigned interests, std::function<void()> callback);
     void unwatch_fd(int fd);
+    unsigned key_modifiers() const;
+    bool focused() const;
+    bool copy_text(const std::string &text);
+    void request_clipboard(std::function<void(std::string)> callback);
     int width() const;
     int height() const;
 

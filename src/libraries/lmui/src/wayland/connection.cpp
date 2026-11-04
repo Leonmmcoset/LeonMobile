@@ -8,6 +8,7 @@
 #include <unistd.h>
 namespace lmui {
 Application::Impl::~Impl() {
+    clipboard_close();
     if (lifecycle_fd >= 0)
         close(lifecycle_fd);
     if (frame_callback)
@@ -64,6 +65,9 @@ void Application::Impl::global(void *data, wl_registry *reg, uint32_t name, cons
             wl_registry_bind(reg, name, &zwp_text_input_manager_v3_interface, 1));
     else if (!strcmp(interface, "wl_shm"))
         s.shm = static_cast<wl_shm *>(wl_registry_bind(reg, name, &wl_shm_interface, 1));
+    else if (!strcmp(interface, "wl_data_device_manager"))
+        s.data_manager = static_cast<wl_data_device_manager *>(
+            wl_registry_bind(reg, name, &wl_data_device_manager_interface, std::min(version, 3u)));
     else if (!strcmp(interface, "xdg_wm_base")) {
         s.wm = static_cast<xdg_wm_base *>(wl_registry_bind(reg, name, &xdg_wm_base_interface, 1));
         static const xdg_wm_base_listener events = {
@@ -90,6 +94,7 @@ int Application::Impl::run() {
     if (wl_display_roundtrip(display) < 0 || !compositor || !shm || !wm)
         throw std::runtime_error("Wayland compositor lacks required globals");
     text_open();
+    clipboard_open();
     surface = wl_compositor_create_surface(compositor);
     xdg = xdg_wm_base_get_xdg_surface(wm, surface);
     static const xdg_surface_listener surface_events = {
@@ -131,6 +136,8 @@ int Application::Impl::run() {
         if (wl_display_dispatch_pending(display) < 0)
             break;
         auto now = std::chrono::steady_clock::now();
+        repeat_dispatch();
+        clipboard_tick();
         if (now - last > std::chrono::milliseconds(200)) {
             if (app->tick)
                 app->tick();
@@ -142,14 +149,20 @@ int Application::Impl::run() {
         std::vector<pollfd> fds{{wl_display_get_fd(display), POLLIN, 0}, {lifecycle_fd, POLLIN, 0}};
         auto watched = watched_fds;
         for (const auto &entry : watched)
-            fds.push_back({entry.fd, POLLIN, 0});
+            fds.push_back({entry.fd, entry.events, 0});
         // Frame callbacks wake animations; idle clients only wake for their tick.
         int timeout = std::max(0, 200 - int(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                 std::chrono::steady_clock::now() - last)
                                                 .count()));
+        if (repeat_key && repeat_rate > 0) {
+            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 repeat_due - std::chrono::steady_clock::now())
+                                 .count();
+            timeout = std::min(timeout, int(std::max(0LL, static_cast<long long>(remaining))));
+        }
         int rc = poll(fds.data(), fds.size(), timeout);
         for (size_t i = 0; i < watched.size(); ++i)
-            if (fds[i + 2].revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)) {
+            if (fds[i + 2].revents & (watched[i].events | POLLERR | POLLHUP | POLLNVAL)) {
                 auto current =
                     std::find_if(watched_fds.begin(), watched_fds.end(), [&](const auto &entry) {
                         return entry.fd == watched[i].fd &&

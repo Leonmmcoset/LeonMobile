@@ -26,6 +26,21 @@ struct Application::Impl {
     xkb_context *xkb{};
     xkb_keymap *keymap{};
     xkb_state *state{};
+    bool keyboard_focused{};
+    uint32_t input_serial{}, repeat_key{};
+    int repeat_rate{}, repeat_delay{};
+    std::chrono::steady_clock::time_point repeat_due{};
+    void dispatch_key(uint32_t key, bool pressed);
+    void repeat_dispatch();
+    unsigned key_modifiers() const;
+    struct Clipboard;
+    std::shared_ptr<Clipboard> clipboard;
+    wl_data_device_manager *data_manager{};
+    void clipboard_open();
+    void clipboard_close();
+    void clipboard_tick();
+    bool clipboard_copy(const std::string &);
+    void clipboard_request(std::function<void(std::string)>);
     int w{480}, h{960};
     double px{}, py{};
     int32_t touch_id{-1};
@@ -45,6 +60,7 @@ struct Application::Impl {
     void text_update();
     struct FdWatch {
         int fd;
+        short events;
         uint64_t generation;
         std::function<void()> callback;
     };

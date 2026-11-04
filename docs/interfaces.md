@@ -275,3 +275,19 @@ and remove their watch before closing the FD. Replacing a watch carries a new
 generation so an old poll result cannot dispatch to a reused descriptor. This is
 used by the input method's separate Wayland protocol connection, avoiding
 200-millisecond keyboard dispatch delays. The library never closes watched FDs.
+
+`watch_fd(fd, interests, callback)` accepts `fd_readable`, `fd_writable` or both.
+Writable watches must be removed when a queue drains to avoid a busy loop.
+`key_modifiers()` reports `key_shift`, `key_alt`, `key_control`, and `key_super`
+for the current key callback without changing the generation-1 `KeyEvent` layout.
+Keyboard repeat follows the compositor's rate/delay and stops on release or
+focus loss. `focused()` reports Wayland keyboard focus.
+
+`copy_text(UTF8)` offers a focused client's text through the standard Wayland
+clipboard using its latest input serial; it returns false when unavailable or
+over 1 MiB. `request_clipboard(callback)` asynchronously delivers UTF-8 text
+(empty on unavailable/failed transfer). Transfers are nonblocking, capped at
+1 MiB and three seconds, with at most four simultaneous transfers. These
+internal transfers share the descriptor-watch limit. Copy ownership ends when
+another source replaces it or the app exits; there is no clipboard history.
+LMUI does not accept terminal escape sequences as clipboard requests.

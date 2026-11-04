@@ -10,7 +10,7 @@ add_custom_command(OUTPUT text-input-client-protocol.h COMMAND ${WAYLAND_SCANNER
 add_custom_command(OUTPUT text-input-protocol.c COMMAND ${WAYLAND_SCANNER} private-code ${TEXT_INPUT_XML} text-input-protocol.c DEPENDS ${TEXT_INPUT_XML})
 add_library(lmui SHARED src/theme.cpp src/canvas.cpp src/widgets.cpp src/application.cpp
             src/motion.cpp src/touch.cpp src/transition.cpp
-            src/wayland/connection.cpp src/wayland/input.cpp src/wayland/lifecycle.cpp src/wayland/text-input.cpp
+            src/wayland/connection.cpp src/wayland/input.cpp src/wayland/clipboard.cpp src/wayland/lifecycle.cpp src/wayland/text-input.cpp
             src/wayland/buffers.cpp src/wayland/render.cpp
             xdg-shell-protocol.c xdg-shell-client-protocol.h
             text-input-protocol.c text-input-client-protocol.h)
@@ -46,6 +46,8 @@ if(BUILD_TESTING)
   target_link_libraries(lmui-wayland-motion-test PRIVATE lmui)
   add_executable(lmui-wayland-io-test ${PROJECT_SOURCE_DIR}/tests/wayland_io.cpp)
   target_link_libraries(lmui-wayland-io-test PRIVATE lmui)
+  add_executable(lmui-wayland-input-test ${PROJECT_SOURCE_DIR}/tests/wayland_input.cpp)
+  target_link_libraries(lmui-wayland-input-test PRIVATE lmui)
   add_executable(lmui-wayland-lifecycle-test ${PROJECT_SOURCE_DIR}/tests/wayland_lifecycle.cpp)
   target_link_libraries(lmui-wayland-lifecycle-test PRIVATE lmui)
 endif()

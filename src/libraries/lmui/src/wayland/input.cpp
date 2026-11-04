@@ -1,8 +1,39 @@
 #include "backend.hpp"
+#include <algorithm>
 #include <cstring>
 #include <linux/input-event-codes.h>
 #include <unistd.h>
 namespace lmui {
+unsigned Application::Impl::key_modifiers() const {
+    if (!state)
+        return 0;
+    unsigned result = 0;
+    for (const auto &[name, flag] :
+         {std::pair{XKB_MOD_NAME_SHIFT, key_shift}, std::pair{XKB_MOD_NAME_ALT, key_alt},
+          std::pair{XKB_MOD_NAME_CTRL, key_control}, std::pair{XKB_MOD_NAME_LOGO, key_super}})
+        if (xkb_state_mod_name_is_active(state, name, XKB_STATE_MODS_EFFECTIVE) > 0)
+            result |= flag;
+    return result;
+}
+void Application::Impl::dispatch_key(uint32_t key, bool pressed) {
+    if (!state)
+        return;
+    char text[128]{};
+    xkb_state_key_get_utf8(state, key + 8, text, sizeof(text));
+    KeyEvent event{xkb_state_key_get_one_sym(state, key + 8), text, pressed};
+    if (app->key)
+        app->key(event);
+    dirty = true;
+}
+void Application::Impl::repeat_dispatch() {
+    if (!repeat_key || repeat_rate <= 0 || !keyboard_focused)
+        return;
+    auto now = std::chrono::steady_clock::now();
+    if (now >= repeat_due) {
+        dispatch_key(repeat_key, true);
+        repeat_due = now + std::chrono::milliseconds(std::max(1, 1000 / repeat_rate));
+    }
+}
 void Application::Impl::notify_pointer(PointerPhase phase) {
     if (phase == PointerPhase::move && !pointer_down)
         return;
@@ -38,8 +69,9 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !s.pointer) {
         s.pointer = wl_seat_get_pointer(seat);
         static const wl_pointer_listener events = {
-            [](void *d, wl_pointer *, uint32_t, wl_surface *, wl_fixed_t x, wl_fixed_t y) {
+            [](void *d, wl_pointer *, uint32_t serial, wl_surface *, wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
+                s.input_serial = serial;
                 s.px = wl_fixed_to_double(x);
                 s.py = wl_fixed_to_double(y);
             },
@@ -53,8 +85,9 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
                 if (s.touch_id < 0)
                     s.notify_motion(wl_fixed_to_double(x), wl_fixed_to_double(y));
             },
-            [](void *d, wl_pointer *, uint32_t, uint32_t, uint32_t button, uint32_t state) {
+            [](void *d, wl_pointer *, uint32_t serial, uint32_t, uint32_t button, uint32_t state) {
                 auto &s = *static_cast<Impl *>(d);
+                s.input_serial = serial;
                 if (button == BTN_LEFT && s.touch_id < 0)
                     s.notify_pointer(state == WL_POINTER_BUTTON_STATE_PRESSED ? PointerPhase::down
                                                                               : PointerPhase::up);
@@ -105,19 +138,29 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
                 }
                 close(fd);
             },
-            [](void *, wl_keyboard *, uint32_t, wl_surface *, wl_array *) {},
-            [](void *, wl_keyboard *, uint32_t, wl_surface *) {},
-            [](void *d, wl_keyboard *, uint32_t, uint32_t, uint32_t key, uint32_t state) {
+            [](void *d, wl_keyboard *, uint32_t serial, wl_surface *, wl_array *) {
                 auto &s = *static_cast<Impl *>(d);
-                if (!s.state)
-                    return;
-                char text[128]{};
-                xkb_state_key_get_utf8(s.state, key + 8, text, sizeof(text));
-                KeyEvent e{xkb_state_key_get_one_sym(s.state, key + 8), text,
-                           state == WL_KEYBOARD_KEY_STATE_PRESSED};
-                if (s.app->key)
-                    s.app->key(e);
+                s.input_serial = serial;
+                s.keyboard_focused = true;
                 s.dirty = true;
+            },
+            [](void *d, wl_keyboard *, uint32_t, wl_surface *) {
+                auto &s = *static_cast<Impl *>(d);
+                s.keyboard_focused = false;
+                s.repeat_key = 0;
+                s.dirty = true;
+            },
+            [](void *d, wl_keyboard *, uint32_t serial, uint32_t, uint32_t key, uint32_t state) {
+                auto &s = *static_cast<Impl *>(d);
+                s.input_serial = serial;
+                bool pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+                s.dispatch_key(key, pressed);
+                if (pressed && s.keymap && xkb_keymap_key_repeats(s.keymap, key + 8)) {
+                    s.repeat_key = key;
+                    s.repeat_due = std::chrono::steady_clock::now() +
+                                   std::chrono::milliseconds(s.repeat_delay);
+                } else if (!pressed && s.repeat_key == key)
+                    s.repeat_key = 0;
             },
             [](void *d, wl_keyboard *, uint32_t, uint32_t depressed, uint32_t latched,
                uint32_t locked, uint32_t group) {
@@ -125,15 +168,20 @@ void Application::Impl::capabilities(void *data, wl_seat *seat, uint32_t caps) {
                 if (s.state)
                     xkb_state_update_mask(s.state, depressed, latched, locked, 0, 0, group);
             },
-            [](void *, wl_keyboard *, int32_t, int32_t) {}};
+            [](void *d, wl_keyboard *, int32_t rate, int32_t delay) {
+                auto &s = *static_cast<Impl *>(d);
+                s.repeat_rate = std::clamp(rate, 0, 100);
+                s.repeat_delay = std::clamp(delay, 0, 5000);
+            }};
         wl_keyboard_add_listener(s.keyboard, &events, &s);
     }
     if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !s.touch) {
         s.touch = wl_seat_get_touch(seat);
         static const wl_touch_listener events = {
-            [](void *d, wl_touch *, uint32_t, uint32_t, wl_surface *, int32_t id, wl_fixed_t x,
-               wl_fixed_t y) {
+            [](void *d, wl_touch *, uint32_t serial, uint32_t, wl_surface *, int32_t id,
+               wl_fixed_t x, wl_fixed_t y) {
                 auto &s = *static_cast<Impl *>(d);
+                s.input_serial = serial;
                 if (s.touch_id >= 0)
                     return;
                 s.notify_pointer(PointerPhase::cancel);
