@@ -32,5 +32,14 @@ int main(void) {
     assert(parse("name = \"bad\"\ncommand = [\"relative\"]\n", &s[0]) < 0);
     assert(parse("name = \"bad\"\nname = \"dup\"\ncommand = [\"/bin/a\"]\n", &s[0]) < 0);
     assert(parse("name = \"bad\"\ncommand = [\"/bin/a\"]\nuid = -1\n", &s[0]) < 0);
+    assert(!parse("name=\"notifier\"\ncommand=[\"/bin/a\"]\ntype=\"notify\"\n"
+                  "ready_timeout_ms=500\nwatchdog_ms=1000\n",
+                  &s[0]));
+    assert(s[0].notify && s[0].ready_timeout_ms == 500 && s[0].watchdog_ms == 1000);
+    service_free(&s[0]);
+    assert(parse("name=\"bad\"\ncommand=[\"/bin/a\"]\nready_timeout_ms=0\n", &s[0]) < 0);
+    assert(parse("name=\"bad\"\ncommand=[\"/bin/a\"]\nwatchdog_ms=1\n", &s[0]) < 0);
+    assert(parse("name=\"bad\"\ncommand=[\"/bin/a\"]\ntype=\"oneshot\"\nwatchdog_ms=500\n", &s[0]) <
+           0);
     puts("service configuration and dependency tests passed");
 }

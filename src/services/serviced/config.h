@@ -13,6 +13,11 @@ struct service {
     unsigned restart_limit;
     int autostart;
     int oneshot;
+    int notify;
+    unsigned ready_timeout_ms, watchdog_ms;
+    int notify_fd, terminating, forced_exit;
+    long long ready_deadline, watchdog_deadline;
+    char health[32];
     pid_t pid;
     int wanted, state, retries, exit_status;
     long long started_ms, next_ms;

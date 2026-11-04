@@ -1,3 +1,4 @@
+#include "../serviced/notify.h"
 #include "notificationd.h"
 #include <errno.h>
 #include <poll.h>
@@ -185,7 +186,9 @@ int notification_serve(const struct notification_options *options) {
         return 1;
     }
     int result = 0;
+    leon_service_ready();
     for (;;) {
+        leon_service_watchdog();
         struct pollfd fds[CLIENT_LIMIT + 2] = {{server, POLLIN, 0}, {signals, POLLIN, 0}};
         for (int i = 0; i < CLIENT_LIMIT; ++i) {
             if (clients[i].fd >= 0 && now_ms() >= clients[i].deadline)

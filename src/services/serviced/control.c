@@ -32,9 +32,10 @@ void manager_handle(struct manager *manager, int server) {
             struct service *s = &manager->services[i];
             if (*name && strcmp(s->name, name))
                 continue;
-            dprintf(fd, "%s\t%s\tpid=%d\texit=%d\tretries=%d\n", s->name,
-                    (const char *[]){"stopped", "running", "finished", "failed"}[s->state], s->pid,
-                    s->exit_status, s->retries);
+            dprintf(
+                fd, "%s\t%s\tpid=%d\texit=%d\tretries=%d\thealth=%s\n", s->name,
+                (const char *[]){"stopped", "running", "finished", "failed", "starting"}[s->state],
+                s->pid, s->exit_status, s->retries, *s->health ? s->health : "inactive");
         }
     } else if (peer.uid != 0)
         dprintf(fd, "ERR permission denied\n");

@@ -16,7 +16,20 @@ restart_limit = 5
 autostart = true
 ```
 
-`type` is `simple` (default) or `oneshot`. A oneshot dependency is satisfied only after successful completion; a simple dependency must have a running process. A failed oneshot blocks dependents. Command execution uses an argument vector, without implicit shell interpretation. Explicit `/bin/sh -c` is possible for reviewed system service definitions.
+`type` is `simple` (default), `oneshot`, or `notify`. A oneshot dependency is satisfied only after successful completion; a simple dependency must have a running process. A notify dependency must explicitly declare readiness. A failed dependency blocks new dependents. Command execution uses an argument vector, without implicit shell interpretation. Explicit `/bin/sh -c` is possible for reviewed system service definitions.
+
+Notify services inherit `LEON_NOTIFY_FD`, a nonblocking datagram socket, and send
+the exact packet `READY=1` after initialization. Until then, status is `starting`.
+`ready_timeout_ms` defaults to 10000 (range 1–60000). Optional `watchdog_ms`
+(250–60000; zero disables it) requires `WATCHDOG=1` packets from the service's
+actual event loop. Only the configured UID and foreground main PID are accepted;
+forked descendants cannot forge readiness or heartbeats. The private helper
+`serviced/notify.h` marks the descriptor close-on-exec when used. Services must
+not leak it to launched applications. Ready/watchdog expiry sends SIGTERM,
+escalates to SIGKILL after three seconds and applies the normal restart limit
+and backoff. Exit codes 124 and 125 identify ready/watchdog timeout. Status adds
+`health=starting|ready|ready-timeout|watchdog-timeout|stopping|inactive`.
+Oneshots cannot declare watchdogs. Existing simple services remain compatible.
 
 `restart` is `never` (default), `on-failure`, or `always`. Rapid failures use exponential delay capped at 32 seconds and a configurable retry count; the count resets after 30 seconds of runtime. Stop sends SIGTERM to the service group and escalates after three seconds. During shutdown, a dependency remains alive until its dependent services exit; independent services can stop concurrently. The manager caps total shutdown at 30 seconds, and PID 1 allows 35 seconds for it to finish. The parser accepts IDs and retry limits in the range 0–60000. Default identity is root; non-root services have supplementary groups cleared.
 

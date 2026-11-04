@@ -23,7 +23,8 @@ void manager_tick(struct manager *manager) {
     manager_reap(manager);
     for (int n = 0; n < manager->count; ++n) {
         struct service *service = &manager->services[manager->order[n]];
-        if (!service->wanted && service->pid && service_now_ms() > service->next_ms)
+        manager_notifications(service);
+        if (service->terminating && service->pid && service_now_ms() > service->next_ms)
             kill(-service->pid, SIGKILL);
         manager_start(manager, service);
     }

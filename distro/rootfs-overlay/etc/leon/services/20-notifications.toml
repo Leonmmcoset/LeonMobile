@@ -1,4 +1,7 @@
 name = "notifications"
 command = ["/usr/sbin/notificationd"]
+type = "notify"
+ready_timeout_ms = 10000
+watchdog_ms = 5000
 after = ["prepare"]
 restart = "always"

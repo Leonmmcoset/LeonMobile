@@ -1,6 +1,6 @@
 #pragma once
 #include "config.h"
-enum service_state { STOPPED, RUNNING, FINISHED, FAILED };
+enum service_state { STOPPED, RUNNING, FINISHED, FAILED, STARTING };
 struct manager {
     struct service services[LM_MAX_SERVICES];
     int count, order[LM_MAX_SERVICES];
@@ -17,3 +17,4 @@ void manager_reap(struct manager *manager);
 void manager_tick(struct manager *manager);
 void manager_shutdown(struct manager *manager);
 void manager_handle(struct manager *manager, int socket);
+void manager_notifications(struct service *service);

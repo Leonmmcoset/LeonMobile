@@ -85,6 +85,8 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
     memset(s, 0, sizeof(*s));
     s->restart_limit = 5;
     s->autostart = 1;
+    s->notify_fd = -1;
+    s->ready_timeout_ms = 10000;
     FILE *f = fopen(path, "r");
     if (!f) {
         snprintf(err, size, "%s: %s", path, strerror(errno));
@@ -94,8 +96,9 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
     size_t cap = 0;
     int number = 0, rc = -1;
     unsigned seen = 0;
-    const char *keys[] = {"name",    "command",       "after",     "uid", "gid",
-                          "restart", "restart_limit", "autostart", "type"};
+    const char *keys[] = {"name", "command",          "after",         "uid",
+                          "gid",  "restart",          "restart_limit", "autostart",
+                          "type", "ready_timeout_ms", "watchdog_ms"};
     while (getline(&line, &cap, f) >= 0) {
         ++number;
         char *p = trim(line);
@@ -107,9 +110,9 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
         *eq++ = 0;
         char *key = trim(p), *value = trim(eq);
         int k = 0;
-        while (k < 9 && strcmp(key, keys[k]))
+        while (k < 11 && strcmp(key, keys[k]))
             ++k;
-        if (k == 9 || (seen & (1u << k)))
+        if (k == 11 || (seen & (1u << k)))
             goto bad;
         seen |= 1u << k;
         if (k == 0 || k == 5 || k == 8) {
@@ -132,6 +135,8 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
             } else if (k == 8) {
                 if (!strcmp(v, "oneshot"))
                     s->oneshot = 1;
+                else if (!strcmp(v, "notify"))
+                    s->notify = 1;
                 else if (strcmp(v, "simple")) {
                     free(v);
                     goto bad;
@@ -171,9 +176,16 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
                 s->gid = (gid_t)v;
             if (k == 6)
                 s->restart_limit = (unsigned)v;
+            if (k == 9)
+                s->ready_timeout_ms = (unsigned)v;
+            if (k == 10)
+                s->watchdog_ms = (unsigned)v;
         }
     }
     if (ferror(f) || !*s->name || !s->argv[0] || s->argv[0][0] != '/')
+        goto bad;
+    if (!s->ready_timeout_ms || (s->watchdog_ms && s->watchdog_ms < 250) ||
+        (s->oneshot && s->watchdog_ms))
         goto bad;
     rc = 0;
     goto done;
