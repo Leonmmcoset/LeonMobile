@@ -134,6 +134,9 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             snprintf(s->zone, sizeof(s->zone), "%s", zone);
             snprintf(s->server, sizeof(s->server), "%s", server);
             s->automatic = automatic;
+            s->synced = 0;
+            s->error[0] = 0;
+            snprintf(s->result, sizeof(s->result), "%s", automatic ? "scheduled" : "disabled");
             if (persist(d)) {
                 *s = old;
                 time_zone_apply(d, old.zone);
@@ -143,8 +146,6 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
                 close(s->fd);
             s->fd = -1;
             s->next = 0;
-            s->synced = 0;s->error[0] = 0;
-            snprintf(s->result, sizeof(s->result), "%s", automatic ? "scheduled" : "disabled");
         } else if (!strcmp(op, "sync")) {
             if (!s->automatic) return lm_failure("automatic time is disabled");
             if (d->options.test) return lm_failure("network clock mutations disabled for test roots");

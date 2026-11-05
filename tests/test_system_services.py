@@ -143,6 +143,7 @@ class SystemServices(unittest.TestCase):
         with self.daemon('timed') as (s,p):
             self.assertEqual(rpc(s,{'op':'status'})['timezone'],'Asia/Shanghai')
             self.assertFalse(rpc(s,{'op':'status'})['automatic'])
+            self.assertEqual(rpc(s,{'op':'status'})['last_result'],'disabled')
 
     def test_time_catalog_history_and_strict_manual_controls(self):
         with self.daemon('timed') as (s, _):
