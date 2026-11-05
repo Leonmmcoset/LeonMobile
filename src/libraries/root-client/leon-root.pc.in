@@ -1,0 +1,9 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+Name: LeonRoot
+Description: LeonMobile application Root request client
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lleon-root
+Cflags: -I${includedir}

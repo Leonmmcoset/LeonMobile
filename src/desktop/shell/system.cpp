@@ -5,6 +5,7 @@
 using namespace mobile;
 namespace leon::shell {
 void Shell::system_refresh() {
+    root_refresh();
     try {
         auto zone = system_request("time", {{"op", "status"}}).value("timezone", "");
         if (!zone.empty() && zone != timezone) {
@@ -39,7 +40,7 @@ void Shell::system_refresh() {
     } catch (...) {
         permission = Json::object();
     }
-    bool show = !permission.empty() && page != Page::lock;
+    bool show = (!permission.empty() || !root_prompt.empty()) && page != Page::lock;
     if (show && !permission_focused) {
         control("modal");
         permission_focused = true;

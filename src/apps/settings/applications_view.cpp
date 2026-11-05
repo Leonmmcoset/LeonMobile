@@ -23,10 +23,13 @@ void SettingsApplication::paint_applications(Canvas &c) {
                    : tr(en, "本地安装包 · 未签名", "Local package · unsigned");
     };
     auto refresh = [&] {
-        action({w - 104, 164, 84, 48}, tr(en, "刷新", "Refresh"), [this] {
-            applications_message_.clear();
-            applications_refresh();
-        }, !busy);
+        action(
+            {w - 104, 164, 84, 48}, tr(en, "刷新", "Refresh"),
+            [this] {
+                applications_message_.clear();
+                applications_refresh();
+            },
+            !busy);
     };
     if (!applications_confirmation_.empty()) {
         bool clear = applications_confirmation_ == "app_clear";
@@ -35,41 +38,47 @@ void SettingsApplication::paint_applications(Canvas &c) {
                      : tr(en, "卸载此应用？", "Uninstall this app?"),
                {36, 178, w - 72, 40}, 25, t.text, true);
         c.text(name(application_), {36, 224, w - 72, 28}, 18, t.primary);
-        c.text(clear
-                   ? tr(en, "将停止应用，删除其私有文件、设置、登录状态和临时数据，并重置权限。",
-                        "Stops the app, deletes its private files, settings, sign-ins and temporary data, and resets permissions.")
-                   : tr(en, "将停止应用，卸载所有安装版本，删除其私有数据，并重置权限。",
-                        "Stops the app, removes all installed versions and private data, and resets permissions."),
+        c.text(clear ? tr(en, "将停止应用，删除其私有文件、设置、登录状态和临时数据，并重置权限。",
+                          "Stops the app, deletes its private files, settings, sign-ins and "
+                          "temporary data, and resets permissions.")
+                     : tr(en, "将停止应用，卸载所有安装版本，删除其私有数据，并重置权限。",
+                          "Stops the app, removes all installed versions and private data, and "
+                          "resets permissions."),
                {28, 286, w - 56, 108}, 17, t.text);
         c.text(clear ? tr(en, "安装文件会保留；共享文件不受影响。此操作无法撤销。",
-                             "Keeps the app installed and shared files intact. This cannot be undone.")
+                          "Keeps the app installed and shared files intact. This cannot be undone.")
                      : tr(en, "共享文件不受影响。此操作无法撤销。",
-                             "Shared files are kept. This cannot be undone."),
+                          "Shared files are kept. This cannot be undone."),
                {28, 398, w - 56, 68}, 14, t.muted);
         action({20, 486, (w - 48) / 2, 52}, tr(en, "取消", "Cancel"), [this] {
             applications_confirmation_.clear();
             scroll = 0;
             app.redraw();
         });
-        action({28 + (w - 48) / 2, 486, (w - 48) / 2, 52},
-               clear ? tr(en, "清除数据", "Clear data") : tr(en, "卸载", "Uninstall"), [this] {
-            auto operation = applications_confirmation_;
-            applications_confirmation_.clear();
-            applications_start(operation, application_id_);
-        }, !busy, true);
+        action(
+            {28 + (w - 48) / 2, 486, (w - 48) / 2, 52},
+            clear ? tr(en, "清除数据", "Clear data") : tr(en, "卸载", "Uninstall"),
+            [this] {
+                auto operation = applications_confirmation_;
+                applications_confirmation_.clear();
+                applications_start(operation, application_id_);
+            },
+            !busy, true);
         return;
     }
     if (application_id_.empty()) {
         c.rounded({20, 164, w - 136, 48}, t.container, 24);
-        c.text(applications_query_.empty() ? tr(en, "搜索应用", "Search apps") : applications_query_,
+        c.text(applications_query_.empty() ? tr(en, "搜索应用", "Search apps")
+                                           : applications_query_,
                {36, 168, w - 168, 40}, 16, applications_query_.empty() ? t.muted : t.text);
         content_hit({20, 164, w - 136, 48}, [this](double, double) { keyboard = true; });
         refresh();
         auto items = visible_applications();
         c.text(busy ? tr(en, "正在读取…", "Loading…")
-                    : !applications_message_.empty() ? applications_message_
-                    : tr(en, "已安装 ", "Installed: ") + std::to_string(applications_.size()) +
-                          tr(en, " 个应用", " apps"),
+               : !applications_message_.empty()
+                   ? applications_message_
+                   : tr(en, "已安装 ", "Installed: ") + std::to_string(applications_.size()) +
+                         tr(en, " 个应用", " apps"),
                {28, 222, w - 56, 48}, 13, applications_failed_ ? t.primary : t.muted);
         double y = 280;
         for (const auto &item : items) {
@@ -80,7 +89,7 @@ void SettingsApplication::paint_applications(Canvas &c) {
             c.text(name(item), {84, y + 6, w - 148, 28}, 20, t.text);
             c.text(item.at("version").get<std::string>() + " · " +
                        (item.value("running", false) ? tr(en, "运行中", "Running")
-                                                      : tr(en, "未运行", "Stopped")),
+                                                     : tr(en, "未运行", "Stopped")),
                    {84, y + 36, w - 148, 24}, 13, t.primary);
             c.text(source(item), {84, y + 62, w - 148, 22}, 12, t.muted);
             settings::chevron(c, w - 40, y + 44);
@@ -91,8 +100,9 @@ void SettingsApplication::paint_applications(Canvas &c) {
             y += 100;
         }
         if (items.empty() && !busy)
-            c.text(!applications_loaded_ ? tr(en, "无法读取应用，请点击刷新", "Cannot load apps. Tap Refresh.")
-                                         : tr(en, "没有匹配的应用", "No matching apps"),
+            c.text(!applications_loaded_
+                       ? tr(en, "无法读取应用，请点击刷新", "Cannot load apps. Tap Refresh.")
+                       : tr(en, "没有匹配的应用", "No matching apps"),
                    {24, 300, w - 48, 64}, 16, t.muted, false, 1);
         return;
     }
@@ -106,19 +116,22 @@ void SettingsApplication::paint_applications(Canvas &c) {
     const auto &item = application_;
     c.rounded({20, 228, w - 40, 108}, t.container, 24);
     c.text(name(item), {36, 240, w - 72, 38}, 25, t.text, true);
-    c.text(item.at("version").get<std::string>() + " · " + source(item),
-           {36, 286, w - 72, 36}, 14, t.muted);
+    c.text(item.at("version").get<std::string>() + " · " + source(item), {36, 286, w - 72, 36}, 14,
+           t.muted);
     c.text(application_id_, {28, 346, w - 56, 32}, 12, t.muted);
     const auto &actions = item.at("actions");
     double bw = (w - 56) / 3;
-    action({20, 392, bw, 48}, tr(en, "停止", "Stop"),
-           [this] { applications_start("app_stop", application_id_); }, !busy && actions.at("stop"));
-    action({28 + bw, 392, bw, 48}, tr(en, "清除数据", "Clear data"),
-           [this] { applications_confirm("app_clear"); }, !busy && actions.at("clear"));
-    action({36 + 2 * bw, 392, bw, 48}, tr(en, "卸载", "Uninstall"),
-           [this] { applications_confirm("app_uninstall"); }, !busy && actions.at("uninstall"));
-    std::string status = item.value("running", false) ? tr(en, "运行中", "Running")
-                                                     : tr(en, "未运行", "Stopped");
+    action(
+        {20, 392, bw, 48}, tr(en, "停止", "Stop"),
+        [this] { applications_start("app_stop", application_id_); }, !busy && actions.at("stop"));
+    action(
+        {28 + bw, 392, bw, 48}, tr(en, "清除数据", "Clear data"),
+        [this] { applications_confirm("app_clear"); }, !busy && actions.at("clear"));
+    action(
+        {36 + 2 * bw, 392, bw, 48}, tr(en, "卸载", "Uninstall"),
+        [this] { applications_confirm("app_uninstall"); }, !busy && actions.at("uninstall"));
+    std::string status =
+        item.value("running", false) ? tr(en, "运行中", "Running") : tr(en, "未运行", "Stopped");
     if (application_id_ == "org.leon.settings")
         status += tr(en, " · 设置无法停止或清除自身", " · Settings cannot stop or reset itself");
     else if (item.value("builtin", false))
@@ -132,8 +145,9 @@ void SettingsApplication::paint_applications(Canvas &c) {
     auto usage = [&](const char *key, double y, const std::string &label) {
         const auto &part = storage.at(key);
         c.text(label, {36, y, w * .53 - 36, 32}, 15, t.text);
-        c.text(part.value("available", false) ? settings::format_bytes(part.at("bytes").get<uint64_t>())
-                                              : tr(en, "不可用", "Unavailable"),
+        c.text(part.value("available", false)
+                   ? settings::format_bytes(part.at("bytes").get<uint64_t>())
+                   : tr(en, "不可用", "Unavailable"),
                {w * .53, y, w * .47 - 36, 32}, 15, t.muted, false, 2);
     };
     usage("package", 626, tr(en, "应用文件", "App files"));
@@ -141,21 +155,27 @@ void SettingsApplication::paint_applications(Canvas &c) {
     usage("runtime", 722, tr(en, "运行时文件", "Runtime files"));
     c.text(item.value("builtin", false)
                ? tr(en, "按已分配空间估算；内置应用仅计主程序，共享库除外。",
-                        "Allocated space estimate; builtin app files cover its executable, excluding shared libraries.")
+                    "Allocated space estimate; builtin app files cover its executable, excluding "
+                    "shared libraries.")
                : tr(en, "按已分配空间估算；应用文件包含保留的历史版本。",
-                        "Allocated space estimate; app files include retained versions."),
+                    "Allocated space estimate; app files include retained versions."),
            {28, 792, w - 56, 60}, 12, t.muted);
     c.text(tr(en, "申请的权限", "Requested permissions"), {28, 862, w - 56, 36}, 22, t.text, true);
     double y = 910;
     for (const auto &permission : item.at("permissions")) {
         std::string key = permission.at("name"), state = permission.at("state");
-        std::string label = key == "network" ? tr(en, "网络访问", "Network access")
-                            : key == "files.import" ? tr(en, "导入文件", "Import files") : key;
-        std::string value = state == "allowed" ? tr(en, "已允许", "Allowed")
-                            : state == "denied" ? tr(en, "已拒绝", "Denied")
-                            : state == "pending" ? tr(en, "等待确认", "Awaiting approval")
-                            : state == "not-requested" ? tr(en, "尚未请求 · 未授权", "Not requested · no access")
-                                                       : tr(en, "服务不可用", "Service unavailable");
+        std::string label = key == "network"        ? tr(en, "网络访问", "Network access")
+                            : key == "files.import" ? tr(en, "导入文件", "Import files")
+                            : key == "root.exec" ? tr(en, "单次 Root 命令", "Single Root command")
+                                                 : key;
+        std::string value =
+            state == "allowed"               ? tr(en, "已允许", "Allowed")
+            : state == "denied"              ? tr(en, "已拒绝", "Denied")
+            : state == "pending"             ? tr(en, "等待确认", "Awaiting approval")
+            : state == "system-confirmation" ? tr(en, "系统确认 · 每次验证 Root 密码",
+                                                  "System confirmation · Root password every time")
+            : state == "not-requested" ? tr(en, "尚未请求 · 未授权", "Not requested · no access")
+                                       : tr(en, "服务不可用", "Service unavailable");
         c.text(label, {32, y, w - 64, 26}, 16, t.text);
         c.text(value, {32, y + 27, w - 64, 25}, 13, t.muted);
         y += 64;

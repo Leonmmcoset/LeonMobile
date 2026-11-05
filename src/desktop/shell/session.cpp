@@ -40,6 +40,19 @@ Shell::Shell() {
             }
             return;
         }
+        if (!root_prompt.empty()) {
+            if (e.pressed) {
+                if (e.symbol == XKB_KEY_Escape)
+                    root_cancel();
+                else if (e.symbol == XKB_KEY_Return || e.symbol == XKB_KEY_KP_Enter)
+                    root_text("\n");
+                else if (e.symbol == XKB_KEY_BackSpace)
+                    root_text("\b");
+                else if (!e.text.empty())
+                    root_text(e.text);
+            }
+            return;
+        }
         if (e.pressed && e.symbol == XKB_KEY_Escape) {
             if (power_menu) {
                 power_menu = false;
@@ -71,7 +84,12 @@ Shell::Shell() {
             app.redraw();
         }
     };
-    app.on_text_input([this](const std::string &text) { unlock_text(text); });
+    app.on_text_input([this](const std::string &text) {
+        if (!root_prompt.empty())
+            root_text(text);
+        else
+            unlock_text(text);
+    });
     app.paint = [this](Canvas &canvas) { paint(canvas); };
     if (getenv("LMUI_CAPTURE_FRAME")) {
         const char *preview = getenv("LEON_SHELL_CAPTURE_SHADE");
@@ -127,6 +145,7 @@ void Shell::show_page(Page destination) {
         (!authentication.ok || authentication.locked))
         return;
     if (destination == Page::lock) {
+        root_clear_prompt();
         clear_device_secret();
         unlock_entry = unlock_pending = false;
         ready_epoch.clear();

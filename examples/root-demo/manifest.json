@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "id": "org.example.rootdemo",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "lmui": 1,
+  "lifecycle": 1,
+  "name": "Root 权限示例",
+  "name_en": "Root demo",
+  "entry": "bin/root-demo",
+  "permissions": ["root.exec"],
+  "root": {
+    "entry": "libexec/diagnostic",
+    "description": "Read process identity and kernel information without changing the system"
+  }
+}

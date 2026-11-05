@@ -14,7 +14,8 @@ void SettingsApplication::paint_header(Canvas &c) {
         click(hits, {8, 8, 56, 48}, [this] { back(); });
         c.text(tr(en, "设置", "Settings"), {72, 8, w - 96, 48}, 18, t.text);
         c.text(page_ == Page::applications && !application_id_.empty()
-                   ? tr(en, "应用信息", "App info") : title(page_),
+                   ? tr(en, "应用信息", "App info")
+                   : title(page_),
                {24, 76, w - 48, 64}, 32, t.text);
         return;
     }
@@ -56,7 +57,12 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
         if (root_dialog_)
             end = 408 + (root_current_required_ ? 94 : 0) + (root_new_required_ ? 188 : 0);
         else if (developer_view_ == DeveloperView::home)
-            end = 812;
+            end = 892;
+        else if (developer_view_ == DeveloperView::root_apps)
+            end = 550 +
+                  std::max<size_t>(1, developer_data_.value("apps", Json::array()).size()) * 202;
+        else if (developer_view_ == DeveloperView::root_history)
+            end = 484 + developer_data_.value("events", Json::array()).size() * 124;
         else if (developer_view_ == DeveloperView::services && !developer_selection_.empty())
             end = 804;
         else if (developer_view_ == DeveloperView::kernel && developer_data_.contains("value"))

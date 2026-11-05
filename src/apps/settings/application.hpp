@@ -18,8 +18,12 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     mobile::Rect viewport_;
     unsigned status_ticks_{};
     int volume_preview_{-1};
-    enum class DeveloperView { home, kernel, modules, services, core };
+    enum class DeveloperView { home, kernel, modules, services, core, root_apps, root_history };
     DeveloperView developer_view_{DeveloperView::home};
+    std::future<mobile::Json> root_settings_job_;
+    void developer_run(mobile::Json);
+    void developer_poll();
+    void paint_root_apps(mobile::Canvas &);
     mobile::Json root_status_ = {{"enabled", false}, {"password_set", false}};
     mobile::Json developer_data_ = mobile::Json::object(), pending_root_ = mobile::Json::object();
     std::string developer_path_, developer_selection_, developer_value_, developer_message_;
@@ -47,7 +51,8 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     void paint_device(mobile::Canvas &canvas);
     mobile::Json applications_ = mobile::Json::array(), application_ = mobile::Json::object();
     std::future<mobile::Json> applications_job_;
-    std::string applications_query_, application_id_, applications_operation_, applications_subject_;
+    std::string applications_query_, application_id_, applications_operation_,
+        applications_subject_;
     std::string applications_confirmation_, applications_message_;
     bool applications_loaded_{}, applications_failed_{};
     unsigned applications_ticks_{};

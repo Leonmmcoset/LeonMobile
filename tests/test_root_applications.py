@@ -4,6 +4,7 @@ import ctypes
 import os
 from pathlib import Path
 import select
+import re
 import shutil
 import signal
 import subprocess
@@ -136,6 +137,7 @@ class RootApplications(unittest.TestCase):
         entry = self.root / "apps" / ("org.example.root" + str(uid)) / "current/bin/app"
         request = fields if fields is not None else dict(op="app_request", args=args or [])
         process = subprocess.Popen([entry, self.endpoint, json.dumps(request)], preexec_fn=identity,
+                                    env=dict(os.environ, LD_LIBRARY_PATH=str(self.path / "sdk-lib")), stdin=subprocess.PIPE,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         self.children.append(process)
         return process, self.line(process)
@@ -253,6 +255,9 @@ class RootApplications(unittest.TestCase):
         self.assertTrue(self.call("app_revoke", id="org.example.root12000")["ok"])
         self.gone(started["pid"])
         self.complete(child)
+        self.assertTrue(self.call("app_policy", id="org.example.root12000", blocked=True, password=SECRET)["ok"])
+        self.assertTrue(self.call("app_reset", id="org.example.root12000")["ok"])
+        self.assertFalse(self.call("app_list")["apps"][0]["blocked"])
 
     def test_update_reinstall_and_caller_exit_invalidate_requests(self):
         for change in ("update", "reinstall", "caller-exit"):
@@ -323,6 +328,54 @@ class RootApplications(unittest.TestCase):
         child, reply = self.request()
         self.assertFalse(reply["ok"])
         child.wait(timeout=3)
+
+    def test_trusted_ui_abort_cancels_pending_and_already_approved_work(self):
+        for running in (False, True):
+            child, first = self.request(["wait"])
+            self.prompt(first["token"])
+            started = None
+            if running:
+                self.assertTrue(self.approve(first["token"])["ok"])
+                started = self.line(child)
+            self.assertTrue(self.call("app_abort", token=first["token"])["ok"])
+            if started: self.gone(started["pid"])
+            self.complete(child)
+            self.assertFalse(self.approve(first["token"])["ok"])
+
+    def test_public_sdk_preserves_binary_status_and_cancels_with_stop_token(self):
+        entry = self.root / "apps/org.example.root12000/current/bin/app"
+        shutil.copy2(BUILD / "bin/root-sdk-fixture", entry)
+        entry.chmod(0o755)
+        libraries = self.path / "sdk-lib"
+        libraries.mkdir(mode=0o755)
+        libraries.chmod(0o755)
+        shutil.copy2(BUILD / "lib/libleon-root.so.1", libraries / "libleon-root.so.1")
+        (libraries / "libleon-root.so.1").chmod(0o644)
+        for mode in ("binary", "wait"):
+            child, first = self.request([mode])
+            self.assertEqual(first["state"], "pending")
+            requests = self.call("app_pending")["requests"]
+            self.assertEqual(len(requests), 1)
+            token = requests[0]["token"]
+            self.assertTrue(self.approve(token)["ok"])
+            self.assertEqual(self.line(child)["state"], "running")
+            if mode == "wait":
+                time.sleep(.2)
+                child.stdin.write(b"cancel\n"); child.stdin.flush()
+            output, frames = self.complete(child)
+            self.assertIn(b"helper_uid=0", output)
+            self.assertEqual(frames[-2]["cancelled"], mode == "wait")
+            if mode == "binary":
+                self.assertEqual(frames[-2]["status"], 7)
+                self.assertTrue(output.endswith(bytes([0, 255, 10, 27, 0])))
+            else:
+                self.gone(int(re.search(rb"helper_pid=(\d+)", output).group(1)))
+        child, first = self.request()
+        self.assertEqual(first["state"], "pending")
+        child.stdin.write(b"cancel\n"); child.stdin.flush()
+        self.complete(child)
+        time.sleep(.2)
+        self.assertEqual(self.call("app_pending")["requests"], [])
 
     def test_application_broker_stop_clear_and_portal_cannot_grant_root(self):
         current = self.root / "apps/org.example.root12000/current"

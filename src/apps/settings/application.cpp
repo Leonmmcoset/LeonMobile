@@ -88,6 +88,7 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
 }
 void SettingsApplication::on_tick() {
     applications_poll();
+    developer_poll();
     if (security_dialog_ && !app.focused()) {
         clear_device_fields();
         app.redraw();

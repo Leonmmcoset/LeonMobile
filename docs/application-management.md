@@ -156,3 +156,13 @@ core service/sandbox/crash, notifications, terminal, IME/portal, Settings,
 navigation/lifecycle and SDK installation checks, followed by offline private
 state inspection and clean UI poweroff. Logs are `build/app-management-qemu-full.log`
 and `build/app-management-qemu-reboot-passed.log`.
+
+Applications that declare `root.exec` show **System confirmation · Root password
+every time**. This is a distinct `system-confirmation` state, never an ordinary
+portal allow grant. Manage per-installation request blocking, revoke active
+commands and read audit events under System → Developer options → Application
+Root requests. Stop cancels pending/active Root commands; clear and uninstall
+wait for Root cgroup writers and reset request restrictions before changing
+private files. A cleanup failure refuses the destructive action. Root helpers
+can have already changed system files outside the app's storage; clearing data
+cannot reverse those changes. See `root-access.md` for the protocol and limits.

@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include "system_request.hpp"
 #include "widgets.hpp"
 #include "wire.h"
 #include <sys/prctl.h>
@@ -7,33 +8,12 @@
 using namespace mobile;
 using leon::apps::settings::Page;
 namespace leon::apps {
-SettingsApplication::~SettingsApplication() { clear_root_fields(); clear_device_fields(); }
+SettingsApplication::~SettingsApplication() {
+    clear_root_fields();
+    clear_device_fields();
+}
 Json SettingsApplication::root_request(Json request) {
-    struct Secrets {
-        Json &request;
-        std::string text;
-        ~Secrets() {
-            root_clear(text.data(), text.size());
-            for (const auto &field : {"password", "new_password"})
-                if (request.contains(field) && request[field].is_string()) {
-                    auto &value = request[field].get_ref<std::string &>();
-                    root_clear(value.data(), value.size());
-                }
-        }
-    } secrets{request, {}};
-    const char *endpoint = std::getenv("LEON_ROOT_SOCKET");
-    secrets.text = request.dump() + "\n";
-    int fd = root_connect(endpoint ? endpoint : LEON_ROOT_SOCKET);
-    if (fd < 0)
-        throw std::runtime_error(tr(en, "Root 服务暂不可用", "Root service unavailable"));
-    char response[LEON_ROOT_MESSAGE];
-    int result = root_send(fd, secrets.text.c_str(), -1);
-    if (!result)
-        result = root_receive(fd, response, sizeof(response), nullptr);
-    close(fd);
-    if (result)
-        throw std::runtime_error(tr(en, "Root 服务请求失败", "Root service request failed"));
-    auto reply = Json::parse(response);
+    auto reply = leon::root_control(std::move(request), 1200);
     if (!reply.value("ok", false))
         throw std::runtime_error(reply.value("error", "Root request rejected"));
     return reply;
@@ -53,6 +33,13 @@ void SettingsApplication::developer_refresh() {
         root_status_ = root_request({{"op", "status"}});
         if (developer_view_ == DeveloperView::home)
             return;
+        if (developer_view_ == DeveloperView::root_apps ||
+            developer_view_ == DeveloperView::root_history) {
+            developer_data_ = root_request(
+                {{"op", developer_view_ == DeveloperView::root_apps ? "app_list" : "app_history"},
+                 {"offset", developer_offset_}});
+            return;
+        }
         std::string area = developer_view_ == DeveloperView::kernel     ? "kernel"
                            : developer_view_ == DeveloperView::modules  ? "modules"
                            : developer_view_ == DeveloperView::services ? "services"
@@ -88,7 +75,9 @@ void SettingsApplication::developer_back() {
         auto separator = developer_path_.rfind('/');
         developer_path_ =
             separator == std::string::npos ? "" : developer_path_.substr(0, separator);
-    } else if (developer_view_ == DeveloperView::services && !developer_selection_.empty())
+    } else if (developer_view_ == DeveloperView::root_history)
+        developer_view_ = DeveloperView::root_apps;
+    else if (developer_view_ == DeveloperView::services && !developer_selection_.empty())
         developer_selection_.clear();
     else
         developer_view_ = DeveloperView::home;
@@ -98,6 +87,8 @@ void SettingsApplication::developer_back() {
     developer_refresh();
 }
 void SettingsApplication::developer_auth(Json operation) {
+    if (root_settings_job_.valid())
+        return;
     const auto requested = operation.value("op", "");
     if (requested != "enable" && requested != "disable" && requested != "password" &&
         !root_status_.value("enabled", false)) {
@@ -136,13 +127,7 @@ void SettingsApplication::developer_submit() {
     if (pending_root_.value("op", "") == "password")
         operation["new_password"] = root_new_password_;
     clear_root_fields();
-    try {
-        root_request(std::move(operation));
-        developer_message_ = tr(en, "已应用", "Applied");
-    } catch (const std::exception &e) {
-        developer_message_ = e.what();
-    }
-    developer_refresh();
+    developer_run(std::move(operation));
     app.redraw();
 }
 bool SettingsApplication::developer_text(const std::string &text) {
@@ -248,13 +233,15 @@ void SettingsApplication::paint_developer(Canvas &c) {
         bool enabled = root_status_.value("enabled", false);
         c.rounded({20, 164, w - 40, 112}, t.container, 24);
         c.text(tr(en, "Root 权限", "Root access"), {36, 176, w - 148, 36}, 20, t.text, true);
-        c.text(enabled ? tr(en, "已开启 · 使用时验证密码", "Enabled · password required")
-                       : tr(en, "已关闭", "Disabled"),
+        c.text(root_settings_job_.valid() ? tr(en, "正在处理，请稍候…", "Working, please wait…")
+               : enabled ? tr(en, "已开启 · 使用时验证密码", "Enabled · password required")
+                         : tr(en, "已关闭", "Disabled"),
                {36, 218, w - 148, 30}, 14, t.muted);
         settings::toggle(c, {w - 92, 200, 52, 30}, enabled, "developer/root");
-        content_hit({20, 164, w - 40, 112}, [this, enabled](double, double) {
-            developer_auth({{"op", enabled ? "disable" : "enable"}});
-        });
+        if (!root_settings_job_.valid())
+            content_hit({20, 164, w - 40, 112}, [this, enabled](double, double) {
+                developer_auth({{"op", enabled ? "disable" : "enable"}});
+            });
         if (root_status_.value("password_set", false))
             action({20, 288, w - 40, 52}, tr(en, "修改 Root 密码", "Change root password"), [this] {
                 developer_auth({{"op", "password"}});
@@ -270,7 +257,9 @@ void SettingsApplication::paint_developer(Canvas &c) {
             {DeveloperView::kernel, "运行时内核参数", "Runtime kernel parameters"},
             {DeveloperView::modules, "内核模块", "Kernel modules"},
             {DeveloperView::services, "服务配置与控制", "Service configuration and control"},
-            {DeveloperView::core, "核心组件状态", "Core component status"}};
+            {DeveloperView::core, "核心组件状态", "Core component status"},
+            {DeveloperView::root_apps, "应用 Root 请求与记录",
+             "Application Root requests and history"}};
         double y = 356;
         for (auto item : items) {
             action({20, y, w - 40, 66}, tr(en, item.zh, item.english), [this, item] {
@@ -284,11 +273,16 @@ void SettingsApplication::paint_developer(Canvas &c) {
             });
             y += 80;
         }
-        c.text(tr(en, "sudo：始终禁用\nRoot 仅供终端、开发串口及设置使用。",
-                  "sudo: always disabled\nRoot is available to terminal, developer console and "
-                  "Settings."),
+        c.text(tr(en, "sudo：始终禁用\n第三方应用提权需系统确认与 Root 密码。",
+                  "sudo: always disabled\nApp elevation requires system confirmation and a Root "
+                  "password."),
                {28, y, w - 56, 62}, 13, t.muted);
         c.text(developer_message_, {28, y + 66, w - 56, 70}, 13, t.muted);
+        return;
+    }
+    if (developer_view_ == DeveloperView::root_apps ||
+        developer_view_ == DeveloperView::root_history) {
+        paint_root_apps(c);
         return;
     }
     action({20, 164, 96, 44}, tr(en, "上一级", "Back"), [this] { developer_back(); });

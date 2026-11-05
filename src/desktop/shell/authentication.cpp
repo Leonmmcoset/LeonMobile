@@ -14,6 +14,7 @@ void Shell::authentication_refresh() {
     authentication = next;
     if (!next.ok || next.locked) {
         if (page != Page::lock || changed) {
+            root_clear_prompt();
             clear_device_secret();
             unlock_entry = unlock_pending = false;
             ready_epoch.clear();
@@ -52,7 +53,13 @@ void Shell::authentication_refresh() {
     bool keyboard = page == Page::lock && unlock_entry && authentication.configured &&
                     !strcmp(authentication.kind, "password") && !auth_job.valid() &&
                     !unlock_pending;
-    app.text_input(keyboard, true);
+    if (!app.focused() && !root_secret.empty()) {
+        erase_secret(root_secret);
+        root_credentials = false;
+    }
+    bool root_keyboard = page != Page::lock && !root_prompt.empty() && root_credentials &&
+                         !root_job.valid() && app.focused();
+    app.text_input(keyboard || root_keyboard, true);
     if (page == Page::lock)
         app.redraw();
 }

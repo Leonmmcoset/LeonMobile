@@ -329,3 +329,10 @@ cannot invoke credential operations or become the trusted shell/IME by choosing
 an app ID. `powerd`'s legacy `locked` report no longer sets production lock state.
 The shell must submit an opaque page and acknowledge the current lock epoch only
 after LMUI confirms that Wayland processed its buffer commit.
+
+The `root.exec` manifest extension, rootd `app_*` single-command protocol,
+installer instance binding and `LeonRoot::Root` C++20 SDK are specified in
+`root-access.md` and `application-format.md`. Root is independent of the ordinary
+portal permission protocol; it has no persistent allow grant. `libleon-root.so.1`
+exports the application request API; password/control adapters remain internal
+to the installed system UI. Buildroot's `leon-core` installs this SDK to staging.

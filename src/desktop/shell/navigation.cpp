@@ -9,6 +9,8 @@ void Shell::pointer(double x, double y, bool down) {
         down_x = x;
         down_y = y;
         touch_feedback.handle({x, y, PointerPhase::down}, hits);
+        if (!root_prompt.empty() && page != Page::lock)
+            return;
         volume_gesture = shade.visible() && !power_menu && volume_track.contains(x, y);
         notification_gesture = shade.visible() && !power_menu && !notifications.empty() &&
                                notification_bounds.contains(x, y);
@@ -29,6 +31,11 @@ void Shell::pointer(double x, double y, bool down) {
         return;
     pressed = false;
     double dx = x - down_x, dy = y - down_y;
+    if (!root_prompt.empty() && page != Page::lock) {
+        touch_feedback.handle({x, y, PointerPhase::up}, hits);
+        app.redraw();
+        return;
+    }
     if (volume_gesture) {
         touch_feedback.cancel();
         volume_gesture = false;

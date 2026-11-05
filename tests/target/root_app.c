@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 /* Installed fixture ELF. Root mode is a harmless, bounded diagnostic helper. */
 int main(int argc, char **argv) {
@@ -42,8 +43,22 @@ int main(int argc, char **argv) {
     }
     if (argc != 3)
         return 2;
+    char stored[LEON_ROOT_MESSAGE];
+    const char *request = argv[2];
+    if (!strcmp(request, "@home")) {
+        char path[4096];
+        snprintf(path, sizeof(path), "%s/root-request.json", getenv("HOME"));
+        int input = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t size = input < 0 ? -1 : read(input, stored, sizeof(stored) - 1);
+        if (input >= 0)
+            close(input);
+        if (size <= 0 || size >= (ssize_t)sizeof(stored) - 1)
+            return 2;
+        stored[size] = 0;
+        request = stored;
+    }
     int fd = root_connect(argv[1]);
-    if (fd < 0 || root_send(fd, argv[2], -1) || root_send(fd, "\n", -1))
+    if (fd < 0 || root_send(fd, request, -1) || root_send(fd, "\n", -1))
         return 3;
     struct timeval timeout = {.tv_sec = 125};
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));

@@ -254,9 +254,13 @@ with tempfile.TemporaryDirectory(prefix="leon-input-") as directory:
             click(400, 215)
             type_value(password)
             wait_state(True)
+            generation = json.loads((runtime / "state/policy.json").read_text())["generation"]
             click(180, 314)  # Change password: old, new, confirmation
             for value in (password, "RotatedRoot!2026", "RotatedRoot!2026"): type_value(value)
-            time.sleep(.3)
+            deadline = time.monotonic() + 6
+            while json.loads((runtime / "state/policy.json").read_text())["generation"] == generation and time.monotonic() < deadline:
+                time.sleep(.05)
+            time.sleep(.2)
             click(400, 215)
             type_value("RotatedRoot!2026")
             wait_state(False)

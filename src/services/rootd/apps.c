@@ -428,7 +428,7 @@ static lm_json *manage(const struct root_options *o, const lm_json *request, int
     int failed = !p || !records || random_token(revision, 16);
     if (!failed) {
         lm_set_string(p, "revision", revision);
-        if (!cancel)
+        if (reset || !cancel)
             lm_set_boolean(p, "blocked", reset ? 0 : lm_boolean(lm_get(request, "blocked"), 1));
         failed =
             root_apps_write(o, "apps-policy.json", list) || root_apps_audit(o, app,
@@ -504,6 +504,34 @@ lm_json *root_apps_serve(const struct root_options *o, int socket, int notice, s
                      : lm_failure("trusted system confirmation required");
     if (!shell && !settings)
         return lm_failure("Root application control requires a trusted system peer");
+    if (!strcmp(op, "app_abort") && shell) {
+        int lock = root_apps_lock(o);
+        lm_json *all = lock >= 0 ? root_apps_records(o) : NULL, *target = NULL;
+        const char *token = lm_string(lm_get(request, "token"), "");
+        for (size_t i = 0; i < lm_size(all); ++i) {
+            const lm_json *r = lm_at(all, i);
+            if (hex(token, 64) && !strcmp(token, lm_string(lm_get(r, "token"), "")) &&
+                lm_integer(lm_get(r, "ui_pid"), -1) == peer.pid &&
+                lm_integer(lm_get(r, "ui_start"), -1) == root_process_start(peer.pid)) {
+                target = lm_copy(r);
+                lm_set_string(target, "state", "denied");
+                char name[64];
+                root_apps_name(name, sizeof(name), lm_integer(lm_get(target, "worker"), -1));
+                if (root_apps_audit(o, target, "aborted", -1) || root_apps_write(o, name, target)) {
+                    lm_free(target);
+                    target = NULL;
+                }
+                break;
+            }
+        }
+        lm_free(all);
+        if (lock >= 0)
+            close(lock);
+        int failed = !target || kill_request(o, target);
+        lm_free(target);
+        return failed ? lm_failure("Root request already closed or cancellation unavailable")
+                      : lm_success();
+    }
     if (!strcmp(op, "app_pending")) {
         if (!shell)
             return lm_failure("only the system confirmation UI may read pending requests");

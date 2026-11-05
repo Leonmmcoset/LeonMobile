@@ -37,6 +37,18 @@ class Shell {
     void unlock_submit();
     void unlock_text(const std::string &text);
     void clear_device_secret();
+    Json root_prompt = Json::object();
+    std::string root_secret, root_message, root_job_token;
+    std::future<Json> root_job;
+    bool root_credentials{};
+    size_t root_detail_page{};
+    void root_refresh();
+    void root_clear_prompt();
+    void root_submit(bool allow, bool block = false);
+    void root_cancel();
+    void root_text(const std::string &);
+    std::vector<std::string> root_command_lines() const;
+    void paint_root(lmui::Canvas &);
     Json permission = Json::object(), power_state = Json::object();
     std::string power_label(bool compact = false) const;
     bool permission_focused{};

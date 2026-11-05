@@ -213,3 +213,33 @@ Root helpers, not containment of deliberately hostile UID 0 code: unrestricted
 Root can change the system, escape its cgroup, read secrets, and undo controls.
 Revocation cannot undo changes already made. Packages remain unsigned; this is
 a QEMU developer prototype with no claim of an independent security audit.
+
+## Application SDK and system UI
+
+Buildroot installs `libleon-root.so.1` plus `LeonRootConfig.cmake` and
+`leon-root.pc` in the SDK. With C++20, use `find_package(LeonRoot 1 REQUIRED)` and
+link `LeonRoot::Root`; include `<leon/root.hpp>`. Run
+`leon::request_root({"argument"}, stop_token, phase_callback)` on a worker thread.
+It returns bounded binary `output`, `status`, `error` and `cancelled`; a nonzero
+helper exit code is a completed command, not a transport failure. A requested
+`std::stop_token` shuts down the connection and cancels pending or running work.
+The callback reports pending/running from the worker thread. Never block the
+LMUI event loop while waiting for the user to approve.
+
+The trusted shell paints application ID, unsigned-package source, version,
+helper and exact JSON-escaped argument boundaries. It paginates long commands
+before the password page, masks password entry, disables IME learning and clears
+input on cancellation, focus loss, locking or service failure. Password hashing
+runs asynchronously. The compositor directs modal input to the trusted shell;
+the application's own window never receives Root password input. Trusted
+`app_abort` cancels a token even if an asynchronous password verification just
+approved it. It requires the same bound UI PID/start time and cannot authorize
+anything. Settings → System → Developer options → Application Root requests
+shows per-app request blocking, authenticated unblocking, immediate revocation
+and recent authorization/execution records.
+
+`examples/root-demo` is an uninstalled third-party SDK sample. Its separate
+helper only prints UID/kernel diagnostics. Build it with
+`scripts/build-root-example.sh`; install the generated `.lmpkg` locally when
+wanted. Neither this sample nor privileged target test fixtures ship in the
+normal system image.
