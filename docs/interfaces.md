@@ -1,5 +1,9 @@
 # Version 1 interfaces
 
+Unified log ingestion/query, credentials, quotas, history and `leonlog` are
+specified in [logging.md](logging.md). The endpoints are independent of the
+generic `lmsys` transport and do not inherit desktop-wide trust.
+
 ## Service configuration and control
 
 Each UTF-8 `.toml` file in `/etc/leon/services` describes one foreground service. The parser implements a strict TOML subset: one supported assignment per line, double-quoted strings with quote/backslash escapes, single-line string arrays, decimal IDs, booleans, blank lines and whole-line comments. It rejects unknown/duplicate keys, missing dependencies, duplicate service names and dependency cycles. General TOML tables, multiline strings and trailing comments are not accepted.
