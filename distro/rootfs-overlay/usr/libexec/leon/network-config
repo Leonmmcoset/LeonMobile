@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+interface=$1
+method=$2
+/sbin/ip addr flush dev "$interface"
+/sbin/ip route flush default dev "$interface"
+: > /run/leon/dhcp-resolv.conf
+if [ "$method" = disabled ]; then
+    /sbin/ip link set "$interface" down
+    exit 0
+fi
+/sbin/ip link set "$interface" up
+if [ "$method" = static ]; then
+    /sbin/ip addr add "$3/$4" dev "$interface"
+    if [ -n "$5" ]; then /sbin/ip route add default via "$5" dev "$interface"; fi
+fi

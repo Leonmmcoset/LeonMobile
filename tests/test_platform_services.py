@@ -239,3 +239,22 @@ class PlatformServices(unittest.TestCase):
             received = rpc(s, {"op": "receive"}, 11004)["events"][0]["payload"]["document"]
             self.assertNotEqual(received, document)
             self.assertEqual(bytes.fromhex(rpc(docs, {"op": "read", "token": received, "offset": 0, "length": 20}, 11004)["hex"]), b"private")
+
+    def test_network_policy_validation_persistence_and_watch(self):
+        with self.daemon("netd") as (s, _):
+            initial = rpc(s, {"op": "status"})
+            self.assertEqual(initial["configuration"]["method"], "dhcp")
+            self.assertFalse(rpc(s, {"op": "configure", "values": {"enabled": False}}, 11004)["ok"])
+            for values in ({"method": "static"}, {"prefix": True}, {"dns": "1.1.1.1"},
+                           {"dns": ["bad"]}, {"dns": ["0.0.0.0"]}, {"interface": "lo"},
+                           {"method": "static", "address": "10.0.2.15", "gateway": "10.2.3.4"}):
+                self.assertFalse(rpc(s, {"op": "configure", "values": values}, 11000)["ok"])
+            result = rpc(s, {"op": "configure", "values": {"method": "static", "address": "10.0.2.15",
+                "gateway": "10.0.2.2", "prefix": 24, "dns": ["10.0.2.3", "::1"]}}, 11000)
+            self.assertTrue(result["ok"], result)
+            self.assertTrue(rpc(s, {"op": "watch", "since": initial["generation"]})["changed"])
+            current = rpc(s, {"op": "status"})["generation"]
+            self.assertFalse(rpc(s, {"op": "watch", "since": current})["changed"])
+        with self.daemon("netd") as (s, _):
+            self.assertEqual(rpc(s, {"op": "status"})["configuration"]["method"], "static")
+

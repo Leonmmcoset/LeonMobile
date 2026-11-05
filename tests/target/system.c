@@ -123,7 +123,8 @@ static int network(void) {
     int ready = 0;
     for (int i = 0; i < 200; ++i) {
         CHECK(RPC("network", "{\"op\":\"status\"}"));
-        if (probe_has("10.0.2.15") && probe_has("nameserver 10.0.2.3")) {
+        if (probe_has("\"configuration_pending\":false") && probe_integer("dhcp_pid") > 1 &&
+            probe_has("\"connected\":true") && probe_has("10.0.2.15") && probe_has("nameserver 10.0.2.3")) {
             ready = 1;
             break;
         }
@@ -145,9 +146,31 @@ static int network(void) {
     }
     CHECK(ready);
     CHECK(RPC("network", "{\"op\":\"renew\"}"));
+    CHECK(RPC("network", "{\"op\":\"configure\",\"values\":{\"method\":\"static\",\"address\":\"10.0.2.99\",\"prefix\":24,\"gateway\":\"10.0.2.2\",\"dns\":[\"10.0.2.3\"]}}"));
+    ready = 0;
+    for (int i = 0; i < 200; ++i) {
+        CHECK(RPC("network", "{\"op\":\"status\"}"));
+        if (probe_has("\"configuration_pending\":false") && probe_has("\"ipv4\":\"10.0.2.99\"") &&
+            probe_has("\"connected\":true") && probe_integer("dhcp_pid") == 0) {
+            ready = 1;
+            break;
+        }
+        usleep(100000);
+    }
+    CHECK(ready);
+    CHECK(!probe_rpc("network", "{\"op\":\"renew\"}", 1000) && probe_has("\"ok\":false"));
+    CHECK(RPC("network", "{\"op\":\"configure\",\"values\":{\"method\":\"dhcp\",\"dns\":[]}}"));
+    ready = 0;
+    for (int i = 0; i < 200; ++i) {
+        CHECK(RPC("network", "{\"op\":\"status\"}"));
+        if (probe_has("\"configuration_pending\":false") && probe_has("\"ipv4\":\"10.0.2.15\"") &&
+            probe_has("\"connected\":true") && probe_integer("dhcp_pid") > 1) { ready = 1; break; }
+        usleep(100000);
+    }
+    CHECK(ready);
     struct stat st;
     CHECK(!stat("/run/resolv.conf", &st) && (st.st_mode & 0444) == 0444);
-    passed("network disable/enable, real DHCP/DNS and supervised client restart");
+    passed("network DHCP renewal, static IPv4/DNS, restore and supervised client restart");
     return 0;
 }
 static int portal(void) {

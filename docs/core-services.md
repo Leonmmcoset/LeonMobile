@@ -87,20 +87,40 @@ validation. Poweroff/reboot use PID 1's coordinated shutdown path.
 
 ## Network
 
-`status` reports actual interface addresses/link flags, IPv4 routes, resolver
-contents, managed interface, enable policy, DHCP PID, generation and error. The
-reference platform manages `eth0` through one foreground BusyBox udhcpc process.
-DHCP loss/restarts have bounded exponential backoff. Children reset signal masks
-and die with netd. Desktop/root can `disable`, `enable`, or `renew`; disable stops
-DHCP, flushes addresses, lowers the interface and clears DNS. DNS replacement is
-atomic and world-readable, including after renewal.
+`status` reports actual interface addresses/link flags, IPv4 routes, resolver,
+managed `eth0`, enabled policy, DHCP PID, configuration progress and errors.
+`connected`/`connection_state` check that interface's carrier, address, default
+route and resolver. They never infer connectivity from an unrelated interface;
+Internet reachability is explicitly `unverified`.
 
-The service samples once per second and publishes a read-only snapshot at
-`/run/leon/network-state.json`. Real state changes increase `generation`.
-`{"op":"watch","since":N}` returns a current snapshot and `changed`; it is a
-bounded polling interface, not an open event stream. UI clients should poll at
-most once per second. There is no Wi-Fi supplicant, cellular modem manager, VPN
-or multi-interface policy yet.
+Root/desktop/Settings UID 11000 can `configure` a nonempty `values` object with
+`enabled` (boolean), `method` (`dhcp` or `static`), numeric IPv4 `address`, integer
+`prefix` (1–32), optional numeric IPv4 `gateway` (empty disables the default
+route), and up to three numeric IPv4/IPv6 addresses in `dns`. Unknown keys,
+wrong types, nonunicast addresses and off-subnet gateways are rejected before
+any change. Static mode requires a valid host address. Policy is durably stored
+in `/data/leon/system/network.json`; corruption prevents startup.
+
+Configuration success acknowledges saved desired state. Application is asynchronous:
+poll `configuration_pending`, `error`, addresses and routes to observe completion.
+The bounded configuration helper flushes previous addresses/routes and sets
+link/static state. Failure remains visible and retries after two seconds.
+DHCP runs as one supervised foreground BusyBox udhcpc process with bounded
+restart backoff. `renew` signals an enabled DHCP client; it rejects static or
+disabled policy. Compatible `enable`/`disable` save policy and schedule application.
+Children reset inherited signal masks and die with netd.
+
+DHCP hooks publish lease DNS to `/run/leon/dhcp-resolv.conf`. netd exclusively
+publishes the system resolver atomically and world-readable, choosing configured
+DNS overrides when supplied. An empty DNS array follows DHCP (or provides no DNS
+in static mode). Disabling clears DNS on the next sample. The service samples
+once per second and publishes `/run/leon/network-state.json`. Real changes
+advance `generation`; `watch` with nonnegative integer `since` returns a snapshot
+and `changed`. Clients should poll at most once per second. `--test` permits
+policy validation/persistence but cannot mutate host interfaces or DNS.
+There is no Wi-Fi supplicant, cellular modem manager, VPN or multi-interface
+routing policy. QEMU tests exercise DHCP renewal/restart and real static/DHCP
+configuration transitions.
 
 ## Storage
 

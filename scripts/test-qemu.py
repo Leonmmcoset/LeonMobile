@@ -670,6 +670,13 @@ def main():
                         result = Guest(proc, log).run("cat /run/leon/root-app-tests.txt")
                         (artifacts / "root-applications.txt").write_text(result + "\n")
                         raise RuntimeError(result)
+                    if args.system_probe and "exited system-test status=1" in text and "\n$ " in text.replace("\r", ""):
+                        failed_guest = Guest(proc, log)
+                        result = failed_guest.run("cat /run/leon/system-tests.txt")
+                        (artifacts / "system-services-failed.txt").write_text(result + "\n")
+                        network = failed_guest.run("lmsys network '{\"op\":\"status\"}'; ip -4 addr show dev eth0")
+                        (artifacts / "network-failed.txt").write_text(network + "\n")
+                        raise RuntimeError(result)
                     if "leond: started shell" in text and "\n$ " in text.replace("\r", ""):
                         break
                     time.sleep(.25)
