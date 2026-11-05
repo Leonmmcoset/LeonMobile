@@ -258,3 +258,37 @@ class PlatformServices(unittest.TestCase):
         with self.daemon("netd") as (s, _):
             self.assertEqual(rpc(s, {"op": "status"})["configuration"]["method"], "static")
 
+    def test_audio_pcm_ownership_volume_focus_pause_and_restart(self):
+        with self.daemon("settingsd"), self.daemon("audiod") as (s, _):
+            self.assertFalse(rpc(s, {"op": "open"}, 12345)["ok"])
+            self.assertFalse(rpc(s, {"op": "open", "rate": True}, 11002)["ok"])
+            self.assertFalse(rpc(s, {"op": "set_master", "volume": 50}, 11002)["ok"])
+            first = rpc(s, {"op": "open", "title": "Track"}, 11002)["token"]
+            self.assertFalse(rpc(s, {"op": "write", "token": first, "hex": "1027" * 1024}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "write", "token": first, "hex": "xx"}, 11002)["ok"])
+            self.assertTrue(rpc(s, {"op": "set_volume", "volume": 50}, 11002)["ok"])
+            written = rpc(s, {"op": "write", "token": first, "hex": "1027" * 1024}, 11002)
+            self.assertEqual(written["accepted"], 2048)
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                state = rpc(s, {"op": "stream", "token": first}, 11002)["stream"]
+                if state["played_bytes"] >= 2048:
+                    break
+            self.assertEqual(state["played_bytes"], 2048)
+            self.assertEqual(state["peak"], 3500)
+            second = rpc(s, {"op": "open", "title": "Other"}, 11004)["token"]
+            self.assertTrue(rpc(s, {"op": "stream", "token": first}, 11002)["stream"]["focus_lost"])
+            self.assertEqual(rpc(s, {"op": "write", "token": first, "hex": "1027" * 8}, 11002)["accepted"], 0)
+            self.assertTrue(rpc(s, {"op": "pause", "token": second}, 1000)["ok"])
+            self.assertFalse(rpc(s, {"op": "stream", "token": first}, 11002)["stream"]["focus_lost"])
+            self.assertEqual(len(rpc(s, {"op": "status"}, 11002)["streams"]), 1)
+            self.assertNotIn("current", rpc(s, {"op": "status"}, 11002))
+            self.assertEqual(rpc(s, {"op": "status"}, 1000)["current"]["title"], "Other")
+            self.assertTrue(rpc(s, {"op": "set_master", "volume": 25}, 11000)["ok"])
+            self.assertTrue(rpc(s, {"op": "set_master", "muted": True}, 11000)["ok"])
+            self.assertTrue(rpc(s, {"op": "close", "token": first}, 11002)["ok"])
+        with self.daemon("audiod") as (s, _):
+            self.assertTrue(rpc(s, {"op": "status"})["muted"])
+            self.assertEqual(rpc(s, {"op": "status"})["streams"], [])
+            token = rpc(s, {"op": "open"}, 11002)["token"]
+            self.assertEqual(rpc(s, {"op": "stream", "token": token}, 11002)["stream"]["volume"], 50)

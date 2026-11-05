@@ -1,0 +1,6 @@
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
+add_executable(audiod main.c backend.c mixer.c service.c)
+target_compile_definitions(audiod PRIVATE _GNU_SOURCE)
+target_link_libraries(audiod PRIVATE leon-system PkgConfig::PIPEWIRE)
+install(TARGETS audiod RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR} COMPONENT Runtime)

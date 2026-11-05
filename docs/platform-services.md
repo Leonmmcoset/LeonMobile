@@ -104,3 +104,44 @@ default. Root-only `reset_app` invalidates in-flight interactions during clear
 or uninstall. The shell owns presentation/focus; an ordinary client cannot
 impersonate the chooser. An unhandled URI reports no installed handler (the
 prototype does not acquire a browser merely by adding this protocol).
+
+## Audio
+
+`audiod`, `/run/leon/audio.sock`, is the application audio policy and PCM broker.
+PipeWire performs resampling/mixing and WirePlumber selects physical outputs,
+including routing changes reported by its device policy. The service uses the
+native PipeWire API, without spawning a helper for each audio request. It retries
+backend connection failures every two seconds and invalidates streams after
+backend loss; clients reopen and resynchronize rather than silently replaying.
+
+Installed app identities can `open` a playback stream: integer `rate` 8000–96000
+(default 48000), `channels` 1 or 2 (default 2), `focus` (`mix`, `exclusive`, `duck`,
+default exclusive), and optional display `title`/`artist` (160/96 bytes).
+The service returns a random `token`. Only its owner can `write` frame-aligned
+signed 16-bit little-endian PCM as `hex` (maximum 2048 decoded bytes per request).
+The reply's `accepted` count implements backpressure; retry the remaining bytes.
+The stream has a 64 KiB ring, with up to two streams per app and sixteen total.
+`stream` reports buffered/played bytes, peak, underruns, volume and focus state.
+`keepalive` (or another owner request) at least once every fifteen seconds retains
+a stream; otherwise it expires. Install changes also invalidate it.
+
+The latest active exclusive stream suspends earlier exclusive streams without
+consuming their queues. Ducking reduces other streams to 20%; mixed streams can
+play concurrently. `pause` releases focus, `resume` reacquires it, `close` frees
+resources. These controls can also be called by desktop/root/Settings for media
+controls. `set_volume` takes the caller's own integer `volume` 0–100; trusted UI
+can additionally select installed `app`. Policy is durable in
+`/data/leon/system/audio.json`. Root-only `reset_app` closes streams and resets
+its per-app volume during clear/uninstall.
+
+`status` returns master volume/mute, backend availability and output `devices`.
+Only trusted UI sees all streams and `current` media metadata; apps see their
+own streams. Trusted `set_master` changes exactly one of `volume` or `muted`.
+Master preferred volume is stored through settingsd, independently of whether
+hardware is connected; mute is audiod's policy. `route` with an enumerated device
+ID updates WirePlumber's configured default. Output removal and replacement use
+the backend's standard routing policy. Microphone recording is not exposed.
+Locking does not terminate playback; trusted lock-screen controls can pause it.
+`--test` uses the same PCM/gain/focus logic with a deterministic in-memory sink,
+never the host's sound device. Physical headphone routing requires hardware
+validation; QEMU validates actual PipeWire playback and mixing separately.
