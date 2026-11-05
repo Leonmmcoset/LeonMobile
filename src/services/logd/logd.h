@@ -16,7 +16,7 @@ struct log_record {
 };
 struct log_ack { int64_t seq, bytes, dropped; int error; };
 struct log_options {
-    const char *runtime, *state, *auth, *crash, *kmsg, *boot;
+    const char *runtime, *state, *auth, *crash, *services, *kmsg, *boot;
     int test;
 };
 struct log_state {

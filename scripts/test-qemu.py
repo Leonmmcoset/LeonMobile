@@ -546,7 +546,13 @@ def main():
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
+    parser.add_argument("--logging-only", action="store_true",
+                        help="production logging diagnostics UI and previous history across real reboot")
     args = parser.parse_args()
+    if args.logging_only and any((args.system_probe, args.root_probe, args.auth_probe,
+                                  args.applications_probe, args.root_apps_probe, args.boot_console_probe,
+                                  args.core_only, args.root_only, args.auth_only, args.applications_only)):
+        parser.error("--logging-only uses a separate production image without privileged boot probes")
     if args.boot_console_probe:
         if not args.boot_console_probe.is_file():
             parser.error("--boot-console-probe must name the compiled AArch64 fixture")
@@ -588,7 +594,8 @@ def main():
     if args.terminal_probe and args.core_only:
         parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
-    artifacts = REPO / ("build/qemu-boot-console-test" if args.boot_console_probe else
+    artifacts = REPO / ("build/qemu-logging-test" if args.logging_only else
+                        "build/qemu-boot-console-test" if args.boot_console_probe else
                         "build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
     artifacts.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="leon-qemu-") as temp:
@@ -776,6 +783,16 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.logging_only:
+                    from logging_qemu import exercise_logging_ui
+                    exercise_logging_ui(guest, qmp, artifacts, args.timeout, reboot=True)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode:
+                        raise RuntimeError("Diagnostics shutdown failed")
+                    passed = True
+                    print("Production logging UI and real reboot history validation passed", flush=True)
+                    return
                 if args.root_apps_probe:
                     from root_apps_qemu import exercise_root_applications
                     exercise_root_applications(guest, qmp, artifacts, args.timeout)

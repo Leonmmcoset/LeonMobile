@@ -14,6 +14,12 @@ void SettingsApplication::open(Page page) {
     keyboard = false;
     scroll = 0;
     error.clear();
+    if (page == Page::diagnostics) {
+        diagnostics_clear();
+        diagnostics_tab_ = DiagnosticsTab::logs;
+        diagnostics_previous_ = diagnostics_warnings_ = diagnostics_live_ = false;
+        diagnostics_refresh();
+    }
     if (page == Page::applications) {
         application_id_.clear();
         application_ = Json::object();
@@ -34,6 +40,11 @@ void SettingsApplication::open(Page page) {
     app.redraw();
 }
 void SettingsApplication::back() {
+    if (page_ == Page::diagnostics && diagnostics_back())
+        return;
+    if (page_ == Page::diagnostics) {
+        diagnostics_clear();
+    }
     if (page_ == Page::applications && applications_back())
         return;
     if (page_ == Page::security && security_dialog_) {
@@ -87,6 +98,7 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
     return true;
 }
 void SettingsApplication::on_tick() {
+    diagnostics_poll();
     applications_poll();
     developer_poll();
     if (security_dialog_ && !app.focused()) {
@@ -151,6 +163,8 @@ std::string SettingsApplication::summary(Page page) const {
         return tr(en, "Root、内核、模块与服务", "Root, kernel, modules and services");
     case Page::applications:
         return tr(en, "应用信息、权限与存储", "App info, permissions and storage");
+    case Page::diagnostics:
+        return tr(en, "日志、服务状态与崩溃记录", "Logs, service health and crash reports");
     default:
         return {};
     }

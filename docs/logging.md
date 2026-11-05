@@ -24,6 +24,9 @@ scope `user` and source `uid:UID/TAG`; the tag is untrusted escaped text. Root
 supervisors bind captured output to the launched UID, main PID and service/app
 ID. Descendant output shares that launch identity. Kernel records use `kmsg`,
 the original `kernel_seq`, and UID/PID -1 because kmsg supplies no credentials.
+Merged stdout/stderr is classified as informational (6); raw console text does
+not provide a trustworthy severity field. Kernel priorities and explicit
+`leonlog write --level ...` messages retain their supplied severity.
 Control bytes, invalid UTF-8 and bidi controls are escaped; valid UTF-8 remains.
 Sending is nonblocking; success means queued, not durably stored.
 
@@ -68,12 +71,15 @@ writer errors and storage health. Daemon counters reset on logd restart; writer
 counters reset on worker restart. Writer sequence acknowledges an append, not
 an fsync; fsync runs once per second while storage responds.
 `{"op":"crashes"}` proxies crashd metadata for system readers, without core
-contents. Failures/unknown operations return `ok:false` and `error`.
+contents. `{"op":"services"}` returns leond's bounded status snapshot as a
+`services` array (`name`, `state`, `pid`), also restricted to system readers.
+Failures/unknown operations return `ok:false` and `error`.
 
 ## Limits and failure handling
 
 Separate rings retain 256 system/kernel and 128 app/user records, each below
-8192 serialized bytes. The writer IPC queue requests a 64 KiB send buffer.
+8192 serialized bytes. The writer IPC queue requests a 256 KiB send buffer
+(subject to the kernel's socket-buffer cap and accounting).
 Queue overflow loses persistence work while memory remains queryable. Public
 and app sources have per-UID quotas (burst 128, approximately 62 messages/s,
 128 active buckets). Public and supervisor sockets have separate kernel queues
@@ -125,3 +131,34 @@ leonlog write 'Checkpoint reached' --source example --level info
 `--socket`/`--ingest` select test endpoints. Write messages are limited to 1024
 raw bytes. A terminal needs separately authorized Root to read system logs;
 UID 1000 and terminal apps are not automatically privileged.
+
+## Settings
+
+Settings → System → System diagnostics shows the journal health and loss count,
+latest 64 records, severity and current/previous-boot filters, optional automatic
+refresh, full record details, read-only service state and crash metadata. Use
+`leonlog` for PID/UID/source filters, paging and cursor following. Diagnostics
+queries and authentication status checks run off the UI thread. Back remains
+available during a query; late responses from another tab/filter are discarded.
+Diagnostic data is excluded from saved application state, cleared on focus loss,
+and cleared if authd locks, restarts or becomes unavailable. The page disables
+core dumps for the Settings process. The compositor remains responsible for
+blocking input and covering private surfaces during lock.
+
+## Validation commands
+
+After building the host binaries and target image:
+
+```sh
+python3 -m unittest discover -s tests -p test_logging.py -v
+./scripts/test-wayland.sh
+python3 scripts/test-logging-wayland.py
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --system-probe build/system-probe --core-only --timeout 300
+python3 scripts/test-qemu.py --logging-only --timeout 180
+```
+
+The real-peer/native diagnostics fixtures require root; target tests use private
+disk copies. `--logging-only` uses the production image without a privileged boot
+fixture, performs a real kernel reboot, and captures the prior boot's logs through
+the actual Settings process. Evidence stays under ignored `build/` directories.

@@ -45,7 +45,9 @@ static void start_writer(struct log_state *s) {
     int pair[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, pair))
         return;
-    int buffer = 64 * 1024;
+    /* Absorb the boot-ring replay burst while the disk worker starts. The
+     * kernel still caps this queue; a stopped worker cannot grow it. */
+    int buffer = 256 * 1024;
     setsockopt(pair[0], SOL_SOCKET, SO_SNDBUF, &buffer, sizeof(buffer));
     pid_t parent = getpid(), pid = fork();
     if (!pid) {
@@ -148,7 +150,7 @@ static void request(struct client *c, struct worker *workers) {
 int main(int argc, char **argv) {
     state.options = (struct log_options){.runtime = LEON_LOG_DIRECTORY,
         .state = "/data/leon/logs", .auth = LEON_AUTH_SOCKET,
-        .crash = "/run/leon/crash.sock", .kmsg = "/dev/kmsg"};
+        .crash = "/run/leon/crash.sock", .services = "/run/leon/services.sock", .kmsg = "/dev/kmsg"};
     state.writer = state.kernel = -1;
     umask(077);
     for (int i = 1; i < argc; ++i) {
@@ -159,6 +161,7 @@ int main(int argc, char **argv) {
             : !strcmp(argv[i], "--state") ? &state.options.state
             : !strcmp(argv[i], "--auth") ? &state.options.auth
             : !strcmp(argv[i], "--crash") ? &state.options.crash
+            : !strcmp(argv[i], "--services") ? &state.options.services
             : !strcmp(argv[i], "--kmsg") ? &state.options.kmsg
             : !strcmp(argv[i], "--boot-id") ? &state.options.boot : NULL;
         if (!field)

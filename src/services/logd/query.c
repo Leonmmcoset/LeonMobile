@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/un.h>
+#include <fcntl.h>
 #include <unistd.h>
 struct selection {
     const struct log_state *state;
@@ -83,6 +85,62 @@ static int unlocked(const struct log_state *s, struct auth_state *state) {
     return !auth_exchange(s->options.auth, "{\"op\":\"status\"}\n", response, 150) &&
            !auth_decode(response, state) && state->ok && !state->locked && *state->epoch;
 }
+static lm_json *services(const char *path) {
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+    struct sockaddr_un a = {.sun_family = AF_UNIX};
+    if (strlen(path) >= sizeof(a.sun_path)) {
+        if (fd >= 0) close(fd);
+        return lm_failure("invalid service endpoint");
+    }
+    strcpy(a.sun_path, path);
+    lm_json *result = lm_failure("service manager unavailable");
+    struct ucred peer;
+    socklen_t length = sizeof(peer);
+    if (fd < 0 || connect(fd, (struct sockaddr *)&a, sizeof(a)) ||
+        getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &length) || peer.uid ||
+        send(fd, "status\n", 7, MSG_DONTWAIT | MSG_NOSIGNAL) != 7)
+        goto done;
+    char text[16384];
+    size_t used = 0;
+    int64_t deadline = log_clock_ns(CLOCK_MONOTONIC) / 1000000 + 700;
+    int complete = 0;
+    while (used < sizeof(text) - 1) {
+        int64_t left = deadline - log_clock_ns(CLOCK_MONOTONIC) / 1000000;
+        struct pollfd p = {fd, POLLIN, 0};
+        if (left <= 0 || poll(&p, 1, (int)left) <= 0)
+            break;
+        ssize_t n = recv(fd, text + used, sizeof(text) - 1 - used, MSG_DONTWAIT);
+        if (n < 0 && (errno == EINTR || errno == EAGAIN))
+            continue;
+        if (!n) { complete = 1; break; }
+        if (n < 0)
+            break;
+        used += (size_t)n;
+    }
+    if (complete) {
+        text[used] = 0;
+        lm_free(result);
+        result = lm_success();
+        lm_json *items = lm_array();
+        char *save;
+        for (char *line = strtok_r(text, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
+            char name[64], state[24];
+            int pid;
+            if (sscanf(line, "%63s\t%23s\tpid=%d", name, state, &pid) == 3) {
+                lm_json *item = lm_object();
+                lm_set_string(item, "name", name);
+                lm_set_string(item, "state", state);
+                lm_set_integer(item, "pid", pid);
+                lm_append(items, item);
+            }
+        }
+        lm_set(result, "services", items);
+    }
+done:
+    if (fd >= 0)
+        close(fd);
+    return result;
+}
 static lm_json *status(const struct log_state *s, int privileged) {
     lm_json *j = lm_success();
     lm_set_string(j, "boot", s->boot);
@@ -109,6 +167,14 @@ static lm_json *status(const struct log_state *s, int privileged) {
 }
 static lm_json *query(const struct log_state *state, struct ucred peer, const lm_json *request,
                        int privileged) {
+    for (const char **key = (const char *[]){"limit", "max_level", "after", "uid", "pid", NULL};
+         *key; ++key)
+        if (lm_get(request, *key) && lm_integer(lm_get(request, *key), INT64_MIN) == INT64_MIN)
+            return lm_failure("log filter must be an integer");
+    if ((lm_get(request, "tail") && lm_boolean(lm_get(request, "tail"), -1) < 0) ||
+        (lm_get(request, "source") && !lm_is_string(lm_get(request, "source"))) ||
+        (lm_get(request, "boot") && !lm_is_string(lm_get(request, "boot"))))
+        return lm_failure("invalid log filter type");
     struct selection s = {.state = state, .peer = peer, .privileged = privileged,
                            .limit = (int)number(request, "limit", 50),
                            .max_level = (int)number(request, "max_level", 7),
@@ -163,11 +229,14 @@ void log_query(const struct log_state *s, struct ucred peer, const char *text, s
         response = query(s, peer, request, privileged);
     else if (!strcmp(op, "status"))
         response = status(s, privileged);
+    else if (!strcmp(op, "services") && privileged)
+        response = services(s->options.services);
     else if (!strcmp(op, "crashes") && privileged) {
-        lm_json *r = lm_object();
-        lm_set_string(r, "op", "list");
-        response = lm_rpc(s->options.crash, r);
-        lm_free(r);
+        char *wire = calloc(1, LEON_LOG_RESPONSE);
+        response = wire && !leon_log_exchange(s->options.crash, "{\"op\":\"list\"}\n", wire,
+                                              LEON_LOG_RESPONSE, 1200)
+                       ? lm_parse(wire, strlen(wire)) : NULL;
+        free(wire);
         if (!response)
             response = lm_failure("crash service unavailable");
     } else

@@ -5,8 +5,8 @@
 #include <string>
 
 namespace leon::apps::settings {
-const std::array<Entry, 11> &entries() {
-    static const std::array<Entry, 11> catalog{{
+const std::array<Entry, 12> &entries() {
+    static const std::array<Entry, 12> catalog{{
         {Page::network, Icon::network, "网络与互联网", "Network & internet",
          "网络 互联网 以太网 IP ethernet connection", true},
         {Page::display, Icon::display, "显示", "Display",
@@ -27,6 +27,8 @@ const std::array<Entry, 11> &entries() {
          "开发者 root 内核 模块 核心 服务 developer kernel modules services", false},
         {Page::security, Icon::system, "安全与屏幕锁定", "Security & screen lock",
          "安全 锁屏 密码 PIN security password lock credential", false},
+        {Page::diagnostics, Icon::developer, "系统诊断", "System diagnostics",
+         "诊断 日志 崩溃 状态 logging logs crash diagnostics services", false},
     }};
     return catalog;
 }

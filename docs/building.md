@@ -123,6 +123,12 @@ The launcher creates a separate persistent `leonmobile-user.img` next to the rel
 
 `python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight distinct ELF manifests, launch/process identity for every built-in, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; journal segments are in that disk's data partition under `/leon/logs/` (mounted as `/data/leon/logs` in the guest). Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
 
+`python3 scripts/test-qemu.py --logging-only --timeout 180` independently exercises
+the production Settings diagnostics page, system-log access, detail/service/crash
+tabs, focus/lock protection and prior history after a real reboot. It writes
+`build/qemu-logging-test/`. Native logging/diagnostics checks and journal recovery
+commands are documented in [logging.md](logging.md).
+
 Include the cross-compiled example to exercise package transfer, checksum validation, install, launch and removal:
 
 ```sh

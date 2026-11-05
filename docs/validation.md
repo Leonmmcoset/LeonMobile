@@ -599,3 +599,54 @@ time/crash/sandbox/cgroup/management probes and Chinese IME/portal UI checks als
 passed, followed by clean poweroff. `build/logd-qemu-core.log` and the QEMU
 artifacts contain the results. Settings diagnostics and the final combined image
 are validated separately below; this result makes no physical-phone claim.
+
+## Unified logging: Settings diagnostics and final image
+
+Settings now exposes System → System diagnostics, with the actual logd health,
+latest records/details, current/previous boot and severity filters, optional live
+refresh, leond service state and crashd metadata. Backend, query transport and
+the page are separate modules. System data remains restricted to root or the
+verified, unlocked Settings process; no Root switch or broad desktop grant is
+used. Late tab/filter results are discarded and diagnostic contents are excluded
+from saved state, cleared on focus/auth failure, and omitted from retained
+pointer callbacks.
+
+The final host build, 11 CTest cases and 89 Python integration tests pass. The
+ten logging cases include the new privileged service snapshot and strict filter
+types. Independent Weston smoke still renders all eight apps, shell and shades,
+and passes lifecycle/motion checks. The independent X11 Weston diagnostics run
+uses actual logd, authd, crashd and leond fixtures. It verifies real record/detail
+rendering, escaped controls/UTF-8, service/crash tabs, authd stall clearing,
+responsive Back when logd disappears, and recovery. Evidence is in
+`build/logd-{python-regression,native,ctest,wayland,wayland-diagnostics}.log` and
+`build/logging-wayland/`.
+
+The AArch64 core/apps and final ext4/initramfs/disk image rebuild successfully.
+The combined QEMU regression passes authentication and Root probes, log
+collection/offline recovery/real ENOSPC, core services and isolation, terminal
+VT/PTY/vi/top/clipboard, notifications, Chinese IME/portal, all eight built-ins,
+package installation/removal, lifecycle/shade controls, app management, saved
+data inspection and clean UI poweroff. The focused boot-console regression
+also passes actual kernel/init/service text, KD_TEXT/KD_GRAPHICS handoff,
+compositor stop/SIGKILL recovery, real reboot and desktop input.
+
+The separate production-image logging run confirms UID 1000 cannot read kernel
+logs while the trusted unlocked Settings ELF can, opens full details, reads real
+service/crash tabs, changes filters, backgrounds/refocuses the page, protects it
+with the real compositor lock, reboots the kernel and reads the prior boot's
+journal through Settings, then powers off cleanly. It uses no injected privileged
+boot helper. Real 480×960 screenshots, serial trace and `diagnostics-proof.json`
+remain in `build/qemu-logging-test/`; main results are in
+`build/logd-qemu-diagnostics.log`, `build/logd-qemu-regression.log` and
+`build/logd-boot-console.log`.
+
+The third-party Root fixture now queries its own captured records through logd
+instead of reading the removed production `application.log`. Its separate QEMU
+protocol/UI/reboot suite also passes (`build/logd-root-apps-regression.log`). An
+earlier run alongside other emulated guests hit a fail-closed Root request
+cancellation; the isolated run passed without relaxing authentication checks or
+deadlines. Heavy emulation can still cause authentication requests to be denied
+and require retry. These results cover the QEMU developer prototype, not a
+lossless audit guarantee, independent security audit or physical phone support.
+The older `dist/` release bundle is not regenerated; current artifacts are under
+`output/images/` and remain outside version control.

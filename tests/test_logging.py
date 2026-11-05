@@ -95,11 +95,12 @@ class LoggingTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def start(self, boot=BOOT_A, test=True):
+    def start(self, boot=BOOT_A, test=True, extra=()):
         args = [BIN / "logd", "--runtime", self.runtime, "--state", self.journal,
                 "--auth", self.path / "auth.sock"]
         if test:
             args += ["--test", "--boot-id", boot, "--kmsg", ""]
+        args += list(extra)
         self.proc = subprocess.Popen(args, stdout=self.output, stderr=self.output,
                                      start_new_session=True)
         self.wait(lambda: (self.runtime / "control.sock").exists() and self.query(op="status")["ok"])
@@ -195,6 +196,8 @@ class LoggingTests(unittest.TestCase):
         self.assertEqual([r["message"] for r in self.query(limit=2, tail=True)["records"]], ["line-10", "line-11"])
         self.assertTrue(all(r["level"] <= 3 for r in self.query(max_level=3)["records"]))
         self.assertFalse(self.query(limit=2**32 + 1)["ok"])
+        self.assertFalse(self.query(limit="2")["ok"])
+        self.assertFalse(self.query(tail=1)["ok"])
         self.flush(records[-1]["seq"])
         self.stop()
         with (self.journal / "journal.0").open("ab") as stream:
@@ -371,7 +374,7 @@ class LoggingTests(unittest.TestCase):
                 return client.makefile("r").read()
         try:
             self.wait(lambda: "early\tfinished" in service_status() or "early\tfailed" in service_status())
-            self.start()
+            self.start(extra=["--services", endpoint])
             records = self.wait(lambda: self.query(source="early")["records"])
             self.assertIn("early\tfinished", service_status(), records)
             record = records[0]
@@ -379,6 +382,11 @@ class LoggingTests(unittest.TestCase):
             self.assertEqual(record["uid"], 12020)
             self.assertGreater(record["pid"], 0)
             self.assertEqual(record["scope"], "system")
+            snapshot = self.query(op="services")
+            self.assertTrue(snapshot["ok"], snapshot)
+            self.assertEqual(snapshot["services"][0]["name"], "early")
+            self.assertEqual(snapshot["services"][0]["state"], "finished")
+            self.assertFalse(as_uid(12020, lambda: self.query(op="services"))["ok"])
             self.assertEqual(as_uid(12020, lambda: self.query())["records"], [])
             self.assertFalse(any((self.path / "legacy").glob("*.log")))
         finally:

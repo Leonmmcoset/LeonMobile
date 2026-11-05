@@ -4,6 +4,12 @@ LeonMobile 1.0.0 remains a QEMU developer platform. These services perform nativ
 Linux operations and use the bounded, peer-authenticated transport documented in
 [interfaces.md](interfaces.md). They do not imply physical phone support.
 
+The independent `logging` unit (`logd`), `leonlog` CLI and Settings → System →
+System diagnostics use their own credential-checked endpoints under
+`/run/leon-log`. See [logging.md](logging.md) for collection, bounded history,
+previous-boot queries and system-log authorization. They do not inherit the
+generic transport's desktop trust policy.
+
 Services run as root, in the foreground, under leond notify readiness and a
 10-second event-loop watchdog. Their entry points, service logic and shared
 transport are separate source modules. `lmsys SERVICE 'JSON'` is the administrative

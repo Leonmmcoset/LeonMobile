@@ -9,6 +9,7 @@ using namespace mobile;
 using leon::apps::settings::Page;
 namespace leon::apps {
 SettingsApplication::~SettingsApplication() {
+    diagnostics_clear();
     clear_root_fields();
     clear_device_fields();
 }

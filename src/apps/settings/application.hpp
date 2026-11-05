@@ -49,6 +49,23 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     void paint_home(mobile::Canvas &canvas);
     void paint_preferences(mobile::Canvas &canvas);
     void paint_device(mobile::Canvas &canvas);
+    enum class DiagnosticsTab { logs, services, crashes };
+    DiagnosticsTab diagnostics_tab_{DiagnosticsTab::logs};
+    std::future<mobile::Json> diagnostics_job_;
+    std::future<auth_state> diagnostics_auth_job_;
+    mobile::Json diagnostics_data_ = mobile::Json::object(), diagnostics_detail_;
+    unsigned diagnostics_ticks_{}, diagnostics_generation_{}, diagnostics_job_generation_{};
+    bool diagnostics_previous_{}, diagnostics_warnings_{}, diagnostics_live_{}, diagnostics_failed_{};
+    bool diagnostics_auth_ok_{};
+    bool diagnostics_pending_{};
+    std::string diagnostics_epoch_;
+    int64_t diagnostics_auth_generation_{-1};
+    void diagnostics_refresh();
+    void diagnostics_poll();
+    void diagnostics_clear();
+    bool diagnostics_back();
+    double diagnostics_bottom() const;
+    void paint_diagnostics(mobile::Canvas &);
     mobile::Json applications_ = mobile::Json::array(), application_ = mobile::Json::object();
     std::future<mobile::Json> applications_job_;
     std::string applications_query_, application_id_, applications_operation_,

@@ -48,7 +48,9 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     else if (page_ == Page::sound || page_ == Page::navigation)
         end = 500;
     else if (page_ == Page::system)
-        end = 508;
+        end = 592;
+    else if (page_ == Page::diagnostics)
+        end = diagnostics_bottom();
     else if (page_ == Page::security)
         end = security_dialog_ ? 680 : 640;
     else if (page_ == Page::language)
@@ -79,6 +81,8 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     cairo_translate(c.cr, 0, -scroll);
     if (page_ == Page::applications)
         paint_applications(c);
+    else if (page_ == Page::diagnostics)
+        paint_diagnostics(c);
     else if (page_ == Page::security)
         paint_security(c);
     else if (page_ == Page::developer)
