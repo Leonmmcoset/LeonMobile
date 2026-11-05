@@ -99,3 +99,56 @@ class PlatformServices(unittest.TestCase):
                                  "--state", state, "--socket", self.root / "broken.sock"],
                                 capture_output=True, timeout=4)
         self.assertNotEqual(failed.returncode, 0)
+
+    def test_documents_selection_snapshot_and_revocation(self):
+        shared = self.root / "shared"
+        shared.mkdir()
+        (shared / "note").write_bytes(b"hello\x00world\xff")
+        (shared / "escape").symlink_to("/etc/passwd")
+        os.mkfifo(shared / "pipe")
+        with self.daemon("documentd") as (s, _):
+            self.assertFalse(rpc(s, {"op": "choose"}, 12345)["ok"])
+            grant = rpc(s, {"op": "choose", "seconds": 120}, 11004)
+            self.assertTrue(grant["ok"], grant)
+            token = grant["token"]
+            self.assertEqual(len(token), 32)
+            self.assertFalse(rpc(s, {"op": "pending"}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "selection", "token": token}, 11002)["ok"])
+            self.assertEqual(rpc(s, {"op": "pending"}, 1000)["requests"][0]["app"], "org.leon.editor")
+            for file in ("../builtin/editor.json", "/etc/passwd", "escape", "pipe"):
+                self.assertFalse(rpc(s, {"op": "pick", "token": token, "file": file}, 1000)["ok"])
+            self.assertFalse(rpc(s, {"op": "pick", "token": token, "file": "note"}, 11004)["ok"])
+            self.assertTrue(rpc(s, {"op": "pick", "token": token, "file": "note"}, 1000)["ok"])
+            (shared / "note").write_bytes(b"changed")
+            data = rpc(s, {"op": "read", "token": token, "offset": 0, "length": 2048}, 11004)
+            self.assertEqual(bytes.fromhex(data["hex"]), b"hello\x00world\xff")
+            self.assertTrue(data["eof"])
+            self.assertFalse(rpc(s, {"op": "read", "token": token, "offset": True, "length": 2}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "read", "token": token, "offset": 0, "length": 2049}, 11004)["ok"])
+            child = rpc(s, {"op": "delegate", "token": token, "from_uid": 11004, "to_uid": 11002})
+            self.assertTrue(child["ok"], child)
+            self.assertFalse(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11004)["ok"])
+            self.assertTrue(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11002)["ok"])
+            self.assertTrue(rpc(s, {"op": "revoke", "token": token}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11002)["ok"])
+
+    def test_documents_private_offer_expiry_quota_and_restart(self):
+        home = self.root / "data/org.leon.editor"
+        home.mkdir(parents=True)
+        (home / "draft").write_text("private draft")
+        with self.daemon("documentd") as (s, _):
+            result = rpc(s, {"op": "offer", "file": "draft", "seconds": 1}, 11004)
+            self.assertTrue(result["ok"], result)
+            self.assertFalse(rpc(s, {"op": "offer", "file": "../../builtin/editor.json"}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "delegate", "token": result["token"],
+                                    "from_uid": 11004, "to_uid": 11002}, 11004)["ok"])
+            time.sleep(1.1)
+            self.assertFalse(rpc(s, {"op": "selection", "token": result["token"]}, 11004)["ok"])
+            tokens = [rpc(s, {"op": "choose"}, 11004)["token"] for _ in range(4)]
+            self.assertFalse(rpc(s, {"op": "choose"}, 11004)["ok"])
+            self.assertTrue(rpc(s, {"op": "cancel", "token": tokens[0]}, 11004)["ok"])
+            self.assertEqual(rpc(s, {"op": "selection", "token": tokens[0]}, 11004)["state"], "canceled")
+            self.assertTrue(rpc(s, {"op": "reset_app", "app": "org.leon.editor"})["ok"])
+            self.assertEqual(rpc(s, {"op": "list"}, 11004)["documents"], [])
+        with self.daemon("documentd") as (s, _):
+            self.assertFalse(rpc(s, {"op": "selection", "token": tokens[1]}, 11004)["ok"])

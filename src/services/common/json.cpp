@@ -1,4 +1,5 @@
 #include "json.h"
+#include "daemon.h"
 #include <cstdlib>
 #include <cstring>
 #include <leon/package.hpp>
@@ -114,6 +115,25 @@ lm_json *lm_apps(const char *root, const char *builtin) {
     } catch (...) {
         return nullptr;
     }
+}
+lm_json *lm_app_identity(const char *root, const char *builtin, uid_t uid) {
+    lm_json *app = lm_app(root, builtin, uid);
+    if (!app)
+        return nullptr;
+    if (lm_boolean(lm_get(app, "builtin"), 0)) {
+        lm_set_string(app, "installation", lm_string(lm_get(app, "version"), ""));
+        return app;
+    }
+    char path[PATH_MAX], instance[34];
+    const char *id = lm_string(lm_get(app, "id"), "");
+    if (snprintf(path, sizeof(path), "%s/apps/%s/current/.installation", root, id) >=
+            (int)sizeof(path) || lm_read_text(path, instance, sizeof(instance)) ||
+        strlen(instance) != 32 || strspn(instance, "0123456789abcdef") != 32) {
+        lm_free(app);
+        return nullptr;
+    }
+    lm_set_string(app, "installation", instance);
+    return app;
 }
 lm_json *lm_root_app(const char *root, const char *builtin, uid_t uid, pid_t pid) {
     try {
