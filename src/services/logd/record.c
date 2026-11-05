@@ -52,7 +52,8 @@ static void sanitize(const unsigned char *in, size_t n, char *out, size_t cap) {
     out[used] = 0;
 }
 void log_append(struct log_state *s, unsigned level, const char *scope, const char *source,
-                int64_t uid, int64_t pid, const unsigned char *bytes, size_t n, int64_t kseq) {
+                int64_t uid, int64_t pid, const unsigned char *bytes, size_t n, int64_t kseq,
+                int64_t kernel_usec) {
     char message[LEON_LOG_MESSAGE * 4 + 16], tag[LEON_LOG_SOURCE * 4 + 16];
     int truncated = n > LEON_LOG_MESSAGE;
     if (n > LEON_LOG_MESSAGE)
@@ -70,6 +71,7 @@ void log_append(struct log_state *s, unsigned level, const char *scope, const ch
     lm_set_integer(j, "uid", uid);
     lm_set_integer(j, "pid", pid);
     lm_set_integer(j, "kernel_seq", kseq);
+    lm_set_integer(j, "kernel_monotonic_us", kernel_usec);
     lm_set_boolean(j, "truncated", truncated);
     lm_set_string(j, "scope", scope);
     lm_set_string(j, "source", tag);
@@ -174,7 +176,7 @@ void log_ingest(struct log_state *s, int fd, int trusted) {
             ++s->rate_dropped;
             continue;
         }
-        log_append(s, p.level, scope, source, uid, pid, p.message, p.length, -1);
+        log_append(s, p.level, scope, source, uid, pid, p.message, p.length, -1, -1);
     }
 }
 void log_kernel(struct log_state *s, int cursor) {
@@ -210,7 +212,7 @@ void log_kernel(struct log_state *s, int cursor) {
         char *end = strchr(message, '\n');
         size_t length = end ? (size_t)(end - message) : strlen(message);
         log_append(s, pri & 7, "kernel", "kmsg", -1, -1,
-                   (unsigned char *)message, length, (int64_t)seq);
+                   (unsigned char *)message, length, (int64_t)seq, (int64_t)usec);
         last = seq + 1;
         char checkpoint[128];
         int count = snprintf(checkpoint, sizeof(checkpoint), "%s %llu\n", s->boot, seq);

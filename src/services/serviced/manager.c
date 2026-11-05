@@ -20,6 +20,7 @@ static int manager_has_live_dependents(const struct manager *manager, const stru
 }
 
 void manager_tick(struct manager *manager) {
+    manager_logs(manager);
     manager_reap(manager);
     for (int n = 0; n < manager->count; ++n) {
         struct service *service = &manager->services[manager->order[n]];
@@ -37,6 +38,7 @@ void manager_shutdown(struct manager *manager) {
         manager->services[i].wanted = 0;
     long long deadline = service_now_ms() + 30000;
     while (service_now_ms() < deadline) {
+        manager_logs(manager);
         manager_reap(manager);
         int live = 0;
         for (int n = manager->count - 1; n >= 0; --n) {

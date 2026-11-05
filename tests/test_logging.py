@@ -7,6 +7,7 @@ import signal
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -348,6 +349,100 @@ class LoggingTests(unittest.TestCase):
         finally:
             os.kill(child, signal.SIGKILL)
             os.waitpid(child, 0)
+
+    def test_supervisor_captures_finished_service_across_logd_outage(self):
+        self.stop()
+        config = self.path / "services"
+        config.mkdir()
+        helper = self.path / "service.py"
+        helper.write_text("print('early-service-without-logd', flush=True)\n")
+        helper.chmod(0o644)
+        (config / "early.toml").write_text('name="early"\ntype="oneshot"\n'
+            + 'command=' + json.dumps([sys.executable, str(helper)]) + '\nuid=12020\ngid=12020\n')
+        endpoint = self.path / "services.sock"
+        manager = subprocess.Popen([BIN / "leond", "--config", config, "--socket", endpoint,
+            "--log-dir", self.path / "legacy", "--log-socket", self.runtime / "capture.sock"],
+            stdout=self.output, stderr=self.output)
+        def service_status():
+            with socket.socket(socket.AF_UNIX) as client:
+                client.connect(str(endpoint))
+                client.sendall(b"status\n")
+                client.shutdown(socket.SHUT_WR)
+                return client.makefile("r").read()
+        try:
+            self.wait(lambda: "early\tfinished" in service_status() or "early\tfailed" in service_status())
+            self.start()
+            records = self.wait(lambda: self.query(source="early")["records"])
+            self.assertIn("early\tfinished", service_status(), records)
+            record = records[0]
+            self.assertEqual(record["message"], "early-service-without-logd")
+            self.assertEqual(record["uid"], 12020)
+            self.assertGreater(record["pid"], 0)
+            self.assertEqual(record["scope"], "system")
+            self.assertEqual(as_uid(12020, lambda: self.query())["records"], [])
+            self.assertFalse(any((self.path / "legacy").glob("*.log")))
+        finally:
+            manager.terminate()
+            manager.wait(timeout=5)
+
+    def test_application_output_and_lifecycle_survive_logger_outage(self):
+        builtin = self.path / "builtin"
+        builtin.mkdir()
+        data = self.path / "app-data"
+        data.mkdir()
+        helper = self.path / "application.py"
+        helper.write_text("import os,socket,time\n"
+            "channel=socket.socket(fileno=int(os.environ['LEON_LIFECYCLE_FD']))\n"
+            "channel.setblocking(True)\n"
+            "print('app-first',flush=True)\n"
+            "while True:\n"
+            " packet=channel.recv(128).decode()\n"
+            " if not packet: break\n"
+            " sequence,event=packet.split()\n"
+            " if event=='save':\n"
+            "  for i in range(4000):\n"
+            "   try: os.write(1,b'no-logger-flood\\n'*32)\n"
+            "   except BlockingIOError: pass\n"
+            " channel.send((sequence+' ok').encode())\n"
+            " if event=='shutdown':\n"
+            "  print('app-last',flush=True)\n"
+            "  break\n")
+        helper.chmod(0o644)
+        (builtin / "gallery.json").write_text(json.dumps(dict(format=1, id="org.leon.gallery",
+            version="1.0.0", arch="aarch64", lmui=1, name="Logging fixture", lifecycle=1,
+            entry=sys.executable, args=[str(helper)], permissions=[])))
+        endpoint = self.path / "apps.sock"
+        broker = subprocess.Popen([BIN / "leon-launchd", "--root", data, "--builtin", builtin,
+            "--socket", endpoint, "--runtime-dir", self.path / "users",
+            "--log-socket", self.runtime / "capture.sock"], stdout=self.output, stderr=self.output)
+        def rpc(op):
+            with socket.socket(socket.AF_UNIX) as client:
+                client.settimeout(3)
+                client.connect(str(endpoint))
+                client.sendall(json.dumps({"op":op,"id":"org.leon.gallery"}).encode()+b"\n")
+                return json.load(client.makefile("r"))
+        try:
+            self.wait(lambda: endpoint.exists())
+            response = rpc("launch")
+            self.assertTrue(response["ok"], response)
+            pid = response["pid"]
+            records = self.wait(lambda: self.query(source="org.leon.gallery")["records"])
+            self.assertEqual(records[0]["pid"], pid)
+            self.assertEqual(records[0]["uid"], 11002)
+            self.assertEqual(records[0]["scope"], "app")
+            self.stop()
+            saved = rpc("save")
+            self.assertTrue(saved["ok"], {"response": saved, "records": records,
+                                           "daemon": (self.path / "daemon.log").read_text()})
+            self.wait(lambda: rpc("lifecycle")["applications"]["org.leon.gallery"]["responsive"])
+            self.assertTrue(rpc("close")["ok"])
+            self.wait(lambda: "org.leon.gallery" not in rpc("lifecycle")["applications"])
+            self.start()
+            self.wait(lambda: self.query(source="org.leon.gallery")["records"])
+            self.assertFalse((data / "data/org.leon.gallery/application.log").exists())
+        finally:
+            broker.terminate()
+            broker.wait(timeout=6)
 
 
 if __name__ == "__main__":

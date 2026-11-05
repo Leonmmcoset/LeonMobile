@@ -33,7 +33,11 @@ struct leon_log_capture {
     unsigned used;
     uint64_t lost;
     unsigned char line[LEON_LOG_MESSAGE];
+    unsigned head, count;
+    struct leon_log_packet pending[4];
 };
+/* Zero-initialize before first open, with fd = -1. Closed captures may retain
+ * four offline fragments; drain them again when the receiver recovers. */
 int leon_log_capture_open(struct leon_log_capture *);
 void leon_log_capture_drain(struct leon_log_capture *, const char *, uid_t, pid_t,
                             enum leon_log_scope, const char *);

@@ -1,5 +1,6 @@
 #pragma once
 #include <sys/types.h>
+#include "log.h"
 #define LM_MAX_SERVICES 64
 #define LM_MAX_ARGS 32
 #define LM_MAX_DEPS 16
@@ -16,6 +17,7 @@ struct service {
     int notify;
     unsigned ready_timeout_ms, watchdog_ms;
     int notify_fd, terminating, forced_exit;
+    struct leon_log_capture log;
     long long ready_deadline, watchdog_deadline;
     char health[32];
     pid_t pid;

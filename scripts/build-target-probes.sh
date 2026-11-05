@@ -8,14 +8,19 @@ if [ ! -x "$compiler" ]; then
 fi
 mkdir -p "$repo/build"
 "$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
+    -I"$repo/src/libraries/log-client" -c "$repo/src/libraries/log-client/client.c" \
+    -o "$repo/build/log-client-probe.o"
+"$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
     -I"$repo/src/services/common" -I"$repo/src/services/serviced" \
     "$repo/tests/target/boot_console.c" "$repo/src/services/common/boot_log.c" \
     -o "$repo/build/boot-console-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/notifications.c" -o "$repo/build/notifications-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    -I"$repo/src/libraries/log-client" \
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
-    "$repo/tests/target/system_sandbox.c" "$repo/src/services/appd/sandbox.c" \
+    "$repo/tests/target/system_sandbox.c" "$repo/tests/target/logging.c" \
+    "$repo/src/services/appd/sandbox.c" "$repo/build/log-client-probe.o" \
     -o "$repo/build/system-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/applications.c" "$repo/tests/target/system_transport.c" \
@@ -43,8 +48,9 @@ mkdir -p "$repo/build"
     -I"$repo/src/libraries/root-client" "$repo/tests/target/root_app.c" \
     "$repo/build/root-wire-probe.o" -o "$repo/build/root-app-fixture"
 "${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os -pthread \
-    -I"$repo/src/libraries/root-client" "$repo/tests/target/root_applications.cpp" \
-    "$repo/build/root-wire-probe.o" -o "$repo/build/root-applications-probe"
+    -I"$repo/src/libraries/root-client" -I"$repo/src/libraries/log-client" \
+    "$repo/tests/target/root_applications.cpp" \
+    "$repo/build/root-wire-probe.o" "$repo/build/log-client-probe.o" -o "$repo/build/root-applications-probe"
 mkdir -p "$repo/build/root-probe-package/bin" "$repo/build/root-probe-package/libexec"
 cp "$repo/build/root-app-fixture" "$repo/build/root-probe-package/bin/app"
 cp "$repo/build/root-app-fixture" "$repo/build/root-probe-package/libexec/helper"

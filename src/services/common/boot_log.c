@@ -18,11 +18,27 @@ void leon_boot_log(const char *format, ...) {
     va_list args, copy;
     va_start(args, format);
     va_copy(copy, args);
-    vfprintf(stderr, format, args);
+    char message[1024];
+    int length = vsnprintf(message, sizeof(message), format, args);
     va_end(args);
+    if (console_enabled && length > 0) {
+        /* Early boot predates logd. The kernel ring retains these messages and
+         * fans out to both consoles, respecting the compositor's VT ownership. */
+        char record[1100];
+        int count = snprintf(record, sizeof(record), "<14>leonboot: %s", message);
+        int kernel = open("/dev/kmsg", O_WRONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
+        ssize_t written = kernel >= 0 ? write(kernel, record, (size_t)count) : -1;
+        if (kernel >= 0)
+            close(kernel);
+        if (written == count) {
+            va_end(copy);
+            errno = saved_errno;
+            return;
+        }
+    }
+    vfprintf(stderr, format, copy);
+    va_end(copy);
     if (console_enabled) {
-        char message[1024];
-        int length = vsnprintf(message, sizeof(message), format, copy);
         int fd = open("/dev/tty1", O_WRONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK | O_NOFOLLOW);
         int mode;
         /* seatd owns KD_GRAPHICS while Wayland runs. Never draw over its scene.
@@ -35,7 +51,6 @@ void leon_boot_log(const char *format, ...) {
         if (fd >= 0)
             close(fd);
     }
-    va_end(copy);
     errno = saved_errno;
 }
 

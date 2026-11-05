@@ -49,7 +49,10 @@ accepts `current`, `previous`, or a 36-byte boot ID. `previous` selects the most
 recent different boot still present; a complete previous boot is not guaranteed.
 
 Records contain `boot`, `seq`, `realtime_ms`, `monotonic_ns`, `level`, `scope`,
-`source`, `uid`, `pid`, `kernel_seq`, and `message`. Cursors increase within a boot,
+`source`, `uid`, `pid`, `kernel_seq`, `kernel_monotonic_us`, `truncated`, and
+`message`. Wall/monotonic timestamps describe ingestion; `kernel_monotonic_us`
+preserves the original kernel timestamp for replayed boot messages (-1 otherwise).
+Cursors increase within a boot,
 including across daemon restarts; they are not consecutive message counts.
 
 Replies contain `access` (`own`/`system`), `records`, `selected_boot`, `next`,
@@ -75,6 +78,15 @@ Queue overflow loses persistence work while memory remains queryable. Public
 and app sources have per-UID quotas (burst 128, approximately 62 messages/s,
 128 active buckets). Public and supervisor sockets have separate kernel queues
 and receive budgets. Supervisors use nonblocking pipes and bounded drain work.
+Each stream keeps four offline fragments (at most 1024 raw bytes each), plus a
+loss count; old fragments are retried after logd recovery. leond retains closed
+service buffers. launchd retains at most 16 closed application buffers and reports
+an eviction to its own service output. Observed transport losses emit a warning
+when the receiver recovers. Nonblocking stdout writers must handle short writes
+and EAGAIN; bytes abandoned by an application cannot be counted by the supervisor.
+Long/no-newline output is fragmented into chunks of at most 1024 bytes. Production
+passes `--log-socket /run/leon-log/capture.sock` to both supervisors; isolated native
+callers without this option retain their legacy file-output behavior.
 
 A separate writer owns disk I/O. Root-owned `/data/leon/logs` (0700) holds four
 segments `journal.0`–`journal.3`, each at most 1 MiB, mode 0600. Files must be

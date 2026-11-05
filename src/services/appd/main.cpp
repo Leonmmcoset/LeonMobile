@@ -31,6 +31,8 @@ int main(int argc, char **argv) {
             options.runtime_prefix = value;
         else if (option == "--wayland")
             options.wayland_socket = value;
+        else if (option == "--log-socket")
+            options.log_socket = value;
         else {
             std::cerr << "Unknown option: " << option << '\n';
             return 2;

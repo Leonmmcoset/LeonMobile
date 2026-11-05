@@ -1,5 +1,6 @@
 // Injected into disposable QEMU disks only. No test daemon or privilege helper is shipped.
 #include "wire.h"
+#include "log.h"
 #include <chrono>
 #include <csignal>
 #include <fcntl.h>
@@ -85,11 +86,20 @@ static Json catalog() {
     throw std::runtime_error("probe package absent");
 }
 static fs::path home() { return fs::path("/data/leon/data") / id; }
+static long long log_after;
+static std::vector<std::string> log_messages() {
+    std::vector<std::string> messages;
+    auto response = std::make_unique<char[]>(LEON_LOG_RESPONSE);
+    std::string request = Json{{"op", "query"}, {"source", id}, {"after", log_after},
+                               {"limit", 128}}.dump() + "\n";
+    if (!leon_log_exchange(LEON_LOG_SOCKET, request.c_str(), response.get(), LEON_LOG_RESPONSE, 1500))
+        for (const auto &record : Json::parse(response.get()).value("records", Json::array()))
+            messages.push_back(record.value("message", ""));
+    return messages;
+}
 static std::string output() {
     std::string bytes;
-    std::istringstream stream(read(home() / "application.log"));
-    std::string line;
-    while (std::getline(stream, line))
+    for (const auto &line : log_messages())
         try {
             auto j = Json::parse(line);
             auto hex = j.value("output_hex", "");
@@ -100,9 +110,7 @@ static std::string output() {
     return bytes;
 }
 static pid_t helper_pid() {
-    std::istringstream stream(read(home() / "application.log"));
-    std::string line;
-    while (std::getline(stream, line))
+    for (const auto &line : log_messages())
         try {
             auto j = Json::parse(line);
             if (j.value("state", "") == "running")
@@ -112,9 +120,13 @@ static pid_t helper_pid() {
     return -1;
 }
 static pid_t launch(const std::string &mode = "wait") {
-    if (fs::exists(home())) {
-        fs::remove(home() / "application.log");
-    } else
+    {
+        auto response = std::make_unique<char[]>(LEON_LOG_RESPONSE);
+        check(!leon_log_exchange(LEON_LOG_SOCKET, "{\"op\":\"status\"}\n", response.get(),
+                                 LEON_LOG_RESPONSE, 1500), "logd unavailable");
+        log_after = Json::parse(response.get()).value("cursor", 0LL);
+    }
+    if (!fs::exists(home()))
         fs::create_directories(home());
     auto uid = catalog().at("uid").get<uid_t>();
     chown(home().c_str(), uid, uid);

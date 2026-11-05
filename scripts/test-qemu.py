@@ -282,7 +282,7 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         put(system_probe, "/usr/bin/leon-test-system")
         unit = temporary / "test-service.toml"
         unit.write_text('name = "system-test"\ncommand = ["/usr/bin/leon-test-system"]\n'
-                        'after = ["apps", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"]\n'
+                        'after = ["logging", "apps", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"]\n'
                         'type = "oneshot"\nrestart = "never"\n')
         put(unit, "/etc/leon/services/99-system-test.toml")
         # Lifecycle fault probes own foreground/background transitions. Finish
@@ -713,7 +713,7 @@ def main():
                     services = guest.run("leonctl status")
                 (artifacts / "notifications-service.txt").write_text(services + "\n")
                 service_pids = {}
-                for service in ("apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root", "authentication"):
+                for service in ("logging", "apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root", "authentication"):
                     running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
                     if not running:
                         raise RuntimeError("Required service is not running: " + service)

@@ -10,7 +10,7 @@ static void signal_handler(int sig) {
         action = sig;
 }
 static void boot_child(const char *path) {
-    execl(path, path, "--boot-console", (char *)NULL);
+    execl(path, path, "--boot-console", "--log-socket", "/run/leon-log/capture.sock", (char *)NULL);
     leon_boot_error(path);
     _exit(127);
 }

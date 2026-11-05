@@ -15,6 +15,7 @@
 #include <time.h>
 #include <unistd.h>
 static FILE *report;
+int probe_logging(FILE *);
 #define CHECK(condition)                                                                           \
     do {                                                                                           \
         if (!(condition)) {                                                                        \
@@ -399,7 +400,7 @@ int main(void) {
     if (!report)
         return 2;
     setbuf(report, NULL);
-    if (geteuid() || sample_memory() || power() || storage() || network() || portal() || timed() ||
+    if (geteuid() || probe_logging(report) || sample_memory() || power() || storage() || network() || portal() || timed() ||
         cleanup() || app_management() || crash()) {
         fputs("SYSTEM_TESTS_FAILED\n", report);
         fclose(report);

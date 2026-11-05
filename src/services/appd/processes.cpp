@@ -146,6 +146,18 @@ std::string Processes::reclaim() {
     return victim;
 }
 void Processes::reap() {
+    for (auto i = retired_logs_.begin(); i != retired_logs_.end();) {
+        leon_log_capture_drain(&i->capture, options_.log_socket.c_str(), i->uid,
+                               i->pid, LEON_LOG_APP, i->id.c_str());
+        if (!i->capture.count && !i->capture.lost)
+            i = retired_logs_.erase(i);
+        else
+            ++i;
+    }
+    if (!options_.log_socket.empty())
+        for (auto &[id, client] : clients_)
+            leon_log_capture_drain(&client.log, options_.log_socket.c_str(), client.uid,
+                                   running_.at(id), LEON_LOG_APP, id.c_str());
     poll_clients();
     pid_t p;
     int status;
@@ -154,6 +166,16 @@ void Processes::reap() {
             if (i->second == p) {
                 kill(-p, SIGKILL);
                 auto &client = clients_.at(i->first);
+                if (!options_.log_socket.empty())
+                    leon_log_capture_close(&client.log, options_.log_socket.c_str(), client.uid,
+                                           p, LEON_LOG_APP, i->first.c_str());
+                if (client.log.count || client.log.lost) {
+                    if (retired_logs_.size() == 16) {
+                        retired_logs_.erase(retired_logs_.begin());
+                        std::fputs("application logging: retired offline buffer evicted\n", stderr);
+                    }
+                    retired_logs_.push_back({i->first, client.uid, p, client.log});
+                }
                 if (!options_.development && leon_cgroup_kill(client.uid))
                     perror("application cgroup cleanup");
                 if (client.fd >= 0)
@@ -225,6 +247,21 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         fail(false, "cannot create application lifecycle channel");
     }
     pid_t parent = getpid();
+    struct Output {
+        leon_log_capture capture{};
+        int write{-1};
+        Output() { capture.fd = -1; }
+        ~Output() {
+            if (capture.fd >= 0) close(capture.fd);
+            if (write >= 0) close(write);
+        }
+    } output;
+    if (!options_.log_socket.empty() && (output.write = leon_log_capture_open(&output.capture)) < 0) {
+        close(gate[0]); close(gate[1]);
+        close(executed[0]); close(executed[1]);
+        if (pair[0] >= 0) { close(pair[0]); close(pair[1]); }
+        fail(false, "cannot create application log pipe");
+    }
     pid_t pid = fork();
     if (pid < 0) {
         close(executed[0]);
@@ -238,6 +275,11 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         fail(false, "cannot fork application");
     }
     if (!pid) {
+        for (const auto &[other, client] : clients_)
+            if (client.log.fd >= 0)
+                close(client.log.fd);
+        if (output.capture.fd >= 0)
+            close(output.capture.fd);
         close(executed[0]);
         auto child_fail = [&](int status) {
             int cause = errno ? errno : EIO;
@@ -270,11 +312,14 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
             dup2(input, STDIN_FILENO);
             close(input);
         }
-        int log = open((home / "application.log").c_str(),
+        int log = output.write;
+        if (log < 0) {
+            log = open((home / "application.log").c_str(),
                        O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW | O_NONBLOCK, 0600);
-        struct stat log_info {};
-        if (log < 0 || fstat(log, &log_info) || !S_ISREG(log_info.st_mode) || fchown(log, uid, uid))
-            child_fail(126);
+            struct stat log_info {};
+            if (log < 0 || fstat(log, &log_info) || !S_ISREG(log_info.st_mode) || fchown(log, uid, uid))
+                child_fail(126);
+        }
         if (log >= 0) {
             dup2(log, 1);
             dup2(log, 2);
@@ -314,6 +359,10 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         }
         execv(exe.c_str(), av.data());
         child_fail(127);
+    }
+    if (output.write >= 0) {
+        close(output.write);
+        output.write = -1;
     }
     close(executed[1]);
     close(gate[0]);
@@ -361,6 +410,8 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
     running_[id] = pid;
     clients_[id].fd = pair[0];
     clients_[id].uid = uid;
+    clients_[id].log = output.capture;
+    output.capture.fd = -1;
     clients_[id].root_helper = m.contains("root");
     foreground(id);
     return pid;
@@ -432,6 +483,9 @@ Processes::~Processes() {
         kill(-pid, SIGKILL);
         if (clients_.at(id).fd >= 0)
             close(clients_.at(id).fd);
+        if (!options_.log_socket.empty())
+            leon_log_capture_close(&clients_.at(id).log, options_.log_socket.c_str(),
+                                   clients_.at(id).uid, pid, LEON_LOG_APP, id.c_str());
     }
 }
 } // namespace leon::appd

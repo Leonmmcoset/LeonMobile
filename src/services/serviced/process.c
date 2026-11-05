@@ -28,8 +28,20 @@ void manager_start(struct manager *manager, struct service *s) {
             return;
         }
     }
+    int output = -1;
+    if (manager->log_socket && (output = leon_log_capture_open(&s->log)) < 0) {
+        if (pair[0] >= 0) close(pair[0]);
+        if (pair[1] >= 0) close(pair[1]);
+        s->next_ms = service_now_ms() + 1000;
+        leon_boot_error("log pipe");
+        return;
+    }
     pid_t pid = fork();
     if (!pid) {
+        /* Do not retain other services' read ends until exec. */
+        for (int i = 0; i < manager->count; ++i)
+            if (manager->services[i].log.fd >= 0)
+                close(manager->services[i].log.fd);
         if (pair[0] >= 0)
             close(pair[0]);
         setsid();
@@ -38,7 +50,7 @@ void manager_start(struct manager *manager, struct service *s) {
         sigprocmask(SIG_SETMASK, &mask, NULL);
         char path[256];
         snprintf(path, sizeof(path), "%s/%s.log", manager->log_directory, s->name);
-        int fd = open(path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0640);
+        int fd = output >= 0 ? output : open(path, O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW, 0640);
         if (fd >= 0) {
             dup2(fd, STDOUT_FILENO);
             dup2(fd, STDERR_FILENO);
@@ -78,9 +90,13 @@ void manager_start(struct manager *manager, struct service *s) {
         perror(s->argv[0]);
         _exit(127);
     }
+    if (output >= 0)
+        close(output);
     if (pair[1] >= 0)
         close(pair[1]);
     if (pid < 0) {
+        if (s->log.fd >= 0) close(s->log.fd);
+        s->log.fd = -1;
         if (pair[0] >= 0)
             close(pair[0]);
         s->next_ms = service_now_ms() + 1000;
@@ -108,6 +124,9 @@ void manager_reap(struct manager *manager) {
                 continue;
             /* A service owns its session; remove descendants before restarting. */
             kill(-pid, SIGKILL);
+            if (manager->log_socket)
+                leon_log_capture_close(&s->log, manager->log_socket, s->uid, pid,
+                                       LEON_LOG_SYSTEM, s->name);
             if (s->notify_fd >= 0)
                 close(s->notify_fd);
             s->notify_fd = -1;
@@ -128,6 +147,16 @@ void manager_reap(struct manager *manager) {
             leon_boot_log("leond: exited %s status=%d retry=%d\n", s->name, s->exit_status,
                           s->wanted);
         }
+    }
+}
+
+void manager_logs(struct manager *manager) {
+    if (!manager->log_socket)
+        return;
+    for (int i = 0; i < manager->count; ++i) {
+        struct service *s = &manager->services[i];
+        leon_log_capture_drain(&s->log, manager->log_socket, s->uid, s->pid,
+                               LEON_LOG_SYSTEM, s->name);
     }
 }
 

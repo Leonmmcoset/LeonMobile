@@ -1,5 +1,6 @@
 add_library(leon-service-config STATIC config.c)
 target_include_directories(leon-service-config PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(leon-service-config PUBLIC leon-log-client)
 add_library(leon-service-policy STATIC policy.c)
 target_compile_definitions(leon-service-policy PRIVATE _GNU_SOURCE)
 target_link_libraries(leon-service-policy PUBLIC leon-service-config PRIVATE leon-system)

@@ -579,3 +579,23 @@ The film, `boot-kernel.png`, `boot-services.png`, other captures and
 serial/encoder/probe evidence remain ignored under
 `build/recordings/LeonMobile-boot-console*`. Source provenance in `recording.json`
 points to the validated code commit before this documentation update.
+
+## Unified logging: backend and supervisor integration
+
+The host build and 11 CTest cases pass. Ten real-peer logging integration tests
+cover credentials/spoofing, own-versus-system visibility, control/binary escaping,
+Settings lock/identity and in-flight revocation, singleton ownership, CLI
+write/query/follow and impostor rejection, pagination, restart/previous boot,
+torn-tail repair, rotation, quotas, FD injection, stopped/killed writer, unsafe
+storage/recovery, finished-service offline buffering, and application output plus
+lifecycle handling while logd is down. Evidence: `build/logd-native.log`.
+
+The AArch64 core and probes compile. A QEMU core run booted the real 7.3.1 kernel
+and verified kernel/init/service log capture, root/ordinary peer separation,
+logd stop/start with retained history and offline output, and actual ENOSPC on a
+separate 64 KiB tmpfs. Queries and memory ingestion continued while it was full;
+storage recovered after freeing space. The remaining memory/power/storage/network/
+time/crash/sandbox/cgroup/management probes and Chinese IME/portal UI checks also
+passed, followed by clean poweroff. `build/logd-qemu-core.log` and the QEMU
+artifacts contain the results. Settings diagnostics and the final combined image
+are validated separately below; this result makes no physical-phone claim.

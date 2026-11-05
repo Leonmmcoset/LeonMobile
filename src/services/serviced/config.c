@@ -86,6 +86,7 @@ int service_load(const char *path, struct service *s, char *err, size_t size) {
     s->restart_limit = 5;
     s->autostart = 1;
     s->notify_fd = -1;
+    s->log.fd = -1;
     s->ready_timeout_ms = 10000;
     FILE *f = fopen(path, "r");
     if (!f) {

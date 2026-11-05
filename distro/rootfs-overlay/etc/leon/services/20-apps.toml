@@ -1,5 +1,5 @@
 name = "apps"
-command = ["/usr/sbin/leon-launchd"]
+command = ["/usr/sbin/leon-launchd", "--log-socket", "/run/leon-log/capture.sock"]
 type = "notify"
 ready_timeout_ms = 10000
 watchdog_ms = 15000

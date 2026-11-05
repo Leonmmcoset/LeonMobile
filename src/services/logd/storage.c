@@ -99,7 +99,8 @@ void log_writer(const struct log_options *options, int socket) {
         int ready = poll(&p, 1, 500);
         if (ready < 0 && errno == EINTR)
             continue;
-        if (ready < 0 || p.revents & (POLLHUP | POLLERR | POLLNVAL))
+        if (ready < 0 || p.revents & (POLLERR | POLLNVAL) ||
+            ((p.revents & POLLHUP) && !(p.revents & POLLIN)))
             break;
         char text[LOG_TEXT];
         ssize_t n = 0;

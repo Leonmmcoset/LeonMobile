@@ -1,5 +1,6 @@
 #pragma once
 #include "options.hpp"
+#include "log.h"
 #include <leon/package.hpp>
 #include <map>
 #include <sys/types.h>
@@ -27,6 +28,8 @@ class Processes {
     enum class StopPhase { none, shutdown, term, kill };
     struct Client {
         uid_t uid{};
+        leon_log_capture log{};
+        Client() { log.fd = -1; }
         int fd{-1};
         unsigned sequence{};
         long long deadline{};
@@ -36,6 +39,13 @@ class Processes {
         std::string event;
     };
     std::map<std::string, Client> clients_;
+    struct RetiredLog {
+        std::string id;
+        uid_t uid;
+        pid_t pid;
+        leon_log_capture capture;
+    };
+    std::vector<RetiredLog> retired_logs_;
     Json exits_ = Json::array();
     void event(const std::string &id, const std::string &name);
     void priority(const std::string &id, bool foreground);

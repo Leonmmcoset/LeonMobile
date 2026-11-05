@@ -9,6 +9,7 @@ struct Options {
     std::string root_socket{"/run/leon-root/control.sock"};
     std::string portal_socket{"/run/leon/portal.sock"};
     std::string wayland_socket{"/run/leon/wayland/wayland-0"};
+    std::string log_socket;
     bool development{};
 };
 } // namespace leon::appd

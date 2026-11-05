@@ -34,7 +34,8 @@ int64_t log_clock_ns(clockid_t clock);
 int log_secure_directory(const char *path, mode_t mode);
 void log_child(int fd, pid_t parent);
 void log_append(struct log_state *, unsigned level, const char *scope, const char *source,
-                int64_t uid, int64_t pid, const unsigned char *, size_t, int64_t kernel_seq);
+                int64_t uid, int64_t pid, const unsigned char *, size_t, int64_t kernel_seq,
+                int64_t kernel_usec);
 void log_ingest(struct log_state *, int fd, int trusted);
 void log_kernel(struct log_state *, int cursor);
 void log_writer(const struct log_options *, int fd);

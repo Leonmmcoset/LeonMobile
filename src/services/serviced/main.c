@@ -27,11 +27,13 @@ int main(int argc, char **argv) {
             socket_path = argv[++i];
         else if (!strcmp(argv[i], "--log-dir") && i + 1 < argc)
             manager->log_directory = argv[++i];
+        else if (!strcmp(argv[i], "--log-socket") && i + 1 < argc)
+            manager->log_socket = argv[++i];
         else if (!strcmp(argv[i], "--policy-dir") && i + 1 < argc)
             manager->policy_directory = argv[++i];
         else {
             fputs("usage: leond [--check] [--boot-console] [--config DIR] [--socket PATH] [--log-dir DIR] "
-                  "[--policy-dir DIR]\n",
+                  "[--policy-dir DIR] [--log-socket PATH]\n",
                   stderr);
             return 2;
         }

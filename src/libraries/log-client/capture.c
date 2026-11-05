@@ -5,20 +5,27 @@
 #include <string.h>
 #include <unistd.h>
 int leon_log_capture_open(struct leon_log_capture *c) {
-    memset(c, 0, sizeof(*c));
-    c->fd = -1;
     int pair[2];
     if (pipe2(pair, O_CLOEXEC | O_NONBLOCK))
         return -1;
     c->fd = pair[0];
     return pair[1];
 }
+static void flush(struct leon_log_capture *c, const char *path) {
+    while (c->count) {
+        if (leon_log_send(path, &c->pending[c->head]))
+            return;
+        c->head = (c->head + 1) % 4;
+        --c->count;
+    }
+}
 static void emit(struct leon_log_capture *c, const char *path, uid_t uid, pid_t pid,
                  enum leon_log_scope scope, const char *source) {
     struct leon_log_packet p = {.magic = LEON_LOG_MAGIC, .uid = uid, .pid = (uint32_t)pid,
                                 .level = 6, .scope = scope};
     snprintf(p.source, sizeof(p.source), "%s", source);
-    if (c->lost) {
+    flush(c, path);
+    if (c->lost && !c->count) {
         p.level = 4;
         p.length = (uint32_t)snprintf((char *)p.message, sizeof(p.message),
                                     "log transport dropped %llu fragments",
@@ -30,18 +37,22 @@ static void emit(struct leon_log_capture *c, const char *path, uid_t uid, pid_t 
         p.level = 6;
         p.length = c->used;
         memcpy(p.message, c->line, c->used);
-        if (leon_log_send(path, &p))
-            ++c->lost;
+        if (c->count || leon_log_send(path, &p)) {
+            if (c->count < 4) {
+                c->pending[(c->head + c->count) % 4] = p;
+                ++c->count;
+            } else
+                ++c->lost;
+        }
         c->used = 0;
     }
 }
 void leon_log_capture_drain(struct leon_log_capture *c, const char *path, uid_t uid, pid_t pid,
                             enum leon_log_scope scope, const char *source) {
-    if (c->fd < 0)
-        return;
+    flush(c, path);
     unsigned char buffer[4096];
     /* Per-stream work budget protects readiness, watchdog and lifecycle handling. */
-    for (int budget = 0; budget < 4; ++budget) {
+    for (int budget = 0; c->fd >= 0 && budget < 4; ++budget) {
         ssize_t n = read(c->fd, buffer, sizeof(buffer));
         if (n < 0 && errno == EINTR) {
             --budget;

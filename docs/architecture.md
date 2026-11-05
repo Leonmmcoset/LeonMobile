@@ -125,12 +125,16 @@ The shared `distro/board/qemu-arm64/cmdline` enables both the framebuffer VT
 (`console=tty0`) and the serial console (`console=ttyAMA0`, last so it remains
 `/dev/console`). Kernel timestamps are enabled and console blanking is disabled.
 The kernel replays its available log buffer when virtio-gpu registers fbcon;
-the screen cannot display output before that driver initializes. PID 1 mirrors
-its startup diagnostics and starts `leond --boot-console` to mirror service
-status/error messages to `/dev/tty1`. This is a bounded, nonblocking, best-effort
-text mirror; stderr remains the serial diagnostic path. Normal service stdout
-and stderr still go to the supervisor's per-service files under `/var/log/leon`.
-Invoking leond without `--boot-console` does not write to a host VT.
+the screen cannot display output before that driver initializes. PID 1 and
+`leond --boot-console` submit startup/status messages to the kernel ring. This
+retains early messages for logd and uses the dual kernel consoles. If kmsg is
+unavailable, diagnostics fall back to stderr and a KD_TEXT-only `/dev/tty1`
+mirror. Normal service/application stdout and stderr use nonblocking supervisor
+pipes, bounded offline buffers and the independent logd journal. PID 1 passes
+`--log-socket /run/leon-log/capture.sock` to leond; the app unit passes the same
+option to leon-launchd. Invoking leond without `--boot-console` never writes to
+a host VT or kmsg. Test callers without `--log-socket` retain legacy file output.
+See [logging.md](logging.md) for identities, rotation and failure behavior.
 
 seatd uses a VT-bound session: it sets `KD_GRAPHICS` and disables kernel keyboard
 processing while Wayland owns the display. The status mirror checks `KD_TEXT`
