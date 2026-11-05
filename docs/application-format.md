@@ -35,6 +35,13 @@ foreground/background/checkpoint/shutdown requests, described in
 packages without this field continue to run. Current LMUI consumes the channel
 automatically and offers `Application::on_lifecycle` for app-owned state saves.
 
+Optional `handlers` declares up to 16 distinct application interaction handlers,
+for example `[{"action":"open","mime":"text/plain"},
+{"action":"open","scheme":"https"}]`. The system resolves installed handlers
+and presents a trusted chooser; it does not execute arguments from a URI.
+Selectors, default applications, message delivery and delegated document access
+are specified in [platform-services.md](platform-services.md).
+
 Each built-in has its own ELF entry (`/usr/bin/leon-settings`, `leon-calculator`,
 `leon-gallery`, `leon-files`, `leon-editor`, `leon-terminal`, `leon-images`,
 `leon-clock`). The former `leon-app MODE` dispatcher is retired. Built-in IDs,

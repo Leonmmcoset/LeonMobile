@@ -26,6 +26,14 @@ class PlatformServices(unittest.TestCase):
             (self.builtin / (name + ".json")).write_text(json.dumps(dict(
                 format=1, id="org.leon." + name, version="1.0.0", arch="aarch64", lmui=1,
                 name=name, entry="/usr/bin/true", permissions=["files.import"])))
+        for name, handlers in {
+            "editor": [{"action": "open", "mime": "text/plain"}, {"action": "share", "mime": "text/plain"}],
+            "gallery": [{"action": "open", "scheme": "https"}],
+        }.items():
+            path = self.builtin / (name + ".json")
+            app = json.loads(path.read_text())
+            app["handlers"] = handlers
+            path.write_text(json.dumps(app))
 
     def tearDown(self):
         self.temp.cleanup()
@@ -52,6 +60,32 @@ class PlatformServices(unittest.TestCase):
                 process.terminate()
             _, error = process.communicate(timeout=6)
             self.assertEqual(process.returncode, 0, error.decode())
+
+    @contextlib.contextmanager
+    def broker(self):
+        endpoint = self.root / "apps.sock"
+        process = subprocess.Popen([BUILD / "bin/leon-launchd", "--root", self.root,
+            "--builtin", self.builtin, "--socket", endpoint, "--runtime-dir", self.root / "users"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            deadline = time.monotonic() + 4
+            while not endpoint.exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertIsNone(process.poll())
+            yield endpoint
+        finally:
+            process.terminate()
+            _, error = process.communicate(timeout=6)
+            self.assertEqual(process.returncode, 0, error.decode())
+
+    def wait_result(self, endpoint, token, state="delivered", uid=11002):
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            result = rpc(endpoint, {"op": "result", "token": token}, uid)
+            if result.get("state") == state:
+                return result
+            time.sleep(.02)
+        self.fail("interaction did not settle: " + repr(result))
 
     def test_settings_schema_atomic_update_and_watch(self):
         with self.daemon("settingsd") as (s, _):
@@ -152,3 +186,56 @@ class PlatformServices(unittest.TestCase):
             self.assertEqual(rpc(s, {"op": "list"}, 11004)["documents"], [])
         with self.daemon("documentd") as (s, _):
             self.assertFalse(rpc(s, {"op": "selection", "token": tokens[1]}, 11004)["ok"])
+
+    def test_interactions_resolve_choose_delivery_and_durable_defaults(self):
+        with self.broker(), self.daemon("intentd") as (s, _):
+            payload = {"action": "share", "mime": "text/plain", "text": "hello 中文"}
+            resolved = rpc(s, {"op": "resolve", **payload}, 11002)
+            self.assertEqual([a["id"] for a in resolved["candidates"]], ["org.leon.editor"])
+            token = rpc(s, {"op": "request", **payload}, 11002)["token"]
+            self.assertFalse(rpc(s, {"op": "pending"}, 11002)["ok"])
+            self.assertFalse(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor"}, 11002)["ok"])
+            self.assertFalse(rpc(s, {"op": "choose", "token": token, "target": "org.leon.files"}, 1000)["ok"])
+            self.assertTrue(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor", "always": True}, 1000)["ok"])
+            self.wait_result(s, token)
+            self.assertEqual(rpc(s, {"op": "receive"}, 11003)["events"], [])
+            events = rpc(s, {"op": "receive"}, 11004)["events"]
+            self.assertEqual(events[0]["payload"]["text"], payload["text"])
+            self.assertEqual(events[0]["source"], "org.leon.gallery")
+            self.assertFalse(rpc(s, {"op": "ack", "token": token}, 11002)["ok"])
+            self.assertTrue(rpc(s, {"op": "ack", "token": token}, 11004)["ok"])
+            self.assertEqual(rpc(s, {"op": "receive"}, 11004)["events"], [])
+            self.assertTrue(rpc(s, {"op": "result", "token": token}, 11002)["acknowledged"])
+        with self.daemon("intentd") as (s, _):
+            self.assertIn("share:mime:text/plain", rpc(s, {"op": "defaults"}, 11000)["defaults"])
+            token = rpc(s, {"op": "request", **payload}, 11002)["token"]
+            self.assertEqual(rpc(s, {"op": "pending"}, 1000)["requests"][0]["default"], "org.leon.editor")
+            self.assertTrue(rpc(s, {"op": "clear_default", "key": "share:mime:text/plain"}, 11000)["ok"])
+            self.assertNotIn("default", rpc(s, {"op": "pending"}, 1000)["requests"][0])
+            self.assertTrue(rpc(s, {"op": "cancel", "token": token}, 11002)["ok"])
+
+    def test_interactions_reject_unsafe_payload_and_foreign_documents(self):
+        with self.broker(), self.daemon("documentd") as (docs, _), self.daemon("intentd") as (s, _):
+            for payload in ({"action": "exec", "uri": "https://example.com"},
+                {"action": "open", "uri": "file:///etc/passwd"},
+                {"action": "open", "uri": "javascript:alert(1)"},
+                {"action": "open", "uri": "https://"},
+                {"action": "open", "uri": "https://test\n--arg"},
+                {"action": "share", "mime": "text/plain", "text": 7},
+                {"action": "share", "mime": "text/plain", "text": "x", "document": "0" * 32}):
+                self.assertFalse(rpc(s, {"op": "request", **payload}, 11002)["ok"])
+            self.assertFalse(rpc(s, {"op": "request", "action": "share", "mime": "text/plain", "text": "x"}, 12345)["ok"])
+            home = self.root / "data/org.leon.editor"
+            home.mkdir(parents=True, exist_ok=True)
+            (home / "secret").write_text("private")
+            document = rpc(docs, {"op": "offer", "file": "secret"}, 11004)["token"]
+            token = rpc(s, {"op": "request", "action": "open", "mime": "text/plain", "document": document}, 11002)["token"]
+            self.assertTrue(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor"}, 1000)["ok"])
+            self.wait_result(s, token, "failed")
+            self.assertEqual(rpc(s, {"op": "receive"}, 11004)["events"], [])
+            token = rpc(s, {"op": "request", "action": "open", "mime": "text/plain", "document": document}, 11004)["token"]
+            self.assertTrue(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor"}, 1000)["ok"])
+            self.wait_result(s, token, uid=11004)
+            received = rpc(s, {"op": "receive"}, 11004)["events"][0]["payload"]["document"]
+            self.assertNotEqual(received, document)
+            self.assertEqual(bytes.fromhex(rpc(docs, {"op": "read", "token": received, "offset": 0, "length": 20}, 11004)["hex"]), b"private")

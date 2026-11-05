@@ -70,6 +70,14 @@ void lm_set(lm_json *json, const char *key, lm_json *child) {
     (*value(json))[key] = std::move(*value(child));
     lm_free(child);
 }
+void lm_erase(lm_json *json, const char *key) { value(json)->erase(key); }
+lm_json *lm_keys(const lm_json *json) {
+    auto keys = J::array();
+    if (json && value(json)->is_object())
+        for (auto it = value(json)->begin(); it != value(json)->end(); ++it)
+            keys.push_back(it.key());
+    return wrap(new J(std::move(keys)));
+}
 void lm_append(lm_json *json, lm_json *child) {
     value(json)->push_back(std::move(*value(child)));
     lm_free(child);

@@ -22,6 +22,8 @@ int lm_is_array(const lm_json *json);
 int lm_is_object(const lm_json *json);
 int lm_is_string(const lm_json *json);
 void lm_set(lm_json *json, const char *key, lm_json *value);
+void lm_erase(lm_json *json, const char *key);
+lm_json *lm_keys(const lm_json *json);
 void lm_append(lm_json *json, lm_json *value);
 void lm_set_string(lm_json *json, const char *key, const char *value);
 void lm_set_integer(lm_json *json, const char *key, int64_t value);

@@ -126,6 +126,18 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(current.resolve(), original)
         self.assertEqual(json.loads(self.command("list").stdout)[0]["version"], "1.0.0")
 
+    def test_interaction_handler_manifest_validation(self):
+        handlers = [{"action": "open", "scheme": "https"},
+                    {"action": "share", "mime": "image/*"}]
+        self.command("install", self.package(declarations={"handlers": handlers}))
+        self.command("remove", "org.example.demo")
+        for value in ({}, [1], [{"action": "exec", "mime": "text/plain"}],
+            [{"action": "open", "scheme": "file"}],
+            [{"action": "share", "scheme": "https"}],
+            [{"action": "open", "mime": "text/plain", "scheme": "https"}],
+            [{"action": "open", "mime": "../text"}], handlers * 2):
+            self.command("install", self.package(declarations={"handlers": value}), success=False)
+
     def test_path_traversal_and_absolute_paths_rejected(self):
         for name in ("../escaped", "/tmp/leon-escaped", "bin/../../escaped", "a\\b"):
             with self.subTest(name=name):

@@ -76,5 +76,25 @@ void validate_manifest(const Json &m, bool builtin) {
         for (const auto &a : m["args"])
             require(a.is_string(), "invalid argument");
     }
+    if (m.contains("handlers")) {
+        require(m["handlers"].is_array() && m["handlers"].size() <= 16, "invalid handlers");
+        std::set<std::string> seen;
+        for (const auto &h : m["handlers"]) {
+            require(h.is_object() && h.size() == 2 && h.contains("action") &&
+                        h["action"].is_string() && (h["action"] == "open" || h["action"] == "share"),
+                    "invalid handler action");
+            bool mime = h.contains("mime");
+            require(mime ? h["mime"].is_string() : h.contains("scheme") && h["scheme"].is_string(),
+                    "handler requires mime or scheme");
+            std::string value = h[mime ? "mime" : "scheme"];
+            require(value.size() <= 96 &&
+                        std::regex_match(value, mime ? std::regex("[a-z0-9][a-z0-9.+-]*/([a-z0-9][a-z0-9.+-]*|\\*)")
+                                                    : std::regex("[a-z][a-z0-9+.-]{0,31}")),
+                    "invalid handler selector");
+            require(mime || (h["action"] == "open" && value != "file" && value != "data" &&
+                             value != "javascript" && value != "shell"), "forbidden URI scheme");
+            require(seen.insert(h.dump()).second, "duplicate handler");
+        }
+    }
 }
 } // namespace leon

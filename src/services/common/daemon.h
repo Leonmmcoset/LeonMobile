@@ -32,6 +32,7 @@ int lm_read_text(const char *path, char *out, size_t size);
 int lm_child_setup(pid_t parent);
 int lm_child(char *const argv[], const char *input, unsigned timeout_ms);
 lm_json *lm_rpc(const char *socket, const lm_json *request);
+lm_json *lm_rpc_bounded(const char *socket, const lm_json *request, unsigned timeout_ms);
 #ifdef __cplusplus
 }
 #endif

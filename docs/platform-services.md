@@ -63,3 +63,44 @@ to the installer's instance marker (including same-version reinstalls).
 Revocation blocks subsequent reads; bytes an app has already read cannot be
 recalled. Applications never receive a raw file descriptor that bypasses later
 revocation checks. Executable startup integration follows in a separate step.
+
+## Application interactions
+
+`intentd`, `/run/leon/intents.sock`, resolves installed manifest `handlers`.
+A handler has an `action` (`open`, `share`) and exactly one selector: `mime`
+(e.g. `text/plain`, `image/*`) or `scheme` (e.g. `https`, `mailto`, open only).
+There are at most 16 distinct handlers per manifest. Schemes are lowercase;
+`file`, `data`, `javascript` and `shell` are forbidden. A declaration never
+registers an executable command template or grants additional filesystem access.
+
+`resolve` and `request` accept `action` and exactly one payload: `uri` (up to
+2048 bytes, without control characters), `text` (up to 2048 bytes, `text/plain`),
+or a `documentd` token in `document`. Text/documents require a concrete `mime`.
+`resolve` returns `candidates` and the default selection `key`. An installed
+application can `request` an interaction, returning its random `token`.
+At most 32 requests and four per source app are retained, for 120 seconds.
+
+Only desktop/root can inspect `pending`, `choose` (`token`, installed `target`,
+optional boolean `always`), mark a delivered request `focused`, or dismiss other
+apps' requests. Selection is checked again against current handlers. The service
+delegates a distinct, owner-bound document capability before launching through
+the application broker; it never passes a private filesystem path or arbitrary
+process arguments. Each cross-service stage has a 350 ms absolute deadline and
+runs separately from the request handler. Failure is observable through `result`.
+
+The source polls `result` or uses `cancel`. The recipient polls `receive` for
+events and acknowledges a token using `ack`; a failed acknowledgement can be
+retried and unacknowledged events may be delivered again. Payloads are untrusted
+application data. Receivers validate their content and should handle tokens
+idempotently. Installation identities are rechecked before delivery and receipt.
+Source cancellation/expiry also revokes delegated documents.
+
+Defaults in `/data/leon/system/default-apps.json` bind a selector to an installed
+instance. Only desktop/root/Settings can list `defaults`, `clear_default` with
+`key`, or `set_default` with a resolvable payload and installed `target`.
+`choose` with `always` is reserved for the trusted chooser. Changed or removed
+installations cease to match; a manifest cannot silently take another app's
+default. Root-only `reset_app` invalidates in-flight interactions during clear
+or uninstall. The shell owns presentation/focus; an ordinary client cannot
+impersonate the chooser. An unhandled URI reports no installed handler (the
+prototype does not acquire a browser merely by adding this protocol).
