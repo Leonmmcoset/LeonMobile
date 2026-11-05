@@ -42,7 +42,9 @@ used as the production TMPDIR.
 
 `/dev` is a separate small tmpfs containing only null, zero, full, random,
 urandom, tty, standard fd symlinks, the private shm mount and a **newinstance**
-devpts mount. `/dev/ptmx` points into that instance. Terminal, forkpty, controlling
+devpts mount, limited to 64 PTYs per application. `/dev/ptmx` points into that
+instance. The per-instance quota bounds each app's use of the shared kernel PTY
+pool, and closing masters releases the slots. Terminal, forkpty, controlling
 TTYs and job control use these private PTYs. Hardware, disk, kernel log, input,
 display and sound device nodes are absent. Apps cannot create device nodes or
 mount, join or create namespaces. An authorized service may still transfer an
@@ -112,7 +114,8 @@ An explicitly authorized unrestricted Root helper can modify system policy.
 `scripts/build-target-probes.sh` builds two test packages and the system probe.
 `scripts/test-qemu.py --core-only --system-probe build/system-probe --timeout 240`
 injects them only into a disposable disk. Its real broker launches cover distinct
-mount/PID/IPC namespaces, private scratch and devpts, minimal devices, FD
+mount/PID/IPC namespaces, private scratch and devpts, the 64-PTY limit and slot
+reuse after closing masters, minimal devices, FD
 inheritance, orphan reaping, host PID reporting, exact signal/exit/core status,
 detached cleanup, forced stop, PID 1 failure, invalid staging/home symlinks and
 fresh relaunches. Full interactive terminal and Root suites cover PTY consumers

@@ -76,7 +76,7 @@ static int devices(uid_t uid) {
             return -1;
     }
     char options[128];
-    snprintf(options, sizeof(options), "newinstance,ptmxmode=0666,mode=0600,gid=%u", uid);
+    snprintf(options, sizeof(options), "newinstance,ptmxmode=0666,mode=0600,max=64,gid=%u", uid);
     if (mount("devpts", ROOT "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC, options) ||
         link_path("pts/ptmx", "/dev/ptmx") || link_path("/proc/self/fd", "/dev/fd") ||
         link_path("/proc/self/fd/0", "/dev/stdin") ||

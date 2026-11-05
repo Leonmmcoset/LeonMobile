@@ -95,6 +95,21 @@ int main(int argc, char **argv) {
     int slave = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
     CHECK(slave >= 0 && isatty(slave));
     close(slave); close(master);
+    /* A private instance also needs a quota on the kernel's shared PTY pool. */
+    int ptys[65], allocated = 0;
+    while (allocated < 65) {
+        int pty = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+        if (pty < 0) break;
+        ptys[allocated++] = pty;
+    }
+    /* musl maps the kernel's ENOSPC to the POSIX EAGAIN for posix_openpt. */
+    CHECK(allocated == 64 && errno == EAGAIN);
+    CHECK(open("/dev/ptmx", O_RDWR | O_NOCTTY | O_CLOEXEC) < 0 && errno == ENOSPC);
+    for (int i = 0; i < allocated; ++i) close(ptys[i]);
+    master = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+    CHECK(master >= 0 && !unlockpt(master) && !ptsname_r(master, path, sizeof(path)) &&
+          !strcmp(path, "/dev/pts/0"));
+    close(master);
     /* A short-lived detached orphan must be reaped by the app's own PID 1. */
     pid_t short_child = fork();
     CHECK(short_child >= 0);

@@ -811,3 +811,11 @@ contents and terminal probe, interrupt, edit, paste and restart results.
 serially; an earlier concurrent TCG run entered the existing fail-closed lock
 path. These checks validate the QEMU developer prototype, not physical phones or
 an independently audited production security boundary.
+
+The private devpts mount now also enforces `max=64`. The rebuilt AArch64 image
+passed the complete system/isolation target probe with fixtures checking exactly
+64 masters, kernel `open` returning ENOSPC and musl `posix_openpt` translating it
+to EAGAIN, followed by closing the masters and reusing `/dev/pts/0`. The combined
+run then stopped in the existing Root session-capacity probe; investigation of
+that compatibility failure follows separately. Its serial evidence is retained
+in ignored `build/isolation-evidence/pty-namespace-serial.log`.
