@@ -17,7 +17,7 @@ Settings::Settings(const Options &options)
                   {"language", "zh-CN"},
                   {"navigation", "gestures"},
                   {"volume", 70},
-                  {"reduce_motion", false}};
+                  {"reduce_motion", false}, {"clock_24h", true}};
     if (!fs::exists(path_))
         atomic_json(path_, defaults);
 }
@@ -30,6 +30,7 @@ Json Settings::read() const {
     auto state = read_json(path_);
     if (!state.contains("reduce_motion"))
         state["reduce_motion"] = false;
+    if (!state.contains("clock_24h")) state["clock_24h"] = true;
     return state;
 }
 Json Settings::set(const Json &request) {
@@ -40,7 +41,7 @@ Json Settings::set(const Json &request) {
     }
     auto value = request.at("value");
     std::string key = request.at("key");
-    bool valid = ((key == "dark" || key == "reduce_motion") && value.is_boolean()) ||
+    bool valid = ((key == "dark" || key == "reduce_motion" || key == "clock_24h") && value.is_boolean()) ||
                  (key == "language" && (value == "zh-CN" || value == "en")) ||
                  (key == "navigation" && (value == "gestures" || value == "buttons")) ||
                  (key == "volume" && value.is_number_integer() && value.get<int>() >= 0 &&

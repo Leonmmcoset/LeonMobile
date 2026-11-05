@@ -142,13 +142,26 @@ automatically. QEMU verifies a real USB storage device and a busy mount.
 ## Time
 
 `status` returns Unix seconds, timezone, automatic policy, numeric IPv4 SNTP
-server, synchronization/error state and RTC availability/time. Settings/root/
+server, synchronization/error state and RTC availability/time. It also exposes
+`sync_pending`, durable `last_attempt`/`last_sync` Unix timestamps (zero means
+never), `last_result` and `rtc_error`. Settings/root/
 desktop may use `configure` with optional `timezone`, `automatic`, and `server`.
 Zones must be installed TZif files. Configuration is durable and switches
 `/run/localtime`; `/etc/localtime` points there. Long-running built-ins and the
 shell follow timed's zone and call `tzset`, including under musl's timezone cache.
 
-`set_time` takes integer `unix_seconds` in 2020–2100. `write_rtc` writes UTC to
+`timezones` lists installed TZif zones from zone1970.tab plus Etc/UTC; optional
+`query` performs a case-insensitive ID search. `sync` schedules an immediate
+attempt while automatic time is enabled. Unknown configuration keys fail.
+
+`set_time` takes integer `unix_seconds` in 2020–2100. `set_local_time` takes
+`local` in exact `YYYY-MM-DD HH:MM:SS` form in the daemon's current timezone;
+invalid calendar dates, nonexistent DST times and ambiguous repeated DST times
+are rejected. Manual changes require automatic time to be disabled. Test roots
+validate but never change the host clock or RTC. Successful manual/network
+changes also attempt a UTC RTC write; clock success is retained if RTC writing
+fails, with the separate `rtc_error` describing that failure.
+`write_rtc` writes UTC to
 `/dev/rtc0`. These operations report permission, hardware and I/O errors.
 Automatic SNTP uses a connected nonblocking UDP socket, correlated origin fields,
 server version/mode/leap/stratum checks, and the four NTP timestamps. Samples must

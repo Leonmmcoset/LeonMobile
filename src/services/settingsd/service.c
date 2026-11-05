@@ -29,9 +29,9 @@ lm_json *settings_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             return lm_failure("unknown setting or invalid value");
         }
         lm_json *next = lm_copy(s->values);
-        const char *keys[] = {"dark", "reduce_motion", "language", "navigation", "volume"};
+        const char *keys[] = {"dark", "reduce_motion", "language", "navigation", "volume", "clock_24h"};
         int changed = 0;
-        for (size_t i = 0; i < 5; ++i)
+        for (size_t i = 0; i < 6; ++i)
             if (lm_get(changes, keys[i])) {
                 char *a = lm_dump(lm_get(changes, keys[i])), *b = lm_dump(lm_get(next, keys[i]));
                 changed |= !a || !b || strcmp(a, b);

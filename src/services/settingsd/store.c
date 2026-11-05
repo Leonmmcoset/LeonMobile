@@ -21,12 +21,19 @@ int settings_load(struct lm_daemon *d) {
         const lm_json *values = lm_get(j, "settings");
         int64_t generation = lm_integer(lm_get(j, "generation"), -1);
         if (lm_size(j) != 3 || lm_integer(lm_get(j, "format"), 0) != 1 ||
-            generation < 1 || !settings_validate(values, 1)) {
+            generation < 1 || (!settings_validate(values, 1) &&
+              !(lm_size(values) == 5 && !lm_get(values,"clock_24h") && settings_validate(values,0)))) {
             lm_free(j);
             return -1;
         }
         s->values = lm_copy(values);
         s->generation = generation;
+        if (!lm_get(values,"clock_24h")) {
+            if (generation == INT64_MAX) {lm_free(j);return -1;}
+            lm_set_boolean(s->values,"clock_24h",1);
+            ++s->generation;
+            if (settings_save(d,s->values,s->generation)) {lm_free(j);return -1;}
+        }
         lm_free(j);
         return 0;
     }
@@ -42,8 +49,8 @@ int settings_load(struct lm_daemon *d) {
             lm_free(j);
             return -1;
         }
-        const char *keys[] = {"dark", "reduce_motion", "language", "navigation", "volume"};
-        for (size_t i = 0; i < 5; ++i)
+        const char *keys[] = {"dark", "reduce_motion", "language", "navigation", "volume", "clock_24h"};
+        for (size_t i = 0; i < 6; ++i)
             if (lm_get(j, keys[i]))
                 lm_set(s->values, keys[i], lm_copy(lm_get(j, keys[i])));
         lm_free(j);

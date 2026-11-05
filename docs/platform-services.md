@@ -7,9 +7,11 @@ for the LeonMobile 1.0.0 developer graphics prototype.
 
 ## Settings
 
-`settingsd` owns the five public UI preferences: boolean `dark` and
+`settingsd` owns the six public UI preferences: boolean `dark`, `clock_24h` and
 `reduce_motion`, `language` (`zh-CN`, `en`), `navigation` (`gestures`, `buttons`),
-and integer `volume` (0–100, preferred playback volume). It stores a versioned
+and integer `volume` (0–100, preferred playback volume). `clock_24h` defaults to
+true. Existing complete five-key stores migrate atomically, retain their values
+and advance generation once when adding that default. It stores a versioned
 record with a durable generation in `/data/leon/system/settings.json`.
 Root, the desktop UID 1000 and Settings UID 11000 may write; reads contain only
 these nonsecret preferences. Authentication, root passwords and grants remain

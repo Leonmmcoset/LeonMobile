@@ -137,6 +137,20 @@ class PlatformServices(unittest.TestCase):
                                 capture_output=True, timeout=4)
         self.assertNotEqual(failed.returncode, 0)
 
+    def test_settings_clock_format_schema_migration(self):
+        state=self.root/'settingsd.json'
+        values=dict(dark=True, reduce_motion=False, language='en', navigation='gestures', volume=37)
+        state.write_text(json.dumps(dict(format=1,generation=9,settings=values)))
+        with self.daemon('settingsd') as (endpoint, _):
+            result=rpc(endpoint, {'op':'status'})
+            self.assertEqual(result['generation'],10)
+            self.assertTrue(result['settings']['clock_24h'])
+            for key,value in values.items(): self.assertEqual(result['settings'][key],value)
+            self.assertFalse(rpc(endpoint, {'op':'set','key':'clock_24h','value':'false'},11000)['ok'])
+            self.assertTrue(rpc(endpoint, {'op':'set','key':'clock_24h','value':False},11000)['ok'])
+        with self.daemon('settingsd') as (endpoint, _):
+            self.assertFalse(rpc(endpoint, {'op':'status'})['settings']['clock_24h'])
+
     def test_documents_selection_snapshot_and_revocation(self):
         shared = self.root / "shared"
         shared.mkdir()

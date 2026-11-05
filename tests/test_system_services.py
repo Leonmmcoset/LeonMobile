@@ -144,6 +144,24 @@ class SystemServices(unittest.TestCase):
             self.assertEqual(rpc(s,{'op':'status'})['timezone'],'Asia/Shanghai')
             self.assertFalse(rpc(s,{'op':'status'})['automatic'])
 
+    def test_time_catalog_history_and_strict_manual_controls(self):
+        with self.daemon('timed') as (s, _):
+            self.assertIn('Asia/Shanghai', [z['id'] for z in rpc(s, {'op':'timezones','query':'shang'})['zones']])
+            self.assertFalse(rpc(s, {'op':'timezones','query':False})['ok'])
+            state = rpc(s, {'op':'status'})
+            self.assertEqual(state['last_sync'], 0)
+            self.assertEqual(state['last_result'], 'never')
+            for request in ({'op':'configure','timezone':'Missing/Zone'},
+                            {'op':'configure','server':'0.0.0.0'},
+                            {'op':'configure','unknown':True}, {'op':'configure'},
+                            {'op':'set_time','unix_seconds':1700000000}):
+                self.assertFalse(rpc(s, request, 11000)['ok'])
+            self.assertTrue(rpc(s, {'op':'configure','automatic':False}, 11000)['ok'])
+            for local in ('2023-02-29 12:00:00', '2024-01-01 00:00:60', 'not a date'):
+                self.assertIn('local date/time',rpc(s, {'op':'set_local_time','local':local},11000)['error'])
+            self.assertIn('test roots',rpc(s, {'op':'set_local_time','local':'2024-02-29 12:00:00'},11000)['error'])
+            self.assertFalse(rpc(s, {'op':'sync'},11000)['ok'])
+
     def test_portal_confirmation_identity_and_import_traversal(self):
         with self.daemon('portald') as (s,p):
             self.assertFalse(rpc(s,{'op':'query','uid':11000,'permission':'network'},11002)['ok'])
