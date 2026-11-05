@@ -44,6 +44,7 @@ Json unpack_and_validate(const fs::path &filename, const fs::path &stage) {
             require(++entries <= 8192, "excessive archive entries");
             std::string name = archive_entry_pathname(entry);
             require(safe_path(name), "unsafe archive path");
+            require(name != ".installation", "reserved installation metadata");
             require(!archive_entry_symlink(entry) && !archive_entry_hardlink(entry),
                     "links are forbidden in application packages");
             auto kind = archive_entry_filetype(entry);
@@ -84,18 +85,24 @@ Json unpack_and_validate(const fs::path &filename, const fs::path &stage) {
             if (name != "checksums.json")
                 require(checksums.contains(name) && checksums[name] == digest(stage / name),
                         "checksum mismatch: " + name);
-        auto executable_path = stage / m.at("entry").get<std::string>();
-        require(fs::is_regular_file(executable_path), "application entry missing");
-        unsigned char elf[64]{};
-        std::ifstream exe(executable_path, std::ios::binary);
-        exe.read(reinterpret_cast<char *>(elf), sizeof(elf));
-        require(exe.gcount() == sizeof(elf) && !memcmp(elf, "\177ELF", 4) && elf[4] == 2 &&
-                    elf[5] == 1 && elf[18] == 183 && elf[19] == 0 && (elf[16] == 2 || elf[16] == 3),
-                "entry must be a little-endian ARM64 ELF executable");
-        fs::permissions(executable_path, fs::perms::owner_read | fs::perms::owner_write |
-                                             fs::perms::owner_exec | fs::perms::group_read |
-                                             fs::perms::group_exec | fs::perms::others_read |
-                                             fs::perms::others_exec);
+        std::vector<std::string> executables = {m.at("entry").get<std::string>()};
+        if (m.contains("root"))
+            executables.push_back(m["root"]["entry"].get<std::string>());
+        for (const auto &entry_path : executables) {
+            auto executable_path = stage / entry_path;
+            require(fs::is_regular_file(executable_path), "application entry missing");
+            unsigned char elf[64]{};
+            std::ifstream exe(executable_path, std::ios::binary);
+            exe.read(reinterpret_cast<char *>(elf), sizeof(elf));
+            require(exe.gcount() == sizeof(elf) && !memcmp(elf, "\177ELF", 4) && elf[4] == 2 &&
+                        elf[5] == 1 && elf[18] == 183 && elf[19] == 0 &&
+                        (elf[16] == 2 || elf[16] == 3),
+                    "entry must be a little-endian ARM64 ELF executable");
+            fs::permissions(executable_path, fs::perms::owner_read | fs::perms::owner_write |
+                                                 fs::perms::owner_exec | fs::perms::group_read |
+                                                 fs::perms::group_exec | fs::perms::others_read |
+                                                 fs::perms::others_exec);
+        }
         archive_read_free(reader);
         return m;
     } catch (...) {

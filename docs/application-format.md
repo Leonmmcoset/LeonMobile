@@ -109,3 +109,23 @@ are outside this implementation. A granted app can communicate with other apps;
 this is not a claim of complete information-flow isolation. Explicit development
 roots (`leon-launchd --root`) bypass target cgroups/Landlock to support native host
 fixtures; distribution services never pass that option.
+
+Third-party Root helpers use an explicit declaration, in addition to `entry`:
+
+```json
+"permissions": ["root.exec"],
+"root": {"entry": "libexec/admin", "description": "Read privileged system diagnostics"}
+```
+
+The helper is a separate package-relative, checksummed AArch64 ELF; scripts and
+using the application's main entry as its helper are rejected. The description
+is required, at most 240 UTF-8 bytes, without ASCII control characters. This is
+an application-supplied purpose, not a system endorsement. `root.exec` does not
+belong to the ordinary permission portal and is never a persistent Root grant.
+It requires rootd's system confirmation and a fresh Root password for each command.
+
+The installer creates a reserved `.installation` file with a random 128-bit
+instance ID before publishing each installation transaction. Packages cannot
+supply this file. Updates and even reinstalling the same archive after removal
+produce different instance IDs while retaining the application UID. Legacy
+installations without this metadata must be reinstalled before using Root.

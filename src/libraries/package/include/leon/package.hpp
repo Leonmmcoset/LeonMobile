@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <sys/types.h>
 namespace leon {
 namespace fs = std::filesystem;
 using Json = nlohmann::json;
@@ -17,6 +18,8 @@ class Packages {
     void install(const fs::path &archive);
     void remove(const std::string &id, bool purge);
     fs::path executable(const Json &manifest) const;
+    // Privileged broker adapter: authenticates the actual installed application ELF.
+    Json root_identity(uid_t uid, pid_t pid) const;
     fs::path root;
     fs::path builtin;
 };

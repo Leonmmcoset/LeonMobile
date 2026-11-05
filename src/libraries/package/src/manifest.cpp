@@ -1,4 +1,5 @@
 #include "internal.hpp"
+#include <algorithm>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -38,14 +39,33 @@ void validate_manifest(const Json &m, bool builtin) {
         require(m.at("lifecycle").is_number_integer() && m.at("lifecycle") == 1,
                 "unsupported application lifecycle protocol");
     if (m.contains("permissions")) {
-        require(m["permissions"].is_array() && m["permissions"].size() <= 2, "invalid permissions");
+        require(m["permissions"].is_array() && m["permissions"].size() <= 3, "invalid permissions");
         std::set<std::string> seen;
         for (const auto &permission : m["permissions"]) {
             require(permission.is_string(), "invalid permission");
             auto value = permission.get<std::string>();
-            require((value == "network" || value == "files.import") && seen.insert(value).second,
+            require((value == "network" || value == "files.import" || value == "root.exec") &&
+                        seen.insert(value).second,
                     "unknown or duplicate permission");
         }
+    }
+    bool root_exec = m.contains("permissions") &&
+                     std::find(m["permissions"].begin(), m["permissions"].end(), "root.exec") !=
+                         m["permissions"].end();
+    require(root_exec == m.contains("root"), "root.exec requires an explicit root helper");
+    if (root_exec) {
+        require(!builtin && m["root"].is_object() && m["root"].size() == 2,
+                "invalid root helper declaration");
+        const auto &r = m["root"];
+        require(r.contains("entry") && r["entry"].is_string() &&
+                    safe_path(r["entry"].get<std::string>()) && r["entry"] != m.at("entry"),
+                "root helper must be a separate package executable");
+        require(r.contains("description") && r["description"].is_string(), "missing root purpose");
+        auto description = r["description"].get<std::string>();
+        require(!description.empty() && description.size() <= 240 &&
+                    std::none_of(description.begin(), description.end(),
+                                 [](unsigned char c) { return c < 32 || c == 127; }),
+                "invalid root purpose");
     }
     require(m.at("name").is_string() && !m.at("name").get<std::string>().empty(),
             "missing application name");

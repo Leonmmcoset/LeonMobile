@@ -23,7 +23,7 @@ def main():
             parser.error(f"Only regular files and directories are allowed: {path}")
         if path.is_file():
             name = path.relative_to(args.payload).as_posix()
-            if name in ("manifest.json", "checksums.json"):
+            if name in ("manifest.json", "checksums.json", ".installation"):
                 parser.error(f"Reserved payload filename: {name}")
             files[name] = path.read_bytes()
     if manifest.get("entry") not in files:
@@ -39,7 +39,7 @@ def main():
                 for name, data in sorted(files.items()):
                     entry = tarfile.TarInfo(name)
                     entry.size = len(data)
-                    entry.mode = 0o755 if name == manifest["entry"] else 0o644
+                    entry.mode = 0o755 if name in (manifest["entry"], manifest.get("root", {}).get("entry")) else 0o644
                     entry.uid = entry.gid = entry.mtime = 0
                     archive.addfile(entry, io.BytesIO(data))
 

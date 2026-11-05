@@ -107,4 +107,11 @@ lm_json *lm_app(const char *root, const char *builtin, uid_t uid) {
     }
     return nullptr;
 }
+lm_json *lm_root_app(const char *root, const char *builtin, uid_t uid, pid_t pid) {
+    try {
+        return wrap(new J(leon::Packages(root, builtin).root_identity(uid, pid)));
+    } catch (...) {
+        return nullptr;
+    }
+}
 }

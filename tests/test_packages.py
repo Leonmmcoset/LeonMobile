@@ -31,9 +31,11 @@ class PackageTests(unittest.TestCase):
         return result
 
     def package(self, version="1.0.0", extra=None, arch="aarch64", corrupt=False,
-                link=None, truncated=False):
+                link=None, truncated=False, declarations=None):
         manifest = dict(format=1, id="org.example.demo", version=version,
                         arch=arch, lmui=1, name="Demo", entry="bin/demo")
+        if declarations:
+            manifest.update(declarations)
         # Installer must validate ELF identity before publishing a transaction.
         elf = bytearray(64)
         elf[:7] = b"\x7fELF\x02\x01\x01"
@@ -77,6 +79,44 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(json.loads(self.command("list").stdout)[0]["uid"], initial["uid"])
         self.command("remove", "org.example.demo", "--purge-data")
         self.assertFalse(data.exists())
+
+    def test_installation_identity_changes_on_update_and_same_version_reinstall(self):
+        package = self.package()
+        self.command("install", package)
+        marker = self.root / "apps/org.example.demo/current/.installation"
+        first = marker.read_text()
+        self.assertRegex(first, r"^[a-f0-9]{32}$")
+        self.command("install", self.package("1.0.1"))
+        second = marker.read_text()
+        self.assertNotEqual(first, second)
+        self.command("remove", "org.example.demo")
+        self.command("install", package)
+        self.assertNotIn(marker.read_text(), (first, second))
+        self.command("remove", "org.example.demo")
+        self.command("install", self.package(extra={".installation": b"a" * 32}), success=False)
+
+    def test_root_helper_declaration_and_elf_are_validated_before_publish(self):
+        declaration = {"permissions": ["root.exec"],
+                       "root": {"entry": "libexec/admin", "description": "Inspect system"}}
+        elf = bytearray(64)
+        elf[:7] = b"\x7fELF\x02\x01\x01"
+        struct.pack_into("<HHI", elf, 16, 2, 183, 1)
+        self.command("install", self.package(declarations=declaration,
+                                              extra={"libexec/admin": bytes(elf)}))
+        helper = self.root / "apps/org.example.demo/current/libexec/admin"
+        self.assertEqual(helper.stat().st_mode & 0o777, 0o755)
+        self.command("remove", "org.example.demo")
+        for fields, payload in [
+            ({"permissions": ["root.exec"]}, {}),
+            ({"root": declaration["root"]}, {}),
+            (declaration, {}),
+            (declaration, {"libexec/admin": b"#!/bin/sh"}),
+            ({**declaration, "root": {"entry": "bin/demo", "description": "Unsafe"}}, {}),
+            ({**declaration, "root": {"entry": "../escape", "description": "Unsafe"}}, {}),
+            ({**declaration, "root": {"entry": "libexec/admin", "description": "bad\ntext"}}, {}),
+            ({**declaration, "permissions": ["root.exec", "root.exec"]}, {}),
+        ]:
+            self.command("install", self.package(declarations=fields, extra=payload), success=False)
 
     def test_invalid_upgrade_keeps_current_version(self):
         self.command("install", self.package())

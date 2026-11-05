@@ -30,6 +30,7 @@ lm_json *lm_copy(const lm_json *json);
 lm_json *lm_app_by_id(const char *root, const char *builtin, const char *id);
 int lm_grants_valid(const lm_json *json);
 lm_json *lm_app(const char *root, const char *builtin, uid_t uid);
+lm_json *lm_root_app(const char *root, const char *builtin, uid_t uid, pid_t pid);
 #ifdef __cplusplus
 }
 #endif
