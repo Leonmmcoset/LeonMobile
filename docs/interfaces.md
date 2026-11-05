@@ -278,6 +278,9 @@ operations, authorization rules and recovery limits are specified in
 [core-services.md](core-services.md). Service names in that document are the
 actual leond units; `lmsys` talks directly to each independent daemon.
 
+Additional settings, application interaction, document and audio service
+protocols are specified in [platform-services.md](platform-services.md).
+
 ### LMUI text input and external event descriptors
 
 `Application::text_input_available()` detects text-input-v3. A client enables it
