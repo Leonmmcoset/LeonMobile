@@ -650,3 +650,67 @@ and require retry. These results cover the QEMU developer prototype, not a
 lossless audit guarantee, independent security audit or physical phone support.
 The older `dist/` release bundle is not regenerated; current artifacts are under
 `output/images/` and remain outside version control.
+
+## Platform services and desktop integration (2026-11-05)
+
+The final native build passes 11 CTest cases and all 101 Python integration
+tests. Real UID fixtures cover typed settings/schema/defaults, atomic batches,
+generation conflicts/watches, migration, persistence and storage failure;
+individual document snapshots, binary reads, expiry, quotas, path/peer denial
+and recursive revocation; declared interaction handlers, unsafe URI rejection,
+trusted choice/defaults, acknowledgement, installation changes and lost launch
+reply recovery; network policy validation/persistence/watches; and audio PCM
+ownership, gain, focus, pause/toggle, live preference updates and restart.
+The installed SDK checks compile and consume LeonPlatform through CMake and
+pkg-config. The complete suite also retains the existing authentication, Root,
+logging, sandbox, package, SDK and application-management checks.
+
+Independent native Weston renders all eight apps, the shell and both shade
+stages, and passes keyboard/input, lifecycle and Material motion checks. The
+four local Buildroot components and the AArch64/musl ext4/initramfs/default disk
+image build successfully. Four new supervised units start settingsd, documentd,
+intentd and audiod; netd remains an independent supervised service.
+
+The focused QEMU run passes the actual kernel boot and a real reboot, settings
+broker compatibility, exact document transfer and revocation, real sandboxed
+Editor delivery/acknowledgement and saved contents, PipeWire crash/restart and
+stream invalidation, and synchronous capability reset during application data
+clear. Settings, DNS overrides, default handlers and per-app audio policy survive
+the reboot. Master volume reaches the actual output's requested 70%, including
+the PipeWire device Route and WirePlumber cubic scale.
+
+Actual compositor input exercises the app chooser and Always default, document
+picker cancellation, background playback, lock-screen pause/resume, Settings
+Ethernet disable/reconnect, per-app volume changes, default clearing, opening a
+private Files document in Editor and Settings revocation of its source and
+delegated grants. Clean service shutdown unmounts data and powers QEMU off.
+The 124.2-second captured WAV contains simultaneous 440 Hz and 660 Hz tones in
+the same analysis window, verifying actual output mixing rather than queue
+consumption alone. The capture includes silence and the later Gallery test tone;
+it is an integration fixture, not a continuous media-quality benchmark.
+
+The separate combined QEMU regression also passes native authentication and
+Root probes, logging/offline recovery/real ENOSPC, memory/power/storage/time,
+DHCP renewal and client crash recovery, actual static IPv4/DNS and return to
+DHCP, Landlock/seccomp/cgroups/core capture, terminal VT/PTY/vi/top/clipboard,
+live notifications, Chinese IME restart and permission/file selection. All eight
+built-ins, SDK package installation/removal, shade/navigation/lifecycle controls,
+Settings application management, offline saved-data inspection and clean UI
+poweroff pass against the final default image. Its evidence is in
+`build/platform-qemu-regression.log` and `build/qemu-test/`.
+
+Reproduce the focused check with `scripts/build-target-probes.sh` and
+`python3 scripts/test-qemu.py --timeout 240 --platform-probe build/platform-probe`.
+Evidence remains ignored in `build/platform-{native-build,ctest,python-final,wayland,
+core-final,desktop-final,image-final,qemu}.log` and `build/qemu-platform-test/`,
+including `platform-services.txt`, `platform-reboot.txt`, the serial trace,
+captured WAV, desktop frames and `platform-overview.png`.
+
+These results apply to the LeonMobile 1.0.0 QEMU developer graphics prototype.
+Physical output/headphone switching, microphone capture, wireless/mobile radio
+management and physical phones are unverified or outside these protocols.
+URI dispatch requires an installed declared handler; this change does not add a
+browser. Settings watches use resynchronizable generation polling. Documents
+grant only temporary read access, and revocation cannot recall bytes already
+read. Current images remain under `output/images/`; the older `dist/` bundle is
+not regenerated.
