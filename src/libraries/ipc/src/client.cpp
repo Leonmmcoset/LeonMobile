@@ -67,8 +67,8 @@ std::string request(const std::string &socket_path, const Json &message) {
     return result;
 }
 Json system_request(const std::string &service, const Json &message) {
-    static const std::array<std::string, 7> names{"memory", "power", "network", "storage",
-                                                  "time",   "crash", "portal"};
+    static const std::array<std::string, 11> names{"memory", "power", "network", "storage",
+                                                  "time",   "crash", "portal", "settings", "documents", "intents", "audio"};
     require(std::find(names.begin(), names.end(), service) != names.end(),
             "unknown system service");
     auto result = Json::parse(request("/run/leon/" + service + ".sock", message));

@@ -1,0 +1,9 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+Name: LeonMobile platform client
+Description: Settings, networking, document, interaction and audio protocol SDK
+Version: @PROJECT_VERSION@
+Requires: nlohmann_json
+Libs: -L${libdir} -lleon-platform
+Cflags: -I${includedir} -std=c++20

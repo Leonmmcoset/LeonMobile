@@ -55,6 +55,12 @@ class DistributionTests(unittest.TestCase):
             subprocess.run(["cmake", "--build", external], check=True,
                            capture_output=True, text=True)
             self.assertEqual((external / "hello").read_bytes()[:4], b"\x7fELF")
+            platform = stage / "platform-build"
+            subprocess.run(["cmake", "-S", REPO / "examples/platform", "-B", platform,
+                            "-G", "Ninja", f"-DCMAKE_PREFIX_PATH={stage / 'usr'}"],
+                           check=True, capture_output=True, text=True)
+            subprocess.run(["cmake", "--build", platform], check=True, capture_output=True, text=True)
+            self.assertEqual((platform / "platform-example").read_bytes()[:4], b"\x7fELF")
 
 
 if __name__ == "__main__":

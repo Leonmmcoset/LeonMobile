@@ -2,6 +2,7 @@
 import contextlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -292,3 +293,42 @@ class PlatformServices(unittest.TestCase):
             self.assertEqual(rpc(s, {"op": "status"})["streams"], [])
             token = rpc(s, {"op": "open"}, 11002)["token"]
             self.assertEqual(rpc(s, {"op": "stream", "token": token}, 11002)["stream"]["volume"], 50)
+
+    def test_public_sdk_settings_documents_audio_and_broker_relay(self):
+        with self.daemon("settingsd") as (settings, _), self.daemon("documentd") as (docs, _), self.daemon("audiod"):
+            for name, target in (("settings", settings), ("documents", docs), ("audio", self.root / "audiod.sock")):
+                (self.root / (name + ".sock")).symlink_to(target)
+            binary = self.root / "sdk-test"
+            shutil.copy2(BUILD / "bin/platform-sdk-test", binary)
+            binary.chmod(0o755)
+            shutil.copy2(BUILD / "lib/libleon-platform.so.1", self.root / "libleon-platform.so.1")
+            (self.root / "libleon-platform.so.1").chmod(0o644)
+            def sdk(*args):
+                result = subprocess.run([binary, self.root, *args],
+                    env=dict(os.environ, LD_LIBRARY_PATH=str(self.root)),
+                    capture_output=True, text=True, timeout=5, user=11004, group=11004, extra_groups=[])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout)
+            self.assertEqual(sdk("settings")["settings"]["language"], "zh-CN")
+            token = sdk("choose")["token"]
+            shared = self.root / "shared"
+            shared.mkdir()
+            (shared / "note").write_text("SDK 中文\n")
+            self.assertTrue(rpc(docs, {"op": "pick", "token": token, "file": "note"}, 1000)["ok"])
+            self.assertEqual(sdk("read", token)["text"], "SDK 中文\n")
+            self.assertEqual(sdk("audio")["accepted"], 2048)
+            endpoint = self.root / "relay.sock"
+            process = subprocess.Popen([BUILD / "bin/leon-launchd", "--root", self.root,
+                "--builtin", self.builtin, "--socket", endpoint, "--settings-socket", settings],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                deadline = time.monotonic() + 4
+                while not endpoint.exists() and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertTrue(rpc(endpoint, {"op": "set", "key": "dark", "value": True}, 11000)["ok"])
+                self.assertTrue(rpc(settings, {"op": "status"})["settings"]["dark"])
+                self.assertFalse((self.root / "settings.json").exists())
+            finally:
+                process.terminate()
+                _, error = process.communicate(timeout=6)
+                self.assertEqual(process.returncode, 0, error.decode())

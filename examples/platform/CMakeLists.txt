@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(LeonPlatformExample LANGUAGES CXX)
+find_package(LeonPlatform 1 CONFIG REQUIRED)
+add_executable(platform-example main.cpp)
+target_link_libraries(platform-example PRIVATE LeonPlatform::Platform)
