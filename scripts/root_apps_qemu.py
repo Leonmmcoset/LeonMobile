@@ -38,7 +38,8 @@ def exercise_root_applications(guest, qmp, artifacts, timeout, reboot=True):
     def button_region(frame):
         return frame[448*480*3:492*480*3]
     def manager_ready(frame):
-        if pixel(frame,30,416)!=bytes.fromhex("eaddff"):
+        if (pixel(frame,30,416)!=bytes.fromhex("eaddff") or
+                pixel(frame,450,416)!=bytes.fromhex("eaddff")):
             return False
         # The history label uses the primary color only after the asynchronous
         # authenticated operation has finished and its actions are enabled.
@@ -122,6 +123,7 @@ def exercise_root_applications(guest, qmp, artifacts, timeout, reboot=True):
     qmp.wait_frame(artifacts/"root-app-manager-ready.ppm",manager_ready,"Root app manager did not finish loading")
     capture("manager-blocked")
     click(130,590)
+    qmp.wait_frame(artifacts/"root-app-manager-password-ready.ppm",lambda f:pixel(f,3,604)==bytes.fromhex("eaddff") and pixel(f,450,432)==bytes.fromhex("6750a4"),"Authenticated policy change did not acquire the private password IME")
     qmp.type_text(PASSWORD); qmp.key("ret")
     qmp.wait_frame(artifacts/"root-app-unblocked-ready.ppm",manager_ready,"Authenticated unblocking did not finish and re-enable the manager")
     capture("manager-ask")

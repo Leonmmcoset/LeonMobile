@@ -512,6 +512,17 @@ selection, all eight built-ins, SDK package installation/removal, shade and
 lifecycle controls, Settings application management and clean UI poweroff.
 Offline ext4 inspection verified the exact saved editor and terminal data.
 
+The recorder completed an uncut, silent production-image capture from boot
+through password setup, third-party confirmation, failed authentication,
+diagnostics, block/unblock and history, followed by clean poweroff. Only the
+installable SDK demo was copied into its private disk; no privileged test
+service or authentication bypass was injected. The MP4 contains 2,251 H.264
+yuv420p frames at 480×960 and 30 fps, lasting 75.034 seconds. Full FFmpeg
+decoding completed without errors. Decoded frames were inspected for the lock
+screen, exact command, masked password and final app UID 12000/helper UID 0
+diagnostic. The movie, PNG captures, timeline and serial/encoder/probe logs stay
+ignored under `build/recordings/LeonMobile-third-party-root*`.
+
 Reproduction and trust boundaries are documented in
 [root-access.md](root-access.md) and [building.md](building.md). Evidence remains
 ignored in `build/third-party-root-*.log` and `build/qemu-root-apps-test/`.

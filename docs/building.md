@@ -169,3 +169,27 @@ rejected; use a new filename for another take. Videos and supporting evidence
 belong under ignored `build/`, rather than in Git. This is a recording of the
 QEMU developer prototype, with the same device and security limits as normal
 target validation.
+
+For the optional third-party Root SDK example, first build the system, then run
+`./scripts/build-root-example.sh`. The generated package is under
+`build/root-demo/`; it is not included in the default image. Root remains
+disabled by default. The SDK's `LeonRoot::Root` API and separate helper manifest
+are documented in `docs/root-access.md`.
+
+Additional validation:
+
+```sh
+python3 scripts/test-root-wayland.py
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 240 \
+  --root-apps-probe build/root-applications-probe \
+  --root-apps-package build/root-demo/org.example.rootdemo-1.0.0.lmpkg
+python3 scripts/record-root-apps.py --output build/recordings/LeonMobile-third-party-root.mp4
+```
+
+The focused QEMU check uses `build/qemu-root-apps-test/`, injects probes only into
+a disposable image and performs a real guest reboot. The recorder uses the
+production image and only copies the installable demo package into its private
+disk; system confirmation and Root password entry use QMP keyboard/pointer input. Its
+MP4 is an uncut 480×960, 30 fps silent capture of the QEMU viewport. Evidence,
+images and temporary fixture packages stay outside version control.
