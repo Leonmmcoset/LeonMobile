@@ -10,6 +10,6 @@ class Settings {
 
   private:
     fs::path path_;
-    std::string runtime_prefix_;
+    std::string socket_;
 };
 } // namespace leon::appd

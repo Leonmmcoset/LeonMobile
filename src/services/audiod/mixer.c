@@ -51,7 +51,8 @@ void audio_focus(struct audio *s) {
         if (duck && p->focus != 2)
             gain /= 5;
         if (s->test)
-            gain = s->muted ? 0 : gain * (unsigned)s->volume / 100;
+            gain = s->muted ? 0 : (unsigned)((uint64_t)gain * (unsigned)s->volume *
+                                             (unsigned)s->volume * (unsigned)s->volume / 1000000);
         atomic_store(&p->gain, gain);
     }
 }

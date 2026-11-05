@@ -22,7 +22,7 @@ return `error`. Unknown operations and wrong field types fail.
 | --- | --- | --- |
 | `memory.sock` | `memory` / `memd` | `/data/leon/system/memory.json` |
 | `power.sock` | `power` / `powerd` | `/data/leon/system/power.json` |
-| `network.sock` | `network` / `netd` | Session DHCP state in `/run` |
+| `network.sock` | `network` / `netd` | `/data/leon/system/network.json`; session DHCP state in `/run` |
 | `storage.sock` | `storage` / `storaged` | Mounted volumes are session state |
 | `time.sock` | `time` / `timed` | `/data/leon/system/time.json` |
 | `crash.sock` | `crash` / `crashd` | `/data/leon/crashes/` |

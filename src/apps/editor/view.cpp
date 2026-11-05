@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include <leon/system.hpp>
+#include <leon/platform.hpp>
 using namespace mobile;
 namespace leon::apps {
 EditorApplication::EditorApplication()
@@ -14,6 +15,7 @@ void EditorApplication::import_document() {
     error = tr(en, "请在系统窗口确认并选择文件", "Confirm and choose a file in the system window");
 }
 void EditorApplication::on_tick() {
+    poll_interactions();
     if (!awaiting_import)
         return;
     try {
@@ -64,10 +66,13 @@ void EditorApplication::paint_content(Canvas &c, double bottom) {
             focus = 0;
         });
     });
-    c.rounded({20, 144, w - 40, bottom - 222}, t.surface, 16);
+    button(c, hits, {20, 142, w - 40, 46}, tr(en, "通过系统选择文件", "Choose a system document"), [this] {
+        perform([this] { document_token=leon::platform::Client().choose_document();keyboard=false; });
+    });
+    c.rounded({20, 202, w - 40, bottom - 280}, t.surface, 16);
     c.text(document.text.empty() ? tr(en, "点击开始编辑…", "Tap to edit…") : document.text,
-           {32, 154, w - 64, bottom - 242}, 16, t.text);
-    click(hits, {20, 144, w - 40, bottom - 222}, [&] {
+           {32, 212, w - 64, bottom - 300}, 16, t.text);
+    click(hits, {20, 202, w - 40, bottom - 280}, [&] {
         focus = 0;
         keyboard = true;
     });

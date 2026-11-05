@@ -9,7 +9,7 @@ void Shell::pointer(double x, double y, bool down) {
         down_x = x;
         down_y = y;
         touch_feedback.handle({x, y, PointerPhase::down}, hits);
-        if (!root_prompt.empty() && page != Page::lock)
+        if ((!root_prompt.empty() || !permission.empty() || !interaction.empty()) && page != Page::lock)
             return;
         volume_gesture = shade.visible() && !power_menu && volume_track.contains(x, y);
         notification_gesture = shade.visible() && !power_menu && !notifications.empty() &&
@@ -31,7 +31,7 @@ void Shell::pointer(double x, double y, bool down) {
         return;
     pressed = false;
     double dx = x - down_x, dy = y - down_y;
-    if (!root_prompt.empty() && page != Page::lock) {
+    if ((!root_prompt.empty() || !permission.empty() || !interaction.empty()) && page != Page::lock) {
         touch_feedback.handle({x, y, PointerPhase::up}, hits);
         app.redraw();
         return;
@@ -65,7 +65,7 @@ void Shell::pointer(double x, double y, bool down) {
         }
     }
     if (page == Page::lock) {
-        if (unlock_entry && std::abs(dx) < 16 && std::abs(dy) < 16)
+        if (std::abs(dx) < 16 && std::abs(dy) < 16 && (unlock_entry || (!audio_state.empty() && down_y > 410 && down_y < 550)))
             touch_feedback.handle({x, y, PointerPhase::up}, hits);
         else if (dy < -60 ||
                  (down_y > app.height() - 220 && std::abs(dx) < 16 && std::abs(dy) < 16))

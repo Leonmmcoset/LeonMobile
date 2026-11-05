@@ -108,6 +108,12 @@ void manage_application(Packages &packages, Processes &processes, const Options 
     // Root-only reset has no callback to apps.sock: avoid a broker/portal cycle.
     // A failed reset must never publish a successful data clear or uninstall.
     portal(options, {{"op", "reset_app"}, {"app", id}});
+    if (!options.development)
+        for (const auto *service : {"documents", "intents", "audio"}) {
+            auto result = Json::parse(leon::request(std::string("/run/leon/") + service + ".sock",
+                                                   {{"op", "reset_app"}, {"app", id}}));
+            fail(result.value("ok", false), (std::string("cannot reset ") + service).c_str());
+        }
     erase_private_tree(options.runtime_prefix, std::to_string(uid));
     if (!uninstall || purge)
         erase_private_tree(packages.root / "data", id);

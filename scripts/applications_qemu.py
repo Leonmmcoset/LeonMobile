@@ -6,7 +6,7 @@ import time
 
 def exercise_applications_ui(guest, qmp, artifacts, package, timeout, reboot=False):
     gallery, local = "org.leon.gallery", "org.example.hello"
-    preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+    preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
     container = bytes.fromhex("30293c" if preferences.get("dark") else "eaddff")
     background = bytes.fromhex("15121b" if preferences.get("dark") else "fff8ff")
     primary = bytes.fromhex("d0bcff" if preferences.get("dark") else "6750a4")

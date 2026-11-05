@@ -11,6 +11,9 @@ void SettingsApplication::open(Page page) {
     transition_content();
     history_.push_back(page_);
     page_ = page;
+    platform_data_ = Json::object();
+    network_field_ = -1; network_loaded_ = false;
+    platform_refresh();
     keyboard = false;
     scroll = 0;
     error.clear();
@@ -68,6 +71,12 @@ void SettingsApplication::back() {
     app.redraw();
 }
 void SettingsApplication::text_input(const std::string &text) {
+    if (page_ == Page::network && network_field_ >= 0) {
+        if (text == "\n") { keyboard = false; network_field_ = -1; }
+        else if (text == "\b") backspace(network_fields_[network_field_]);
+        else if (network_fields_[network_field_].size() + text.size() <= 160) network_fields_[network_field_] += text;
+        app.redraw(); return;
+    }
     if (page_ == Page::applications) {
         applications_text(text);
         return;
@@ -98,6 +107,7 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
     return true;
 }
 void SettingsApplication::on_tick() {
+    platform_poll();
     diagnostics_poll();
     applications_poll();
     developer_poll();
@@ -114,6 +124,7 @@ void SettingsApplication::on_tick() {
     if (++status_ticks_ < 10)
         return;
     status_ticks_ = 0;
+    platform_refresh();
     auto info = settings::read_device_info();
     if (device_ != info) {
         device_ = std::move(info);

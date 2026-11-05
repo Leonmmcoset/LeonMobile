@@ -8,6 +8,7 @@ struct Options {
     std::string notifications_socket{"/run/leon/notifications.sock"};
     std::string root_socket{"/run/leon-root/control.sock"};
     std::string portal_socket{"/run/leon/portal.sock"};
+    std::string settings_socket;
     std::string wayland_socket{"/run/leon/wayland/wayland-0"};
     std::string log_socket;
     bool development{};

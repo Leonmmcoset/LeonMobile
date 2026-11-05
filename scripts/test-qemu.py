@@ -62,7 +62,7 @@ class Guest:
         deadline = time.monotonic() + 10
         actual = None
         while time.monotonic() < deadline:
-            actual = json.loads(self.run("cat /data/leon/settings.json")).get(key)
+            actual = json.loads(self.run("lmsys settings '{\"op\":\"status\"}'"))["settings"].get(key)
             if actual == expected:
                 return
             time.sleep(.2)
@@ -212,9 +212,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None, platform_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe, platform_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -223,6 +223,18 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         # debugfs has its own command parser; no shell interprets these paths.
         commands.append("write " + json.dumps(str(source.resolve())) + " " + destination)
         commands.append("set_inode_field " + destination + " mode 0100755")
+    if platform_probe:
+        put(platform_probe, "/usr/bin/leon-test-platform")
+        unit = temporary / "platform-test.toml"
+        unit.write_text('name="platform-test"\ncommand=["/usr/bin/leon-test-platform"]\n'
+                        'after=["settings","documents","intents","audio","apps"]\n'
+                        'type="oneshot"\nrestart="never"\n')
+        put(unit, "/etc/leon/services/99-platform-test.toml")
+        unit = temporary / "platform-shell.toml"
+        unit.write_text((REPO / "distro/rootfs-overlay/etc/leon/services/30-shell.toml").read_text()
+                        .replace('after = [', 'after = ["platform-test", '))
+        commands.append("rm /etc/leon/services/30-shell.toml")
+        put(unit, "/etc/leon/services/30-shell.toml")
     if boot_console_probe:
         put(boot_console_probe, "/usr/bin/leon-test-boot-console")
         unit = temporary / "boot-console-test.toml"
@@ -518,6 +530,7 @@ def verify_core_data(disk,temp):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--platform-probe", type=Path, help="AArch64 platform-service and media integration fixture")
     parser.add_argument("--timeout", type=int, default=150)
     parser.add_argument("--images", type=Path, default=REPO / "output/images",
                         help="image directory, including an assembled local release")
@@ -549,6 +562,14 @@ def main():
     parser.add_argument("--logging-only", action="store_true",
                         help="production logging diagnostics UI and previous history across real reboot")
     args = parser.parse_args()
+    if args.platform_probe:
+        if not args.platform_probe.is_file():
+            parser.error("--platform-probe must name the compiled AArch64 fixture")
+        if any((args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe,
+                args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package,
+                args.boot_console_probe, args.package, args.core_only, args.root_only, args.auth_only,
+                args.applications_only, args.logging_only)):
+            parser.error("Platform checks require their own disposable disk and exclude other probes")
     if args.logging_only and any((args.system_probe, args.root_probe, args.auth_probe,
                                   args.applications_probe, args.root_apps_probe, args.boot_console_probe,
                                   args.core_only, args.root_only, args.auth_only, args.applications_only)):
@@ -594,7 +615,8 @@ def main():
     if args.terminal_probe and args.core_only:
         parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
-    artifacts = REPO / ("build/qemu-logging-test" if args.logging_only else
+    artifacts = REPO / ("build/qemu-platform-test" if args.platform_probe else
+                        "build/qemu-logging-test" if args.logging_only else
                         "build/qemu-boot-console-test" if args.boot_console_probe else
                         "build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -603,7 +625,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package, args.boot_console_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package, args.boot_console_probe, args.platform_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -617,7 +639,7 @@ def main():
                    "virtio-blk-pci,drive=system", "-device", "virtio-gpu-pci,xres=480,yres=960",
                    "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
                    "-netdev", "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
-                   "-audiodev", "none,id=audio", "-device", "intel-hda", "-device",
+                   "-audiodev", ("wav,id=audio,path=" + str(artifacts / "platform-audio.wav") if args.platform_probe else "none,id=audio"), "-device", "intel-hda", "-device",
                    "hda-duplex,audiodev=audio", "-display", "none", "-monitor", "none",
                    "-serial", "stdio", "-qmp", f"unix:{endpoint},server=on,wait=off"]
         if args.system_probe:
@@ -677,6 +699,10 @@ def main():
                         network = failed_guest.run("lmsys network '{\"op\":\"status\"}'; ip -4 addr show dev eth0")
                         (artifacts / "network-failed.txt").write_text(network + "\n")
                         raise RuntimeError(result)
+                    if args.platform_probe and "exited platform-test status=1" in text and "\n$ " in text.replace("\r", ""):
+                        result = Guest(proc, log).run("cat /run/leon/platform-tests.txt")
+                        (artifacts / "platform-services.txt").write_text(result + "\n")
+                        raise RuntimeError(result)
                     if "leond: started shell" in text and "\n$ " in text.replace("\r", ""):
                         break
                     time.sleep(.25)
@@ -686,6 +712,19 @@ def main():
                     raise RuntimeError("No framebuffer startup log was observed before Wayland")
                 # Serial login is non-root. The broker provides controlled operations.
                 guest = Guest(proc, log)
+                if args.platform_probe:
+                    from platform_qemu import exercise_platform, verify_audio
+                    result = guest.run("cat /run/leon/platform-tests.txt")
+                    (artifacts / "platform-services.txt").write_text(result + "\n")
+                    if "PLATFORM_TESTS_PASSED" not in result:
+                        raise RuntimeError(result)
+                    exercise_platform(guest, qmp, artifacts)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=30)
+                    verify_audio(artifacts / "platform-audio.wav")
+                    passed = True
+                    print("Platform services, real PCM mixing, trusted selection, Settings and media UI passed", flush=True)
+                    return
                 consoles = guest.run("cat /proc/consoles")
                 (artifacts / "boot-consoles.txt").write_text(consoles + "\n")
                 if not all(re.search(rf"^{name}\s", consoles, re.M) for name in ("tty0", "ttyAMA0")):
@@ -727,7 +766,7 @@ def main():
                     services = guest.run("leonctl status")
                 (artifacts / "notifications-service.txt").write_text(services + "\n")
                 service_pids = {}
-                for service in ("logging", "apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root", "authentication"):
+                for service in ("logging", "apps", "notifications", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method", "root", "authentication", "settings", "documents", "intents", "audio"):
                     running = re.search(rf"^{service}\trunning\tpid=(\d+)", services, re.M)
                     if not running:
                         raise RuntimeError("Required service is not running: " + service)
@@ -845,7 +884,7 @@ def main():
                     print("Root protocol, developer UI, sandboxed su and two real reboots passed", flush=True)
                     return
                 if args.core_only:
-                    preferences=json.loads(guest.run("cat /data/leon/settings.json"))
+                    preferences=json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                     exercise_core_ui(guest,qmp,artifacts,preferences)
                     guest.run("lmsys power '{\"op\":\"poweroff\"}'")
                     proc.wait(timeout=25)
@@ -1048,7 +1087,7 @@ def main():
                     qmp.wait_shade(artifacts / "shade-return-expanded.ppm", 896)
                 qmp.click(350, 200)  # Theme tile
                 time.sleep(.5)
-                if not json.loads(guest.run("cat /data/leon/settings.json"))["dark"]:
+                if not json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]["dark"]:
                     raise RuntimeError("Shade theme tile did not update system settings")
                 qmp.capture(artifacts / "shade-expanded-dark.ppm")
                 qmp.click(350, 200)
@@ -1113,18 +1152,18 @@ def main():
                 qmp.click(400, 257)  # Dark theme switch
                 time.sleep(1)
                 qmp.capture(artifacts / "settings-display-dark.ppm")
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("dark") is not True:
                     raise RuntimeError("Settings UI did not persist the dark theme")
                 qmp.click(400, 720)  # Display -> Reduce motion
                 time.sleep(.4)
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("reduce_motion") is not True:
                     raise RuntimeError("Reduce motion preference did not persist")
                 qmp.capture(artifacts / "settings-reduced-motion.ppm")
                 qmp.click(400, 720)  # Restore full motion
                 time.sleep(.4)
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("reduce_motion") is not False:
                     raise RuntimeError("Full motion preference could not be restored")
                 qmp.click(36, 75)  # Back to categories
@@ -1168,7 +1207,7 @@ def main():
                 qmp.click(180, 328)  # English
                 time.sleep(.5)
                 qmp.capture(artifacts / "settings-english.ppm")
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("language") != "en":
                     raise RuntimeError("Language selection did not persist")
                 qmp.click(180, 244)  # Restore simplified Chinese
@@ -1180,12 +1219,12 @@ def main():
                 qmp.click(350, 320)  # 3-button navigation
                 time.sleep(.5)
                 qmp.capture(artifacts / "settings-navigation-buttons.ppm")
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("navigation") != "buttons":
                     raise RuntimeError("Navigation selection did not persist")
                 qmp.click(120, 320)  # Restore gestures
                 time.sleep(.3)
-                preferences = json.loads(guest.run("cat /data/leon/settings.json"))
+                preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("navigation") != "gestures" or preferences.get("language") != "zh-CN":
                     raise RuntimeError("Settings UI could not restore language/navigation")
                 qmp.click(36, 75)

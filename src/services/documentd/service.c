@@ -76,7 +76,7 @@ lm_json *document_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             return lm_failure("permission denied");
         lm_json *out = lm_success(), *items = lm_array();
         for (size_t i = 0; i < DOCUMENT_LIMIT; ++i)
-            if (s->items[i].token[0] && (lm_trusted(uid) || s->items[i].uid == uid) &&
+            if (s->items[i].token[0] && (lm_trusted(uid) || uid == 11000 || s->items[i].uid == uid) &&
                 (!pending || s->items[i].state == 0))
                 lm_append(items, describe(&s->items[i]));
         lm_set(out, pending ? "requests" : "documents", items);
@@ -127,7 +127,7 @@ lm_json *document_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             p = &s->items[i];
     if (!p)
         return lm_failure("unknown or expired document");
-    if (uid != p->uid && !lm_trusted(uid))
+    if (uid != p->uid && !lm_trusted(uid) && !(uid == 11000 && !strcmp(op, "revoke")))
         return lm_failure("permission denied");
     if (!strcmp(op, "selection"))
         return describe(p);

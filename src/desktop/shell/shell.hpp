@@ -51,9 +51,15 @@ class Shell {
     void paint_root(lmui::Canvas &);
     Json permission = Json::object(), power_state = Json::object();
     std::string power_label(bool compact = false) const;
+    Json interaction = Json::object(), audio_state = Json::object();
+    void platform_refresh();
+    void paint_interaction(lmui::Canvas &);
+    void paint_media(lmui::Canvas &, double y);
     bool permission_focused{};
     Json picker_files = Json::array();
-    std::string picker_directory;
+    std::string picker_directory, picker_token;
+    size_t interaction_page{};
+    std::string interaction_token;
     size_t picker_page{};
     void picker_open(const std::string &directory);
     void picker_choose(const std::string &file);

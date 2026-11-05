@@ -3,9 +3,11 @@ import contextlib
 import json
 import os
 import shutil
+import socket
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 
@@ -79,8 +81,8 @@ class PlatformServices(unittest.TestCase):
             _, error = process.communicate(timeout=6)
             self.assertEqual(process.returncode, 0, error.decode())
 
-    def wait_result(self, endpoint, token, state="delivered", uid=11002):
-        deadline = time.monotonic() + 4
+    def wait_result(self, endpoint, token, state="delivered", uid=11002, timeout=4):
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             result = rpc(endpoint, {"op": "result", "token": token}, uid)
             if result.get("state") == state:
@@ -148,23 +150,28 @@ class PlatformServices(unittest.TestCase):
             token = grant["token"]
             self.assertEqual(len(token), 32)
             self.assertFalse(rpc(s, {"op": "pending"}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "pending"}, 11000)["ok"])
             self.assertFalse(rpc(s, {"op": "selection", "token": token}, 11002)["ok"])
+            self.assertEqual(rpc(s, {"op": "list"}, 11002)["documents"], [])
+            self.assertEqual(rpc(s, {"op": "list"}, 11000)["documents"][0]["token"], token)
             self.assertEqual(rpc(s, {"op": "pending"}, 1000)["requests"][0]["app"], "org.leon.editor")
             for file in ("../builtin/editor.json", "/etc/passwd", "escape", "pipe"):
                 self.assertFalse(rpc(s, {"op": "pick", "token": token, "file": file}, 1000)["ok"])
             self.assertFalse(rpc(s, {"op": "pick", "token": token, "file": "note"}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "pick", "token": token, "file": "note"}, 11000)["ok"])
             self.assertTrue(rpc(s, {"op": "pick", "token": token, "file": "note"}, 1000)["ok"])
             (shared / "note").write_bytes(b"changed")
             data = rpc(s, {"op": "read", "token": token, "offset": 0, "length": 2048}, 11004)
             self.assertEqual(bytes.fromhex(data["hex"]), b"hello\x00world\xff")
             self.assertTrue(data["eof"])
+            self.assertFalse(rpc(s, {"op": "read", "token": token, "offset": 0, "length": 4}, 11000)["ok"])
             self.assertFalse(rpc(s, {"op": "read", "token": token, "offset": True, "length": 2}, 11004)["ok"])
             self.assertFalse(rpc(s, {"op": "read", "token": token, "offset": 0, "length": 2049}, 11004)["ok"])
             child = rpc(s, {"op": "delegate", "token": token, "from_uid": 11004, "to_uid": 11002})
             self.assertTrue(child["ok"], child)
             self.assertFalse(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11004)["ok"])
             self.assertTrue(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11002)["ok"])
-            self.assertTrue(rpc(s, {"op": "revoke", "token": token}, 11004)["ok"])
+            self.assertTrue(rpc(s, {"op": "revoke", "token": token}, 11000)["ok"])
             self.assertFalse(rpc(s, {"op": "read", "token": child["token"], "offset": 0, "length": 4}, 11002)["ok"])
 
     def test_documents_private_offer_expiry_quota_and_restart(self):
@@ -207,6 +214,15 @@ class PlatformServices(unittest.TestCase):
             self.assertTrue(rpc(s, {"op": "ack", "token": token}, 11004)["ok"])
             self.assertEqual(rpc(s, {"op": "receive"}, 11004)["events"], [])
             self.assertTrue(rpc(s, {"op": "result", "token": token}, 11002)["acknowledged"])
+            uri = "https://example.com/document?q=LeonMobile#intro"
+            resolved = rpc(s, {"op": "resolve", "action": "open", "uri": uri}, 11004)
+            self.assertEqual([app["id"] for app in resolved["candidates"]], ["org.leon.gallery"])
+            link = rpc(s, {"op": "request", "action": "open", "uri": uri}, 11004)["token"]
+            self.assertTrue(rpc(s, {"op": "choose", "token": link, "target": "org.leon.gallery"}, 1000)["ok"])
+            self.wait_result(s, link, uid=11004)
+            event = rpc(s, {"op": "receive"}, 11002)["events"][0]
+            self.assertEqual(event["payload"]["uri"], uri)
+            self.assertTrue(rpc(s, {"op": "ack", "token": link}, 11002)["ok"])
         with self.daemon("intentd") as (s, _):
             self.assertIn("share:mime:text/plain", rpc(s, {"op": "defaults"}, 11000)["defaults"])
             token = rpc(s, {"op": "request", **payload}, 11002)["token"]
@@ -241,6 +257,62 @@ class PlatformServices(unittest.TestCase):
             self.assertNotEqual(received, document)
             self.assertEqual(bytes.fromhex(rpc(docs, {"op": "read", "token": received, "offset": 0, "length": 20}, 11004)["hex"]), b"private")
 
+    def test_interactions_retry_lost_launch_reply_and_bound_outage(self):
+        endpoint = self.root / "apps.sock"
+        calls, errors = [], []
+        stop = threading.Event()
+        with socket.socket(socket.AF_UNIX) as listener:
+            listener.bind(str(endpoint))
+            listener.listen(4)
+            listener.settimeout(.1)
+
+            def serve():
+                while not stop.is_set():
+                    try:
+                        connection, _ = listener.accept()
+                    except socket.timeout:
+                        continue
+                    with connection:
+                        connection.settimeout(1)
+                        try:
+                            data = bytearray()
+                            while block := connection.recv(8192):
+                                data.extend(block)
+                            calls.append(json.loads(data))
+                            if len(calls) == 1:
+                                # The launch succeeded but its first acknowledgement
+                                # arrives after intentd's bounded RPC deadline.
+                                stop.wait(.45)
+                            connection.sendall(b'{"ok":true}\n')
+                        except (BrokenPipeError, ConnectionResetError):
+                            pass
+                        except Exception as error:
+                            errors.append(error)
+
+            worker = threading.Thread(target=serve)
+            worker.start()
+            try:
+                with self.daemon("intentd") as (s, _):
+                    token = rpc(s, {"op": "request", "action": "share", "mime": "text/plain", "text": "late reply"}, 11002)["token"]
+                    self.assertTrue(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor"}, 1000)["ok"])
+                    self.wait_result(s, token)
+                    self.assertEqual(calls, [{"op": "launch", "id": "org.leon.editor"}] * 2)
+                    self.assertEqual(len(rpc(s, {"op": "receive"}, 11004)["events"]), 1)
+            finally:
+                stop.set()
+                worker.join(timeout=2)
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(errors, [])
+        endpoint.unlink()
+        with self.daemon("intentd") as (s, _):
+            token = rpc(s, {"op": "request", "action": "share", "mime": "text/plain", "text": "outage"}, 11002)["token"]
+            self.assertTrue(rpc(s, {"op": "choose", "token": token, "target": "org.leon.editor"}, 1000)["ok"])
+            result = self.wait_result(s, token, state="failed", timeout=8)
+            self.assertIn("timed out", result["error"])
+            self.assertEqual(rpc(s, {"op": "pending"}, 1000)["requests"][0]["state"], "failed")
+            self.assertTrue(rpc(s, {"op": "cancel", "token": token}, 1000)["ok"])
+            self.assertEqual(rpc(s, {"op": "pending"}, 1000)["requests"], [])
+
     def test_network_policy_validation_persistence_and_watch(self):
         with self.daemon("netd") as (s, _):
             initial = rpc(s, {"op": "status"})
@@ -259,28 +331,51 @@ class PlatformServices(unittest.TestCase):
         with self.daemon("netd") as (s, _):
             self.assertEqual(rpc(s, {"op": "status"})["configuration"]["method"], "static")
 
+    def test_audio_tracks_live_settings_changes(self):
+        with self.daemon("settingsd") as (settings, _), self.daemon("audiod") as (audio, _):
+            for volume in (37, 70, 25, 100):
+                self.assertTrue(rpc(settings, {"op": "set", "key": "volume", "value": volume}, 11000)["ok"])
+                deadline = time.monotonic() + 4
+                while time.monotonic() < deadline:
+                    state = rpc(audio, {"op": "status"})
+                    if state["volume"] == volume:
+                        break
+                    time.sleep(.05)
+                self.assertEqual(state["volume"], volume)
+
     def test_audio_pcm_ownership_volume_focus_pause_and_restart(self):
         with self.daemon("settingsd"), self.daemon("audiod") as (s, _):
             self.assertFalse(rpc(s, {"op": "open"}, 12345)["ok"])
             self.assertFalse(rpc(s, {"op": "open", "rate": True}, 11002)["ok"])
+            self.assertFalse(rpc(s, {"op": "open", "paused": "true"}, 11002)["ok"])
             self.assertFalse(rpc(s, {"op": "set_master", "volume": 50}, 11002)["ok"])
-            first = rpc(s, {"op": "open", "title": "Track"}, 11002)["token"]
+            first = rpc(s, {"op": "open", "title": "Track", "paused": True}, 11002)["token"]
             self.assertFalse(rpc(s, {"op": "write", "token": first, "hex": "1027" * 1024}, 11004)["ok"])
+            self.assertFalse(rpc(s, {"op": "toggle", "token": first}, 11004)["ok"])
             self.assertFalse(rpc(s, {"op": "write", "token": first, "hex": "xx"}, 11002)["ok"])
             self.assertTrue(rpc(s, {"op": "set_volume", "volume": 50}, 11002)["ok"])
             written = rpc(s, {"op": "write", "token": first, "hex": "1027" * 1024}, 11002)
             self.assertEqual(written["accepted"], 2048)
+            paused = rpc(s, {"op": "stream", "token": first}, 11002)["stream"]
+            self.assertTrue(paused["paused"])
+            self.assertEqual(paused["played_bytes"], 0)
+            self.assertEqual(paused["buffered_bytes"], 2048)
+            self.assertTrue(rpc(s, {"op": "resume", "token": first}, 11002)["ok"])
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 state = rpc(s, {"op": "stream", "token": first}, 11002)["stream"]
                 if state["played_bytes"] >= 2048:
                     break
             self.assertEqual(state["played_bytes"], 2048)
-            self.assertEqual(state["peak"], 3500)
+            self.assertEqual(state["peak"], 1715)
             second = rpc(s, {"op": "open", "title": "Other"}, 11004)["token"]
             self.assertTrue(rpc(s, {"op": "stream", "token": first}, 11002)["stream"]["focus_lost"])
             self.assertEqual(rpc(s, {"op": "write", "token": first, "hex": "1027" * 8}, 11002)["accepted"], 0)
             self.assertTrue(rpc(s, {"op": "pause", "token": second}, 1000)["ok"])
+            self.assertTrue(rpc(s, {"op": "toggle", "token": second}, 1000)["ok"])
+            self.assertFalse(rpc(s, {"op": "stream", "token": second}, 11004)["stream"]["paused"])
+            self.assertTrue(rpc(s, {"op": "toggle", "token": second}, 11004)["ok"])
+            self.assertTrue(rpc(s, {"op": "stream", "token": second}, 11004)["stream"]["paused"])
             self.assertFalse(rpc(s, {"op": "stream", "token": first}, 11002)["stream"]["focus_lost"])
             self.assertEqual(len(rpc(s, {"op": "status"}, 11002)["streams"]), 1)
             self.assertNotIn("current", rpc(s, {"op": "status"}, 11002))

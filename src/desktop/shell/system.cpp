@@ -23,24 +23,23 @@ void Shell::system_refresh() {
     }
     try {
         auto network = system_request("network", {{"op", "status"}});
-        connected = false;
-        for (const auto &item : network.at("interfaces"))
-            if (item.value("name", "") == network.value("managed_interface", "") &&
-                item.value("up", false) && item.value("running", false))
-                connected = true;
+        connected = network.value("connected", false);
     } catch (...) {
         connected = false;
     }
     try {
         auto list = system_request("portal", {{"op", "pending"}}).at("requests");
         auto next = list.empty() ? Json::object() : list.front();
-        if (next != permission && next.value("file_request", false))
-            picker_open("");
+        bool changed = next != permission;
         permission = std::move(next);
+        if (changed && permission.value("file_request", false) && permission.at("token").dump() != picker_token) {
+            picker_token = permission.at("token").dump(); picker_open("");
+        }
     } catch (...) {
         permission = Json::object();
     }
-    bool show = (!permission.empty() || !root_prompt.empty()) && page != Page::lock;
+    platform_refresh();
+    bool show = (!permission.empty() || !root_prompt.empty() || !interaction.empty()) && page != Page::lock;
     if (show && !permission_focused) {
         control("modal");
         permission_focused = true;
@@ -61,8 +60,10 @@ std::string Shell::power_label(bool compact) const {
     return compact ? "—" : tr(en, "电源信息不可用", "Power status unavailable");
 }
 void Shell::permission_decide(bool allow) {
-    system_request("portal",
-                   {{"op", "decide"}, {"token", permission.at("token")}, {"allow", allow}});
+    if (permission.value("document_request", false))
+        system_request("documents", {{"op", "cancel"}, {"token", permission.at("token")}});
+    else
+        system_request("portal", {{"op", "decide"}, {"token", permission.at("token")}, {"allow", allow}});
     if (allow && permission.value("permission", "") == "network") {
         auto id = permission.at("app").get<std::string>();
         // Socket restrictions are inherited across exec. Restart with the new grant.
@@ -77,7 +78,7 @@ void Shell::permission_decide(bool allow) {
 }
 void Shell::picker_open(const std::string &directory) {
     picker_files =
-        system_request("portal", {{"op", "files"}, {"directory", directory}}).at("files");
+        system_request(permission.value("document_request", false) ? "documents" : "portal", {{"op", "files"}, {"directory", directory}}).at("files");
     std::sort(picker_files.begin(), picker_files.end(), [](const Json &a, const Json &b) {
         if (a.at("directory") != b.at("directory"))
             return a.at("directory").get<bool>();
@@ -88,7 +89,7 @@ void Shell::picker_open(const std::string &directory) {
     app.redraw();
 }
 void Shell::picker_choose(const std::string &file) {
-    system_request("portal", {{"op", "pick"}, {"token", permission.at("token")}, {"file", file}});
+    system_request(permission.value("document_request", false) ? "documents" : "portal", {{"op", "pick"}, {"token", permission.at("token")}, {"file", file}});
     system_refresh();
     app.redraw();
 }
@@ -109,7 +110,7 @@ void Shell::paint_permission(Canvas &c) {
     if (permission.value("file_request", false)) {
         y = h / 2 - 280;
         c.rounded({24, y, w - 48, 560}, t.surface, 28);
-        c.text(tr(en, "选择要导入的文件", "Choose a file to import"), {44, y + 16, w - 88, 42}, 23,
+        c.text(tr(en, "选择文件", "Choose a file"), {44, y + 16, w - 88, 42}, 23,
                t.text, true);
         c.text(picker_directory.empty() ? "Shared" : picker_directory, {44, y + 64, w - 88, 32}, 14,
                t.muted);

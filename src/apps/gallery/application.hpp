@@ -4,8 +4,13 @@ namespace leon::apps {
 class GalleryApplication final : public mobile::ApplicationWindow {
   public:
     GalleryApplication();
+    ~GalleryApplication() override;
 
   private:
+    std::string audio_token;
+    size_t audio_sample{};
+    void toggle_audio();
+    void on_tick() override;
     bool demo_switch{};
     double demo_slider{.4};
     std::string demo_input;

@@ -8,5 +8,26 @@
   "name_en": "Images",
   "lmui": 1,
   "icon": "images",
-  "lifecycle": 1
+  "lifecycle": 1,
+  "handlers": [
+    {
+      "action": "open",
+      "mime": "image/png"
+    },
+    {
+      "action": "open",
+      "mime": "image/jpeg"
+    },
+    {
+      "action": "share",
+      "mime": "image/png"
+    },
+    {
+      "action": "share",
+      "mime": "image/jpeg"
+    }
+  ],
+  "permissions": [
+    "files.import"
+  ]
 }

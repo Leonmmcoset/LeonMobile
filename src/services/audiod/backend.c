@@ -5,14 +5,28 @@
 #include <spa/param/audio/format-utils.h>
 #include <spa/param/props.h>
 #include <spa/pod/builder.h>
+#include <spa/pod/parser.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 struct device {
     uint32_t id;
+    int card_id, profile_device;
     unsigned channels;
     char name[160], description[160];
     struct pw_node *node;
+    struct spa_hook listener;
+};
+struct card {
+    struct audio_backend *backend;
+    uint32_t id;
+    struct pw_device *proxy;
+    struct spa_hook listener;
+    struct {
+        int valid, device, index;
+        unsigned channels;
+    } routes[32];
 };
 struct audio_backend {
     struct audio *owner;
@@ -23,6 +37,7 @@ struct audio_backend {
     struct pw_metadata *metadata;
     struct spa_hook registry_listener, core_listener, metadata_listener;
     struct device devices[32];
+    struct card cards[32];
     char default_sink[160];
     uint32_t metadata_id;
     int ready, failed, route_changed;
@@ -57,6 +72,81 @@ static int metadata_property(void *data, uint32_t subject, const char *key, cons
 }
 static const struct pw_metadata_events metadata_events = {PW_VERSION_METADATA_EVENTS,
                                                           .property = metadata_property};
+static int property_integer(const struct spa_dict *props, const char *key) {
+    const char *value = spa_dict_lookup(props, key);
+    if (!value || !*value)
+        return -1;
+    char *end;
+    errno = 0;
+    long number = strtol(value, &end, 10);
+    return errno || *end || number < 0 || number > INT_MAX ? -1 : (int)number;
+}
+static void node_info(void *data, const struct pw_node_info *info) {
+    struct device *device = data;
+    if (!(info->change_mask & PW_NODE_CHANGE_MASK_PROPS) || !info->props)
+        return;
+    // Registry globals omit properties such as card.profile.device. Resolve
+    // the hardware route from the bound node's complete, changing properties.
+    device->card_id = property_integer(info->props, PW_KEY_DEVICE_ID);
+    device->profile_device = property_integer(info->props, "card.profile.device");
+    int channels = property_integer(info->props, "audio.channels");
+    if (channels > 0 && channels <= 64)
+        device->channels = (unsigned)channels;
+}
+static const struct pw_node_events node_events = {PW_VERSION_NODE_EVENTS, .info = node_info};
+static void card_param(void *data, int seq, uint32_t id, uint32_t index, uint32_t next,
+                       const struct spa_pod *param) {
+    (void)seq;
+    (void)index;
+    (void)next;
+    struct card *card = data;
+    int32_t route = -1, device = -1;
+    const struct spa_pod *props = NULL, *volumes = NULL;
+    if (id != SPA_PARAM_Route || !param)
+        return;
+    if (spa_pod_parse_object(param, SPA_TYPE_OBJECT_ParamRoute, NULL,
+                             SPA_PARAM_ROUTE_index, SPA_POD_Int(&route),
+                             SPA_PARAM_ROUTE_device, SPA_POD_Int(&device),
+                             SPA_PARAM_ROUTE_props, SPA_POD_Pod(&props)) < 0 ||
+        route < 0 || device < 0)
+        return;
+    if (spa_pod_parse_object(props, SPA_TYPE_OBJECT_Props, NULL,
+                             SPA_PROP_channelVolumes, SPA_POD_Pod(&volumes)) < 0)
+        return;
+    float values[64];
+    unsigned channels = spa_pod_copy_array(volumes, SPA_TYPE_Float, values, 64);
+    if (!channels)
+        return;
+    size_t slot = 32;
+    for (size_t i = 0; i < 32; ++i) {
+        if (card->routes[i].valid && card->routes[i].device == device) {
+            slot = i;
+            break;
+        }
+        if (!card->routes[i].valid)
+            slot = i;
+    }
+    if (slot == 32)
+        return;
+    card->routes[slot].valid = 1;
+    card->routes[slot].device = device;
+    card->routes[slot].index = route;
+    card->routes[slot].channels = channels;
+    card->backend->route_changed = 1;
+}
+static void card_info(void *data, const struct pw_device_info *info) {
+    struct card *card = data;
+    if (!(info->change_mask & PW_DEVICE_CHANGE_MASK_PARAMS))
+        return;
+    for (uint32_t i = 0; i < info->n_params; ++i)
+        if (info->params[i].id == SPA_PARAM_Route) {
+            memset(card->routes, 0, sizeof(card->routes));
+            if (info->params[i].flags & SPA_PARAM_INFO_READ)
+                pw_device_enum_params(card->proxy, 0, SPA_PARAM_Route, 0, UINT32_MAX, NULL);
+        }
+}
+static const struct pw_device_events card_events = {PW_VERSION_DEVICE_EVENTS, .info = card_info,
+                                                    .param = card_param};
 static void global(void *data, uint32_t id, uint32_t permissions, const char *type,
                    uint32_t version, const struct spa_dict *props) {
     (void)permissions;
@@ -70,6 +160,8 @@ static void global(void *data, uint32_t id, uint32_t permissions, const char *ty
             if (!b->devices[i].node) {
                 struct device *d = &b->devices[i];
                 d->id = id;
+                d->card_id = property_integer(props, PW_KEY_DEVICE_ID);
+                d->profile_device = property_integer(props, "card.profile.device");
                 const char *name = spa_dict_lookup(props, PW_KEY_NODE_NAME),
                            *description = spa_dict_lookup(props, PW_KEY_NODE_DESCRIPTION);
                 snprintf(d->name, sizeof(d->name), "%s", name ? name : "");
@@ -80,7 +172,24 @@ static void global(void *data, uint32_t id, uint32_t permissions, const char *ty
                 if (d->channels < 1 || d->channels > 64)
                     d->channels = 2;
                 d->node = pw_registry_bind(b->registry, id, type, PW_VERSION_NODE, 0);
+                if (d->node)
+                    pw_node_add_listener(d->node, &d->listener, &node_events, d);
                 b->route_changed = 1;
+                break;
+            }
+    } else if (!strcmp(type, PW_TYPE_INTERFACE_Device) && kind && !strcmp(kind, "Audio/Device")) {
+        for (size_t i = 0; i < 32; ++i)
+            if (!b->cards[i].proxy) {
+                struct card *card = &b->cards[i];
+                card->backend = b;
+                card->id = id;
+                card->proxy = pw_registry_bind(b->registry, id, type, PW_VERSION_DEVICE, 0);
+                if (!card->proxy)
+                    break;
+                pw_device_add_listener(card->proxy, &card->listener, &card_events, card);
+                uint32_t params[] = {SPA_PARAM_Route};
+                pw_device_subscribe_params(card->proxy, params, 1);
+                pw_device_enum_params(card->proxy, 0, SPA_PARAM_Route, 0, UINT32_MAX, NULL);
                 break;
             }
     } else if (!strcmp(type, PW_TYPE_INTERFACE_Metadata) && !b->metadata) {
@@ -103,6 +212,12 @@ static void global_remove(void *data, uint32_t id) {
         if (b->devices[i].node && b->devices[i].id == id) {
             pw_proxy_destroy((struct pw_proxy *)b->devices[i].node);
             memset(&b->devices[i], 0, sizeof(b->devices[i]));
+            b->route_changed = 1;
+        }
+    for (size_t i = 0; i < 32; ++i)
+        if (b->cards[i].proxy && b->cards[i].id == id) {
+            pw_proxy_destroy((struct pw_proxy *)b->cards[i].proxy);
+            memset(&b->cards[i], 0, sizeof(b->cards[i]));
             b->route_changed = 1;
         }
 }
@@ -147,6 +262,9 @@ void audio_backend_free(struct audio_backend *b) {
     for (size_t i = 0; i < 32; ++i)
         if (b->devices[i].node)
             pw_proxy_destroy((struct pw_proxy *)b->devices[i].node);
+    for (size_t i = 0; i < 32; ++i)
+        if (b->cards[i].proxy)
+            pw_proxy_destroy((struct pw_proxy *)b->cards[i].proxy);
     if (b->metadata)
         pw_proxy_destroy((struct pw_proxy *)b->metadata);
     if (b->registry)
@@ -246,16 +364,39 @@ void audio_backend_master(struct audio *s) {
         struct device *d = &b->devices[i];
         if (!d->node || strcmp(d->name, b->default_sink))
             continue;
+        struct card *card = NULL;
+        int route = -1;
+        unsigned channels = d->channels;
+        for (size_t j = 0; j < 32; ++j)
+            if (b->cards[j].proxy && d->card_id >= 0 && b->cards[j].id == (uint32_t)d->card_id)
+                for (size_t k = 0; k < 32; ++k)
+                    if (b->cards[j].routes[k].valid && b->cards[j].routes[k].device == d->profile_device) {
+                        card = &b->cards[j];
+                        route = card->routes[k].index;
+                        channels = card->routes[k].channels;
+                        break;
+                    }
         uint8_t buffer[1024];
         struct spa_pod_builder builder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
         float values[64];
-        for (unsigned j = 0; j < d->channels; ++j)
-            values[j] = (float)s->volume / 100;
+        float volume = (float)s->volume / 100;
+        for (unsigned j = 0; j < channels; ++j)
+            values[j] = volume * volume * volume;
         const struct spa_pod *param = spa_pod_builder_add_object(
             &builder, SPA_TYPE_OBJECT_Props, SPA_PARAM_Props, SPA_PROP_channelVolumes,
-            SPA_POD_Array(sizeof(float), SPA_TYPE_Float, d->channels, values), SPA_PROP_mute,
+            SPA_POD_Array(sizeof(float), SPA_TYPE_Float, channels, values), SPA_PROP_mute,
             SPA_POD_Bool(s->muted));
-        pw_node_set_param(d->node, SPA_PARAM_Props, 0, param);
+        if (card) {
+            // ALSA devices expose their effective volume through the active
+            // Route. Node-only Props would leave hardware volume unchanged.
+            const struct spa_pod *r = spa_pod_builder_add_object(
+                &builder, SPA_TYPE_OBJECT_ParamRoute, SPA_PARAM_Route,
+                SPA_PARAM_ROUTE_index, SPA_POD_Int(route),
+                SPA_PARAM_ROUTE_device, SPA_POD_Int(d->profile_device),
+                SPA_PARAM_ROUTE_props, SPA_POD_Pod(param), SPA_PARAM_ROUTE_save, SPA_POD_Bool(true));
+            pw_device_set_param(card->proxy, SPA_PARAM_Route, 0, r);
+        } else
+            pw_node_set_param(d->node, SPA_PARAM_Props, 0, param);
     }
     b->route_changed = 0;
     pw_thread_loop_unlock(b->loop);

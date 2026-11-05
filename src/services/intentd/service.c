@@ -63,7 +63,7 @@ lm_json *intent_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             if (!p->token[0] || lm_now_ms() >= p->expires ||
                 !lm_identity_matches(d, p->uid, p->source, p->installation))
                 continue;
-            if (pending ? (!p->focused && p->phase < 4) :
+            if (pending ? !p->focused :
                 (p->phase == 3 && p->target_uid == uid && !p->acknowledged &&
                  lm_identity_matches(d, uid, p->target, p->target_instance)))
                 lm_append(items, intent_description(d, p, 1));

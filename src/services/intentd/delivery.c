@@ -83,15 +83,32 @@ void intent_tick(struct lm_daemon *d) {
                 p->phase = 2;
             return;
         } else if (p->phase == 2) {
+            long long now = lm_now_ms();
+            if (!p->launch_until)
+                p->launch_until = now + 5000;
+            if (now >= p->launch_until) {
+                snprintf(p->error, sizeof(p->error), "application broker unavailable or launch acknowledgement timed out");
+                p->phase = 4;
+                continue;
+            }
+            if (now < p->launch_retry)
+                continue;
             lm_json *r = lm_object();
             lm_set_string(r, "op", "launch");
             lm_set_string(r, "id", p->target);
             lm_json *reply = call(d, "apps", r);
-            if (!lm_boolean(lm_get(reply, "ok"), 0)) {
+            if (!reply) {
+                // Launch is idempotent for an installed app. A lost response
+                // does not prove that the broker failed to start it. Retry in
+                // a later tick without extending the overall deadline.
+                p->launch_retry = lm_now_ms() + 500;
+            } else if (!lm_boolean(lm_get(reply, "ok"), 0)) {
                 snprintf(p->error, sizeof(p->error), "application launch failed");
                 p->phase = 4;
-            } else
+            } else {
+                p->error[0] = 0;
                 p->phase = 3;
+            }
             lm_free(reply);
             return;
         }

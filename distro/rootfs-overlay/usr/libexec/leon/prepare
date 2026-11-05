@@ -6,6 +6,9 @@ chown 1000:1000 /data/leon/shared /data/home/leon /run/user/1000 /run/leon/wayla
 chmod 0700 /data/home/leon
 chmod 0700 /run/user/1000
 chmod 0755 /run/leon/wayland
+mkdir -p /data/leon/system
+chown 0:0 /data/leon/system
+chmod 0700 /data/leon/system
 ln -sfn /usr/share/zoneinfo/Etc/UTC /run/localtime
 mount -t tmpfs -o mode=0755,nosuid,nodev,noexec tmpfs /media
 mkdir -p /sys/fs/cgroup

@@ -1,5 +1,6 @@
 #pragma once
 #include "document.hpp"
+#include <future>
 #include <leon/mobile/application.hpp>
 namespace leon::apps {
 class EditorApplication final : public mobile::ApplicationWindow {
@@ -8,6 +9,10 @@ class EditorApplication final : public mobile::ApplicationWindow {
 
   private:
     Document document;
+    std::future<mobile::Json> document_job;
+    std::string document_token;
+    unsigned interaction_ticks{};
+    void poll_interactions();
     int focus{};
     bool awaiting_import{};
     long long import_token{};

@@ -28,8 +28,8 @@ in their dedicated services.
 The first initialization migrates validated values from the legacy
 `/data/leon/settings.json`, filling missing defaults. A malformed existing record
 prevents startup instead of resetting user preferences. Replacements use fsync,
-rename and parent-directory fsync; an I/O failure is reported. The executable is
-introduced separately from its supervised distribution integration.
+rename and parent-directory fsync; an I/O failure is reported. The supervised
+`settings` unit starts before the application broker and shell.
 
 ## Documents
 
@@ -62,7 +62,8 @@ snapshots are allowed. Grants expire, disappear on daemon restart and are bound
 to the installer's instance marker (including same-version reinstalls).
 Revocation blocks subsequent reads; bytes an app has already read cannot be
 recalled. Applications never receive a raw file descriptor that bypasses later
-revocation checks. Executable startup integration follows in a separate step.
+revocation checks. Settings UID 11000 may list and revoke grants, but cannot
+select documents for other apps or read their contents.
 
 ## Application interactions
 
@@ -86,7 +87,12 @@ apps' requests. Selection is checked again against current handlers. The service
 delegates a distinct, owner-bound document capability before launching through
 the application broker; it never passes a private filesystem path or arbitrary
 process arguments. Each cross-service stage has a 350 ms absolute deadline and
-runs separately from the request handler. Failure is observable through `result`.
+runs separately from the request handler. A transport timeout while launching
+retries the broker's idempotent launch operation with 500 ms backoff and a
+five-second total deadline; explicit rejection fails immediately. A lost launch
+reply therefore does not discard an interaction whose receiver was started.
+Failure is observable through `result` and the trusted chooser's dismissible
+error view.
 
 The source polls `result` or uses `cancel`. The recipient polls `receive` for
 events and acknowledges a token using `ack`; a failed acknowledgement can be
@@ -117,7 +123,9 @@ backend loss; clients reopen and resynchronize rather than silently replaying.
 Installed app identities can `open` a playback stream: integer `rate` 8000–96000
 (default 48000), `channels` 1 or 2 (default 2), `focus` (`mix`, `exclusive`, `duck`,
 default exclusive), and optional display `title`/`artist` (160/96 bytes).
-The service returns a random `token`. Only its owner can `write` frame-aligned
+Optional boolean `paused` (default false) starts a stream paused so the owner
+can prebuffer PCM before resuming. The service returns a random `token`.
+Only its owner can `write` frame-aligned
 signed 16-bit little-endian PCM as `hex` (maximum 2048 decoded bytes per request).
 The reply's `accepted` count implements backpressure; retry the remaining bytes.
 The stream has a 64 KiB ring, with up to two streams per app and sixteen total.
@@ -127,9 +135,11 @@ a stream; otherwise it expires. Install changes also invalidate it.
 
 The latest active exclusive stream suspends earlier exclusive streams without
 consuming their queues. Ducking reduces other streams to 20%; mixed streams can
-play concurrently. `pause` releases focus, `resume` reacquires it, `close` frees
+play concurrently. `pause` releases focus, `resume` reacquires it, `toggle`
+atomically switches the daemon's current pause state, and `close` frees
 resources. These controls can also be called by desktop/root/Settings for media
-controls. `set_volume` takes the caller's own integer `volume` 0–100; trusted UI
+controls. The shell uses `toggle` so repeated presses do not reuse an obsolete
+state from a previous frame. `set_volume` takes the caller's own integer `volume` 0–100; trusted UI
 can additionally select installed `app`. Policy is durable in
 `/data/leon/system/audio.json`. Root-only `reset_app` closes streams and resets
 its per-app volume during clear/uninstall.
@@ -138,10 +148,58 @@ its per-app volume during clear/uninstall.
 Only trusted UI sees all streams and `current` media metadata; apps see their
 own streams. Trusted `set_master` changes exactly one of `volume` or `muted`.
 Master preferred volume is stored through settingsd, independently of whether
-hardware is connected; mute is audiod's policy. `route` with an enumerated device
+hardware is connected; mute is audiod's policy. Master percentages use
+WirePlumber's cubic volume scale, matching `wpctl`; per-app PCM gain is linear.
+Hardware sinks use the active PipeWire device Route's channel volume/mute;
+software sinks use node Props. Route changes update the device/profile mapping,
+so the next policy refresh targets the selected output.
+`route` with an enumerated device
 ID updates WirePlumber's configured default. Output removal and replacement use
 the backend's standard routing policy. Microphone recording is not exposed.
 Locking does not terminate playback; trusted lock-screen controls can pause it.
 `--test` uses the same PCM/gain/focus logic with a deterministic in-memory sink,
 never the host's sound device. Physical headphone routing requires hardware
 validation; QEMU validates actual PipeWire playback and mixing separately.
+
+## C++20 application SDK and desktop integration
+
+`#include <leon/platform.hpp>` exposes `leon::platform::Client`. Link with
+`find_package(LeonPlatform 1 CONFIG REQUIRED)` / `LeonPlatform::Platform`, or
+`pkg-config leon-platform`. The generation-1 shared library is
+`libleon-platform.so.1`, and requires C++20 and nlohmann JSON headers. Exceptions
+report transport/service failure. SDK JSON replies follow the schemas above;
+no SDK call accepts a caller identity. `Client` accepts an endpoint directory
+only for isolated development. Unprivileged apps cannot mutate endpoint files.
+
+Settings/watch and network/watch methods expose durable/resynchronizable
+snapshots. Document methods choose, offer, inspect, read (with a caller-selected
+byte limit) and revoke. `interact`, `resolve`, `receive`, `acknowledge` and
+`interaction` implement delivery. `open_audio`, `write_audio`, `audio_control`,
+`audio_status` and `audio_volume` expose playback and media state. `write_audio`
+returns accepted bytes; callers retain/retry any remaining frames, poll focus,
+and send keepalives during long pauses. Calls are synchronous and bounded; large
+document reads and long tasks belong on an application worker, not its UI loop.
+
+The trusted shell integrates document selection and application choosing into
+compositor-enforced modal dialogs; prompts are withheld while locked. It can
+remember Always selections, then focus the broker-launched receiver. The editor
+handles received plain text/documents and saves a private draft. Images handles
+PNG/JPEG documents; Files sends a document token when opening a private file.
+Editor/Images also expose the new document picker. The editor's legacy Import
+copy remains available for generation-1 compatibility. LMUI's demo includes a
+60-second PCM test tone and text sharing, exercising real background playback.
+
+Settings → Network edits Ethernet enablement, renewal, DHCP/static IPv4 and DNS.
+Settings → Sound shows actual outputs and per-stream application volumes.
+Settings → System → Default apps clears saved associations; Document access
+lists and revokes temporary grants. Settings has a specific revoke/list role,
+without gaining arbitrary document read access. Lock-screen and expanded-shade
+media controls pause/resume; credential-protected lock screens hide track names.
+
+The supervised `settings`, `documents`, `intents`, and `audio` units restart
+independently. apps.sock's `settings`/`set` are compatibility relays to settingsd;
+normal boot has no second preferences store. Explicit `--root` development brokers
+retain their isolated legacy fixture, or use `--settings-socket PATH` to test the
+relay. The legacy file is retained only as migration input. Clear/uninstall stop
+writers and synchronously revoke document, interaction and audio state before
+removing private data. Service failure is reported instead of claiming success.

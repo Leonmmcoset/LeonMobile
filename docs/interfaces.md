@@ -87,7 +87,7 @@ action semantics are specified in [application-management.md](application-manage
 `leon-launchd --portal-socket PATH` selects an isolated permission service for
 development. The production default is `/run/leon/portal.sock`.
 
-Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Volume changes require a live PipeWire sink; the helper executes as the desktop user with a bounded timeout. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
+Settings are `dark` (boolean), `reduce_motion` (boolean), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Preferences are owned by settingsd; audiod applies volume to the selected PipeWire sink and retains the preference while outputs are unavailable. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
 
 ### Application lifecycle v1
 

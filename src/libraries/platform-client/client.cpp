@@ -48,7 +48,7 @@ std::size_t Client::write_audio(const std::string &token,std::span<const std::ui
     return used;
 }
 void Client::audio_control(const std::string &token,const std::string &op) const {
-    if(op!="keepalive" && op!="pause" && op!="resume" && op!="close") throw std::runtime_error("invalid audio control");
+    if(op!="keepalive" && op!="pause" && op!="resume" && op!="toggle" && op!="close") throw std::runtime_error("invalid audio control");
     call("audio",{{"op",op},{"token",token}});
 }
 Json Client::audio_status() const {return call("audio",{{"op","status"}});}

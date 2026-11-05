@@ -57,6 +57,14 @@ The existing pkg-config interface remains available. Configure
 `examples/hello` with `-DLEON_HELLO_PKGCONFIG=ON` to exercise that interface.
 `scripts/build-example.sh` uses the cross SDK and packages the resulting ELF.
 
+`LeonPlatform::Platform` (`find_package(LeonPlatform 1 CONFIG REQUIRED)`) exports
+the C++20 `<leon/platform.hpp>` client for preferences, network watches, document
+capabilities, app interactions and PCM playback. The equivalent pkg-config
+module is `leon-platform`; its runtime library is `libleon-platform.so.1`.
+See [platform-services.md](platform-services.md) for ownership, limits, retries
+and the trusted UI roles. `examples/platform` demonstrates consumption through
+either installed SDK interface.
+
 ## Changing an application
 
 Keep its entry point, private state, view, backend/model and `manifest.json`

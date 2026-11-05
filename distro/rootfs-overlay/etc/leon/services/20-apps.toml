@@ -3,5 +3,5 @@ command = ["/usr/sbin/leon-launchd", "--log-socket", "/run/leon-log/capture.sock
 type = "notify"
 ready_timeout_ms = 10000
 watchdog_ms = 15000
-after = ["prepare", "portal", "crash"]
+after = ["prepare", "portal", "crash", "settings", "documents", "intents"]
 restart = "always"

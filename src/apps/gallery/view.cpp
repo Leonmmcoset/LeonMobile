@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include <leon/platform.hpp>
 using namespace mobile;
 namespace leon::apps {
 GalleryApplication::GalleryApplication() : ApplicationWindow("org.leon.gallery", "LMUI", "LMUI") {}
@@ -45,6 +46,11 @@ void GalleryApplication::paint_content(Canvas &c, double) {
         hits.back().continuous = bool(change);
         hits.back().prominent = child.kind == Kind::button && child.filled;
     }
+    button(c, hits, {24, 628, w - 48, 50}, audio_token.empty() ? tr(en, "播放测试音", "Play test tone") : tr(en, "停止测试音", "Stop test tone"), [this] {perform([this] {toggle_audio();});});
+    button(c, hits, {24, 690, w - 48, 50}, tr(en, "分享文本到应用", "Share text to an app"), [this] {
+        perform([this] {leon::platform::Client().interact({{"action", "share"}, {"mime", "text/plain"},
+            {"text", demo_input.empty() ? "Hello from LeonMobile" : demo_input}});});
+    });
     c.rounded({24, 520, w - 48, 90}, t.container, 28);
     c.text("Material You · LMUI 1", {40, 536, w - 80, 56}, 22, t.primary, true, 1);
 }

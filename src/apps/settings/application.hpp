@@ -11,6 +11,18 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     ~SettingsApplication() override;
 
   private:
+    std::future<mobile::Json> platform_job_;
+    mobile::Json platform_data_ = mobile::Json::object();
+    settings::Page platform_page_{settings::Page::home};
+    std::array<std::string, 4> network_fields_{"", "24", "", ""};
+    int network_field_{-1};
+    bool static_network_{}, network_loaded_{};
+    void platform_refresh();
+    void platform_poll();
+    void paint_platform(mobile::Canvas &);
+    void paint_network_controls(mobile::Canvas &);
+    void paint_audio_controls(mobile::Canvas &);
+    void network_submit();
     settings::Page page_{settings::Page::home};
     std::vector<settings::Page> history_;
     settings::DeviceInfo device_;

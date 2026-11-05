@@ -75,9 +75,10 @@ void Shell::paint(Canvas &c) {
         paint_permission(c);
     else
         paint_root(c);
+    paint_interaction(c);
     touch_feedback.draw(c);
     app.input_region(overlay || shade.visible() ||
-                             ((!permission.empty() || !root_prompt.empty()) && page != Page::lock)
+                             ((!permission.empty() || !root_prompt.empty() || !interaction.empty()) && page != Page::lock)
                          ? std::vector<Rect>{{0, 0, w, h}}
                          : std::vector<Rect>{{0, 0, w, 42}, {0, h - 64, w, 64}});
     if (shade.animating())

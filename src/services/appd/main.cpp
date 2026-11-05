@@ -27,6 +27,8 @@ int main(int argc, char **argv) {
             options.root_socket = value;
         else if (option == "--portal-socket")
             options.portal_socket = value;
+        else if (option == "--settings-socket")
+            options.settings_socket = value;
         else if (option == "--runtime-dir")
             options.runtime_prefix = value;
         else if (option == "--wayland")

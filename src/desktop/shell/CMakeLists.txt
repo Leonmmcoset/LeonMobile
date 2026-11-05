@@ -1,5 +1,5 @@
 find_package(Threads REQUIRED)
-add_executable(leon-shell main.cpp session.cpp authentication.cpp root.cpp system.cpp navigation.cpp render.cpp control.cpp shade.cpp
+add_executable(leon-shell main.cpp session.cpp authentication.cpp root.cpp system.cpp platform.cpp navigation.cpp render.cpp control.cpp shade.cpp
                 views/status.cpp views/lock.cpp views/home.cpp views/tasks.cpp
                 views/shade.cpp views/shade_widgets.cpp views/quick.cpp
                 views/notifications.cpp views/navigation.cpp)

@@ -1,5 +1,6 @@
 #include "application.hpp"
 #include <fstream>
+#include <leon/platform.hpp>
 using namespace mobile;
 namespace leon::apps {
 FilesApplication::FilesApplication() : ApplicationWindow("org.leon.files", "文件", "Files") {
@@ -35,11 +36,16 @@ void FilesApplication::paint_content(Canvas &c, double bottom) {
                            directory.path = p;
                            scroll = 0;
                        } else {
-                           std::ifstream f(p);
-                           std::string data(512, 0);
-                           f.read(data.data(), data.size());
-                           data.resize(size_t(f.gcount()));
-                           error = data;
+                           perform([&] {
+                               auto relative = fs::relative(p, user_home()).string();
+                               auto extension = p.extension().string();
+                               auto mime = extension == ".png" ? "image/png" :
+                                   extension == ".jpg" || extension == ".jpeg" ? "image/jpeg" : "text/plain";
+                               leon::platform::Client platform;
+                               auto token = platform.offer_document(relative);
+                               try { platform.interact({{"action", "open"}, {"mime", mime}, {"document", token}}); }
+                               catch (...) { platform.revoke_document(token); throw; }
+                           });
                        }
                    });
             button(c, hits, {w - 66, y, 46, 48}, "×", [&, p] { perform([&] { fs::remove(p); }); });

@@ -1,0 +1,6 @@
+name = "intents"
+command = ["/usr/sbin/intentd"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare", "documents"]
+restart = "always"

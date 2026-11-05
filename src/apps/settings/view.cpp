@@ -45,10 +45,14 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
         end = top + visible_entries().size() * 84;
     else if (page_ == Page::applications)
         end = applications_bottom();
-    else if (page_ == Page::sound || page_ == Page::navigation)
-        end = 500;
+    else if (page_ == Page::sound)
+        end = 560 + platform_data_.value("devices", Json::array()).size() * 82 + platform_data_.value("streams", Json::array()).size() * 160;
+    else if (page_ == Page::network) end = static_network_ ? 1290 : 990;
+    else if (page_ == Page::defaults) end = 340 + platform_data_.value("defaults", Json::object()).size() * 136;
+    else if (page_ == Page::documents) end = 340 + platform_data_.value("documents", Json::array()).size() * 148;
+    else if (page_ == Page::navigation) end = 500;
     else if (page_ == Page::system)
-        end = 592;
+        end = 760;
     else if (page_ == Page::diagnostics)
         end = diagnostics_bottom();
     else if (page_ == Page::security)
@@ -79,7 +83,8 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     c.save();
     c.clip(viewport_);
     cairo_translate(c.cr, 0, -scroll);
-    if (page_ == Page::applications)
+    if (page_ == Page::defaults || page_ == Page::documents) paint_platform(c);
+    else if (page_ == Page::applications)
         paint_applications(c);
     else if (page_ == Page::diagnostics)
         paint_diagnostics(c);

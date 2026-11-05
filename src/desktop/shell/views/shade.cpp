@@ -28,7 +28,12 @@ void Shell::paint_shade(Canvas &c, const std::string &time) {
     c.rounded({w - 154, 62, 130, 36}, t.container, 18);
     c.text(power_label(), {w - 150, 62, 122, 36}, 12, t.text, false, 1);
     paint_quick(c, expansion);
-    paint_notifications(c, 264 + 190 * expansion, bottom - 120);
+    double notifications_top = 264 + 190 * expansion;
+    if (audio_state.contains("current") && bottom - notifications_top > 280) {
+        paint_media(c, notifications_top);
+        notifications_top += 128;
+    }
+    paint_notifications(c, notifications_top, bottom - 120);
     double footer = bottom - 96;
     if (bottom > 550) {
         c.rounded({w - 132, footer, 48, 48}, t.container, 24);

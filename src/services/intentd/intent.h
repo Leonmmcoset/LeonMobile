@@ -5,7 +5,7 @@ struct intent {
     char token[33], source[97], installation[33], target[97], target_instance[33];
     char key[160], error[128], document[33];
     uid_t uid, target_uid;
-    long long expires;
+    long long expires, launch_until, launch_retry;
     lm_json *payload;
     int phase, focused, acknowledged;
 };

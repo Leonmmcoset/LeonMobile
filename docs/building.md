@@ -17,7 +17,7 @@ Native component development additionally uses:
 ```sh
 sudo apt-get install cmake ninja-build pkg-config libarchive-dev nlohmann-json3-dev \
   libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev libxkbcommon-dev \
-  libvterm-dev libjpeg-dev weston fonts-wqy-zenhei fonts-dejavu-core \
+  libvterm-dev libjpeg-dev libpipewire-0.3-dev weston fonts-wqy-zenhei fonts-dejavu-core \
   xvfb xdotool vim-tiny python3-pil
 ```
 
@@ -120,6 +120,21 @@ sha256sum --check SHA256SUMS
 The launcher creates a separate persistent `leonmobile-user.img` next to the release files. Use the same `LEON_DISK`, `LEON_DISPLAY` and `LEON_AUDIO` settings as the repository launcher. The included `scripts/update-image.py` can replace a stopped runtime disk's system partition.
 
 ## Target validation
+
+The platform-service integration check includes a real reboot, sandboxed app
+delivery, revocable documents, two mixed PCM streams captured from QEMU's audio
+device, backend recovery and the desktop chooser/picker/media/Settings flow:
+
+```sh
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 240 --platform-probe build/platform-probe
+```
+
+Its serial output, service/reboot reports, display frames and captured WAV are
+written to `build/qemu-platform-test/`. Tone analysis checks that the output
+contains both 440 Hz and 660 Hz in the same capture window; consuming PCM alone
+is insufficient. The privileged test helper is injected into a private image
+and is absent from the shipping root filesystem.
 
 `python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight distinct ELF manifests, launch/process identity for every built-in, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; journal segments are in that disk's data partition under `/leon/logs/` (mounted as `/data/leon/logs` in the guest). Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
 

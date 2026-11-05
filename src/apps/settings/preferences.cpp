@@ -80,12 +80,15 @@ void SettingsApplication::paint_preferences(Canvas &c) {
                t.text);
         c.text(tr(en, "音量将应用于默认音频输出。", "Volume applies to the default audio output."),
                {36, 426, w - 72, 28}, 13, t.muted);
+        paint_audio_controls(c);
     } else if (page_ == Page::system) {
         link(c, {16, 164, w - 32, 76}, Page::language);
         link(c, {16, 248, w - 32, 76}, Page::navigation);
         link(c, {16, 332, w - 32, 76}, Page::developer);
         link(c, {16, 416, w - 32, 76}, Page::security);
         link(c, {16, 500, w - 32, 76}, Page::diagnostics);
+        link(c, {16, 584, w - 32, 76}, Page::defaults);
+        link(c, {16, 668, w - 32, 76}, Page::documents);
     } else if (page_ == Page::language) {
         for (bool english : {false, true}) {
             double y = english ? 248 : 164;

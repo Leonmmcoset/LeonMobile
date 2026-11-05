@@ -1,0 +1,6 @@
+name = "documents"
+command = ["/usr/sbin/documentd"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare"]
+restart = "always"

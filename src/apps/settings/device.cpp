@@ -27,11 +27,12 @@ DeviceInfo read_device_info() {
     }
     try {
         auto network = system_request("network", {{"op", "status"}});
+        info.connected = network.value("connected", false);
         info.interface = network.value("managed_interface", "");
         for (const auto &item : network.at("interfaces"))
             if (item.value("name", "") == info.interface) {
                 info.address = item.value("ipv4", "");
-                info.connected = item.value("up", false) && item.value("running", false);
+
             }
     } catch (...) {
     }

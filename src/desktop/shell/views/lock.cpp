@@ -17,6 +17,7 @@ void Shell::paint_lock(Canvas &c, const std::string &time) {
                                  : tr(en, "认证服务正在恢复", "Authentication service recovering"),
                {24, h - 180, w - 48, 48}, 16, t.muted, false, 1);
         c.restore();
+        paint_media(c, 420);
         return;
     }
     bool pin = !strcmp(authentication.kind, "pin");

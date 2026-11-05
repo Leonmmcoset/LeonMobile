@@ -1,0 +1,6 @@
+name = "settings"
+command = ["/usr/sbin/settingsd"]
+type = "notify"
+watchdog_ms = 10000
+after = ["prepare"]
+restart = "always"

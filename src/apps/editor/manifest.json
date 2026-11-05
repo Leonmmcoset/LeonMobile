@@ -11,5 +11,15 @@
   "lifecycle": 1,
   "permissions": [
     "files.import"
+  ],
+  "handlers": [
+    {
+      "action": "open",
+      "mime": "text/plain"
+    },
+    {
+      "action": "share",
+      "mime": "text/plain"
+    }
   ]
 }

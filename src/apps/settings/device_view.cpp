@@ -22,6 +22,7 @@ void SettingsApplication::paint_device(Canvas &c) {
         settings::information(c, 464, tr(en, "硬件地址", "Hardware address"),
                               device_.hardware_address.empty() ? unavailable
                                                                : device_.hardware_address);
+        paint_network_controls(c);
     } else if (page_ == Page::storage) {
         double y = 164;
         for (bool data : {true, false}) {

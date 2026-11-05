@@ -199,7 +199,8 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             (lm_get(r, "rate") && lm_integer(lm_get(r, "rate"), -1) < 0) ||
             (lm_get(r, "channels") && lm_integer(lm_get(r, "channels"), -1) < 0) ||
             (lm_get(r, "title") && !short_text(lm_get(r, "title"), 160)) ||
-            (lm_get(r, "artist") && !short_text(lm_get(r, "artist"), 96))) {
+            (lm_get(r, "artist") && !short_text(lm_get(r, "artist"), 96)) ||
+            (lm_get(r, "paused") && lm_boolean(lm_get(r, "paused"), -1) < 0)) {
             lm_free(app);
             return lm_failure("invalid PCM format, focus or metadata");
         }
@@ -233,6 +234,7 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
         snprintf(p->title, sizeof(p->title), "%s", lm_string(lm_get(r, "title"), p->app));
         snprintf(p->artist, sizeof(p->artist), "%s", lm_string(lm_get(r, "artist"), ""));
         p->uid = uid;
+        atomic_store(&p->paused, lm_boolean(lm_get(r, "paused"), 0));
         p->rate = (unsigned)rate;
         p->channels = (unsigned)channels;
         p->expires = lm_now_ms() + 15000;
@@ -269,14 +271,14 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
         audio_close(s, p);
         return lm_success();
     }
-    if (!strcmp(op, "pause") || !strcmp(op, "resume")) {
-        int pause = !strcmp(op, "pause");
-        atomic_store(&p->paused, pause);
+    if (!strcmp(op, "pause") || !strcmp(op, "resume") || !strcmp(op, "toggle")) {
+        int pause = !strcmp(op, "toggle") ? !atomic_load(&p->paused) : !strcmp(op, "pause");
         if (!pause) {
             if (s->order == UINT32_MAX)
                 return lm_failure("focus counter exhausted");
             p->order = ++s->order;
         }
+        atomic_store(&p->paused, pause);
         audio_focus(s);
         return lm_success();
     }
@@ -292,7 +294,7 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
     unsigned write = atomic_load_explicit(&p->write_index, memory_order_relaxed),
              read = atomic_load_explicit(&p->read_index, memory_order_acquire);
     size_t free_bytes = AUDIO_RING - (write - read);
-    if (atomic_load(&p->paused) || atomic_load(&p->blocked))
+    if (atomic_load(&p->blocked) && !atomic_load(&p->paused))
         free_bytes = 0;
     if (free_bytes < (unsigned)bytes)
         bytes = (int)(free_bytes - free_bytes % (p->channels * 2));

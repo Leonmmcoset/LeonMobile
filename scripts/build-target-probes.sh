@@ -64,4 +64,9 @@ Path(sys.argv[1]).write_text(json.dumps(dict(format=1, id="org.example.rootprobe
 PY
 python3 "$repo/scripts/make-package.py" "$repo/build/root-probe-manifest.json" \
     "$repo/build/root-probe-package" "$repo/build/root-app-fixture-package.lmpkg"
-echo 'AArch64 boot console, application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os -c \
+    "$repo/tests/target/system_transport.c" -o "$repo/build/platform-transport.o"
+"${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/platform.cpp" "$repo/build/platform-transport.o" \
+    -lleon-platform -o "$repo/build/platform-probe"
+echo 'AArch64 boot console, platform services, application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'
