@@ -108,9 +108,21 @@ def exercise_developer_ui(guest, qmp, artifacts):
     click(180, 590)  # Service list
     names = [line.split("\t")[0] for line in guest.run("leonctl status").splitlines()]
     index = names.index("notifications")
-    if index >= 8:
-        raise RuntimeError("Notification service moved outside the first visible page")
-    click(180, 340 + index * 64)
+    # The service catalogue follows the image's unit enumeration order, not a
+    # fixed first-screen index. Follow its real 12-row pages and scrolling.
+    offset = 0
+    while index >= offset + 12:
+        qmp.drag(450, 820, 450, 250)
+        click(350, 730)  # Next after scrolling a complete 12-row page to its end
+        offset += 12
+    row = index - offset
+    scroll = 0
+    if row >= 8:
+        qmp.drag(450, 820, 450, 250)
+        count = min(12, len(names) - offset)
+        # Content ends at 428 + 64*n; the portrait client viewport ends at 838.
+        scroll = max(0, 428 + count * 64 - 838 + 16)
+    click(180, 340 + row * 64 - scroll)
     qmp.capture(artifacts / "developer-service.ppm")
     old = guest.run("pidof notificationd")
     click(390, 444)  # Restart and authenticate

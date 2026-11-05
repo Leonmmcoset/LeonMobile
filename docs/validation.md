@@ -788,3 +788,14 @@ exposed EOF arriving before waitpid on forced stop. OOM priority writes now use
 a pinned proc-directory descriptor instead of a recyclable numeric PID path.
 Evidence remains ignored under `build/isolation-{ctest,python,wayland}.log`,
 `build/isolation-qemu-core.log` and `build/qemu-test/`.
+
+The separate third-party Root suite passed installed main/helper identity,
+fresh approval, masked IME password entry, bad-password delay, cancellation,
+block/unblock/history, exact helper output, revocation and actual reboot
+persistence with the requesting app still sandboxed. The developer Root suite
+also passed all three boot phases, runtime kernel/module/service controls and
+two real `su` commands from Terminal's private PTY. The privileged PTY relayed
+correctly through SCM_RIGHTS without exposing the host devpts mount. Its UI
+fixture now follows the actual service catalogue's pages and scroll position
+rather than assuming notificationd is on the first screen. Reports are in
+`build/isolation-qemu-root-apps.log` and `build/isolation-qemu-root.log`.
