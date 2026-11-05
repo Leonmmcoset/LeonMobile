@@ -819,3 +819,30 @@ to EAGAIN, followed by closing the masters and reusing `/dev/pts/0`. The combine
 run then stopped in the existing Root session-capacity probe; investigation of
 that compatibility failure follows separately. Its serial evidence is retained
 in ignored `build/isolation-evidence/pty-namespace-serial.log`.
+
+The Root compatibility investigation reproduced a policy-reader race during
+atomic replacement: a descriptor opened before rename could have link count
+zero at fstat, causing a valid policy generation to be treated as corrupt and
+live sessions to be revoked. Readers now accept that pinned root-owned snapshot
+while retaining private directory, owner, mode, no-symlink, extra-hardlink and
+schema checks. Service output records the reason for revocation.
+
+The new concurrent replacement regression failed against the previous reader
+and passed ten consecutive runs after correction, including real session
+survival and subsequent authenticated disable/revocation. The complete final
+native suite passes 12 CTest and 107 Python cases, including corruption,
+permissions/hardlinks, six-session capacity, password rotation, lockout and
+third-party Root identity/revocation. The AArch64 core and reference image
+rebuilt successfully. Evidence remains ignored in
+`build/isolation-root-policy-{before,after}.log`, `build/isolation-{ctest,python}.log`
+and `build/isolation-{build-core,image}.log`.
+
+The final combined QEMU regression on the image containing both the 64-PTY
+limit and policy snapshot correction passed all Root/authentication and
+system/isolation probes, including the six-session capacity/revocation check.
+All eight built-ins, actual terminal PTY/VT/Ctrl-C/vi/top/clipboard/restart,
+notifications, Chinese IME/portal decisions, SDK package installation/removal,
+Settings stop/clear/uninstall and clean UI poweroff passed. Offline inspection
+confirmed exact editor/import contents and terminal probe/edit/restart data.
+The final run is recorded in ignored `build/isolation-qemu-full.log` and
+`build/qemu-test/`; it validates the current QEMU developer graphics prototype.

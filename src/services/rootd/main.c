@@ -273,6 +273,9 @@ int main(int argc, char **argv) {
             if ((w->generation &&
                  (!valid || !policy.enabled || w->generation != policy.generation)) ||
                 (!w->generation && lm_now_ms() > w->deadline)) {
+                fprintf(stderr, "rootd: revoking worker=%d reason=%s\n", w->pid,
+                        !w->generation ? "request timeout" : !valid ? "invalid policy" :
+                        !policy.enabled ? "disabled" : "policy generation changed");
                 root_session_cleanup(&o, w->pid);
                 kill(-w->pid, SIGKILL);
                 kill(w->pid, SIGKILL);

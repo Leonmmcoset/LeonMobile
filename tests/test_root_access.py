@@ -16,6 +16,7 @@ import socket
 import subprocess
 import tempfile
 import termios
+import threading
 import time
 import unittest
 from test_system_services import rpc
@@ -234,6 +235,51 @@ class RootAccess(unittest.TestCase):
             while any(Path(f"/proc/{reply['pid']}").exists() for _, _, reply in sessions) and time.monotonic() < deadline:
                 time.sleep(.02)
             self.assertFalse(any(Path(f"/proc/{reply['pid']}").exists() for _, _, reply in sessions))
+
+    def test_atomic_policy_replacement_preserves_live_sessions(self):
+        self.enable()
+        with self.session("printf ROOT_READY; exec sleep 60") as (_, master, reply):
+            self.assertIn(b"ROOT_READY", self.read_terminal(master, b"ROOT_READY"))
+            policy = self.state / "policy.json"
+            snapshot = policy.read_bytes()
+            stop = threading.Event()
+            errors = []
+            replacements = 0
+
+            def replace_policy():
+                nonlocal replacements
+                try:
+                    while not stop.is_set():
+                        next_policy = self.state / "policy-test-next"
+                        fd = os.open(next_policy, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                        with os.fdopen(fd, "wb") as output:
+                            output.write(snapshot)
+                        os.replace(next_policy, policy)
+                        replacements += 1
+                except BaseException as error:
+                    errors.append(error)
+
+            writer = threading.Thread(target=replace_policy)
+            writer.start()
+            try:
+                # Exercise actual rootd readers while a trusted writer publishes
+                # complete, unchanged policy generations using atomic rename.
+                states = [self.call("status", uid=0) for _ in range(512)]
+                self.assertTrue(all(state.get("ok") for state in states),
+                                [state for state in states if not state.get("ok")])
+            finally:
+                stop.set()
+                writer.join(timeout=5)
+            self.assertFalse(writer.is_alive())
+            self.assertFalse(errors)
+            self.assertGreater(replacements, 0)
+            time.sleep(.2)
+            self.assertTrue(Path(f"/proc/{reply['pid']}").exists())
+            self.assertTrue(self.call("disable", password=SECRET)["ok"])
+            deadline = time.monotonic() + 3
+            while Path(f"/proc/{reply['pid']}").exists() and time.monotonic() < deadline:
+                time.sleep(.02)
+            self.assertFalse(Path(f"/proc/{reply['pid']}").exists())
 
     def test_su_client_password_not_echoed_and_terminal_restored(self):
         self.enable()

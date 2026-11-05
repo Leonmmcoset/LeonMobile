@@ -67,8 +67,15 @@ int root_policy_load(const struct root_options *o, struct root_policy *p) {
     if (fd < 0)
         return errno == ENOENT ? 0 : -1;
     struct stat info;
-    ssize_t count = read(fd, text, sizeof(text));
-    int invalid = fstat(fd, &info) || !S_ISREG(info.st_mode) || info.st_uid || info.st_nlink != 1 ||
+    ssize_t count;
+    do {
+        count = read(fd, text, sizeof(text));
+    } while (count < 0 && errno == EINTR);
+    /* Only root can publish in this 0700 directory. Atomic replacement may
+     * unlink a successfully opened inode, but its pinned descriptor still holds
+     * a complete policy snapshot. Reject extra hardlinks, not that legitimate
+     * zero-link snapshot; the next read observes the newly published policy. */
+    int invalid = fstat(fd, &info) || !S_ISREG(info.st_mode) || info.st_uid || info.st_nlink > 1 ||
                   (info.st_mode & 077) || count <= 0 || count == sizeof(text);
     close(fd);
     if (invalid)

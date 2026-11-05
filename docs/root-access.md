@@ -41,9 +41,17 @@ root-only `/data/leon/rootd/` (0700), with `policy.json` at 0600. Only a random
 16-byte salt and scrypt-derived 32-byte verifier are stored (N=32768, r=8, p=1,
 64 MiB memory limit); comparison is constant-time. Policy generation changes
 invalidate existing sessions. Missing state starts disabled; malformed,
-misowned, linked or permissively readable state locks access rather than resetting
-the password. Failures impose a durable one-second cooldown, rising to 30 seconds
-after five failures, shared between callers and retained on daemon restart.
+misowned, symlinked, multiply linked or permissively readable state locks access
+rather than resetting the password. Failures impose a durable one-second
+cooldown, rising to 30 seconds after five failures, shared between callers and
+retained on daemon restart.
+
+Readers validate the root-owned policy through an opened descriptor. Atomic
+replacement can remove that inode's directory entry while leaving its complete
+snapshot valid; this does not revoke sessions for an unchanged generation. New
+reads observe the published policy, so disable, password rotation and malformed
+state still revoke sessions. Revocation reasons are recorded in rootd's service
+log without passwords or verifier contents.
 
 Only root or UID 11000 running the installed Settings executable (device/inode
 checked through `/proc/PID/exe`) can inspect/manage developer settings. Read-only
