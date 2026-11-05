@@ -212,9 +212,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -223,6 +223,18 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         # debugfs has its own command parser; no shell interprets these paths.
         commands.append("write " + json.dumps(str(source.resolve())) + " " + destination)
         commands.append("set_inode_field " + destination + " mode 0100755")
+    if boot_console_probe:
+        put(boot_console_probe, "/usr/bin/leon-test-boot-console")
+        unit = temporary / "boot-console-test.toml"
+        unit.write_text('name="boot-console-test"\ncommand=["/usr/bin/leon-test-boot-console"]\n'
+                        'after=["prepare","seat","authentication"]\ntype="notify"\n'
+                        'ready_timeout_ms=60000\nrestart="never"\n')
+        put(unit, "/etc/leon/services/19-boot-console-test.toml")
+        unit = temporary / "boot-compositor.toml"
+        unit.write_text((REPO / "distro/rootfs-overlay/etc/leon/services/20-compositor.toml").read_text()
+                        .replace('"prepare", "seat"', '"prepare", "seat", "boot-console-test"'))
+        commands.append("rm /etc/leon/services/20-compositor.toml")
+        put(unit, "/etc/leon/services/20-compositor.toml")
     if root_apps_probe:
         put(root_apps_probe, "/usr/bin/leon-test-root-apps")
         put(root_apps_probe.parent / "root-app-fixture-package.lmpkg", "/usr/share/root-probe.lmpkg")
@@ -528,11 +540,20 @@ def main():
                         help="Settings application management, clear/uninstall and real reboot persistence")
     parser.add_argument("--root-apps-probe", type=Path, help="disposable-disk Root application regression service")
     parser.add_argument("--root-apps-package", type=Path, help="run focused Root application authorization UI and reboot checks")
+    parser.add_argument("--boot-console-probe", type=Path,
+                        help="disposable-disk VT ownership, late-log, crash and reboot regression")
     parser.add_argument("--root-only", action="store_true",
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
+    if args.boot_console_probe:
+        if not args.boot_console_probe.is_file():
+            parser.error("--boot-console-probe must name the compiled AArch64 fixture")
+        if any((args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe,
+                args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package,
+                args.package, args.core_only, args.root_only, args.auth_only, args.applications_only)):
+            parser.error("Boot console checks require their own disposable disk and exclude other probes")
     if bool(args.root_apps_probe) != bool(args.root_apps_package):
         parser.error("--root-apps-probe and --root-apps-package must be provided together")
     if args.root_apps_probe and (args.root_probe or args.auth_probe or args.system_probe or args.applications_probe or args.core_only or args.root_only or args.auth_only or args.applications_only):
@@ -567,14 +588,15 @@ def main():
     if args.terminal_probe and args.core_only:
         parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
-    artifacts = REPO / ("build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
+    artifacts = REPO / ("build/qemu-boot-console-test" if args.boot_console_probe else
+                        "build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
     artifacts.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="leon-qemu-") as temp:
         temp = Path(temp)
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package, args.boot_console_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -623,6 +645,20 @@ def main():
                             boot_console_seen = pixels.count(b"\0\0\0") > 100000 and light > 100
                         except RuntimeError:
                             pass  # virtio-gpu has not committed its portrait mode yet.
+                    if (args.boot_console_probe and "leond: started boot-console-test" in text and
+                            "\n$ " in text.replace("\r", "")):
+                        if not boot_console_seen:
+                            raise RuntimeError("No kernel framebuffer log was observed before the boot fixture")
+                        from boot_console_qemu import exercise_boot_console
+                        guest = Guest(proc, log)
+                        exercise_boot_console(guest, qmp, artifacts, args.timeout)
+                        guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                        proc.wait(timeout=30)
+                        if proc.returncode:
+                            raise RuntimeError("Boot console test shutdown failed")
+                        passed = True
+                        print("Boot console kernel/init/service logs, VT handoff/recovery and real reboot passed", flush=True)
+                        return
                     if args.root_apps_probe and "exited root-applications-test status=1" in text:
                         result = Guest(proc, log).run("cat /run/leon/root-app-tests.txt")
                         (artifacts / "root-applications.txt").write_text(result + "\n")

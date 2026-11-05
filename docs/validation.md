@@ -533,3 +533,37 @@ This validation covers the QEMU developer prototype. Approved unrestricted
 Root can modify the system and escape its process controls; revocation cannot
 undo completed changes. The feature has not received an independent security
 audit or physical phone validation.
+
+## Visible boot console and Wayland handoff (2026-11-05)
+
+The native build passed 11 CTest checks and all 79 Python integration tests.
+The AArch64/musl kernel configuration, core runtime, initramfs and default disk
+were rebuilt. The complete QEMU regression passed kernel/serial boot, native
+authentication and Root probes, core service fault/sandbox/cgroup/crash checks,
+terminal VT/PTY/vi/top/clipboard, live notifications, Chinese IME restart,
+permission/file selection, all built-ins, SDK package installation/removal,
+shade/navigation/lifecycle, Settings application management, offline saved data
+inspection and clean UI poweroff. The harness captured a real framebuffer boot
+log before Wayland and confirmed both tty0 and ttyAMA0 in `/proc/consoles`.
+
+The focused boot suite used a test-only readiness barrier in a disposable disk.
+Actual `/dev/vcs1` cells and the screen contained kernel messages, PID 1 mount
+diagnostics and leond service starts in KD_TEXT. The serial login remained UID
+1000. After release, the real VT reported KD_GRAPHICS and pixels below the clock
+remained identical after genuine `/dev/kmsg` and internal status-mirror writes.
+Stopping the compositor restored KD_TEXT, rendered fresh kernel/userspace
+diagnostics and allowed a normal restart to the lock screen. SIGKILL also
+restored text mode, and supervised compositor recovery used a new PID and
+returned to the lock screen. A real kernel reboot repeated text diagnostics,
+graphics takeover and successful desktop input.
+
+The relocated release launcher read the shared dual-console command line;
+Python compilation, shell syntax and whitespace checks passed. Production boot
+contains no readiness barrier or artificial delay. fbcon becomes visible only
+after virtio-gpu initialization; earlier available kernel messages are replayed
+from its log buffer. The older `dist/` bundle was not regenerated.
+
+Evidence stays ignored in `build/boot-console-*.log`,
+`build/qemu-test/boot-console.*` and `build/qemu-boot-console-test/`, including
+the VT states, text cells, serial trace and recovery PNGs. These checks apply to
+the QEMU developer prototype; physical phone display/VT behavior is unverified.

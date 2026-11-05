@@ -7,6 +7,10 @@ if [ ! -x "$compiler" ]; then
     exit 1
 fi
 mkdir -p "$repo/build"
+"$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
+    -I"$repo/src/services/common" -I"$repo/src/services/serviced" \
+    "$repo/tests/target/boot_console.c" "$repo/src/services/common/boot_log.c" \
+    -o "$repo/build/boot-console-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/notifications.c" -o "$repo/build/notifications-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
@@ -54,4 +58,4 @@ Path(sys.argv[1]).write_text(json.dumps(dict(format=1, id="org.example.rootprobe
 PY
 python3 "$repo/scripts/make-package.py" "$repo/build/root-probe-manifest.json" \
     "$repo/build/root-probe-package" "$repo/build/root-app-fixture-package.lmpkg"
-echo 'AArch64 application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'
+echo 'AArch64 boot console, application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'

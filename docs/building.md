@@ -74,6 +74,19 @@ VT-bound seat prevents later kernel/status messages from drawing over Wayland
 and restores the text console when the compositor exits. See
 [architecture.md](architecture.md#boot-and-storage) for output routing.
 
+For focused boot ownership/recovery checks, compile the target probes and run:
+
+```sh
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 180 --boot-console-probe build/boot-console-probe
+```
+
+This uses a private image and a test-only readiness barrier to inspect the real
+text VT before Wayland starts. It checks kernel/init/service text, dual consoles,
+graphics ownership, late-log drawing suppression, text recovery after compositor
+stop/SIGKILL, and a real reboot. The barrier and privileged fixture are absent
+from production images. Evidence is in `build/qemu-boot-console-test/`.
+
 ## Install and update
 
 Build the example using the target SDK:
