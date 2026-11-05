@@ -295,7 +295,7 @@ def main():
                     "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "4",
                     "-m", "2048", "-S", "-name", "LeonMobile-recording", "-kernel", str(images / "Image"),
                     "-initrd", str(images / "leon-initramfs.cpio.gz"), "-append",
-                    "console=ttyAMA0 leon.root=/dev/vda1 rootwait ro", "-drive",
+                    (REPO / "distro/board/qemu-arm64/cmdline").read_text().strip(), "-drive",
                     f"if=none,file={disk},format=raw,id=system", "-device", "virtio-blk-pci,drive=system",
                     "-device", "virtio-gpu-pci,xres=480,yres=960", "-device", "qemu-xhci",
                     "-device", "usb-kbd", "-device", "usb-tablet", "-netdev", "user,id=net0",

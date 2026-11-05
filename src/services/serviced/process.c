@@ -24,7 +24,7 @@ void manager_start(struct manager *manager, struct service *s) {
             if (pair[1] >= 0)
                 close(pair[1]);
             s->next_ms = service_now_ms() + 1000;
-            perror("notification socket");
+            leon_boot_error("notification socket");
             return;
         }
     }
@@ -84,7 +84,7 @@ void manager_start(struct manager *manager, struct service *s) {
         if (pair[0] >= 0)
             close(pair[0]);
         s->next_ms = service_now_ms() + 1000;
-        perror("fork");
+        leon_boot_error("fork");
         return;
     }
     s->pid = pid;
@@ -95,7 +95,7 @@ void manager_start(struct manager *manager, struct service *s) {
     s->ready_deadline = s->started_ms + s->ready_timeout_ms;
     s->watchdog_deadline = s->started_ms + s->watchdog_ms;
     strcpy(s->health, s->notify ? "starting" : "ready");
-    fprintf(stderr, "leond: started %s pid=%d\n", s->name, pid);
+    leon_boot_log("leond: started %s pid=%d\n", s->name, pid);
 }
 
 void manager_reap(struct manager *manager) {
@@ -125,8 +125,8 @@ void manager_reap(struct manager *manager) {
                 s->next_ms = service_now_ms() + 500 * (1 << (s->retries > 6 ? 6 : s->retries));
             } else
                 s->wanted = 0;
-            fprintf(stderr, "leond: exited %s status=%d retry=%d\n", s->name, s->exit_status,
-                    s->wanted);
+            leon_boot_log("leond: exited %s status=%d retry=%d\n", s->name, s->exit_status,
+                          s->wanted);
         }
     }
 }

@@ -121,6 +121,24 @@ build units does not introduce an on-device package repository or OTA service.
 
 QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
 
+The shared `distro/board/qemu-arm64/cmdline` enables both the framebuffer VT
+(`console=tty0`) and the serial console (`console=ttyAMA0`, last so it remains
+`/dev/console`). Kernel timestamps are enabled and console blanking is disabled.
+The kernel replays its available log buffer when virtio-gpu registers fbcon;
+the screen cannot display output before that driver initializes. PID 1 mirrors
+its startup diagnostics and starts `leond --boot-console` to mirror service
+status/error messages to `/dev/tty1`. This is a bounded, nonblocking, best-effort
+text mirror; stderr remains the serial diagnostic path. Normal service stdout
+and stderr still go to the supervisor's per-service files under `/var/log/leon`.
+Invoking leond without `--boot-console` does not write to a host VT.
+
+seatd uses a VT-bound session: it sets `KD_GRAPHICS` and disables kernel keyboard
+processing while Wayland owns the display. The status mirror checks `KD_TEXT`
+before writing; fbcon also suppresses kernel drawing in graphics mode. seatd
+restores text mode when the compositor disconnects, allowing subsequent
+diagnostics to appear during compositor failure or shutdown. This uses Linux
+VT/fbcon ownership rather than a second renderer or an artificial boot delay.
+
 The reference kernel enables memory PSI, Landlock, seccomp and cgroup v2 memory/process controllers. `prepare` mounts cgroup2, enables controllers beneath `/sys/fs/cgroup/leon/apps` and mounts a private tmpfs at `/media` so removable mount points can be created while the system partition stays read-only. Shutdown unmounts removable volumes before persistent partitions. `/etc/localtime` points into `/run`; the UTC boot default and installed timezone database are available before time policy is applied.
 
 The GPT disk contains `system` (768 MiB ext4, mounted read-only) and `data` (512 MiB ext4, mounted read/write). System software, configuration and built-in apps live in the system image. Installed apps, application-private data, settings and logs live under `/data`. Runtime sockets and device/session state live under `/run`.

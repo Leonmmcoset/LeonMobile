@@ -14,6 +14,7 @@ import shutil
 import time
 
 REPO = Path(__file__).resolve().parents[1]
+KERNEL_COMMAND_LINE = (REPO / "distro/board/qemu-arm64/cmdline").read_text().strip()
 
 
 class Guest:
@@ -582,7 +583,7 @@ def main():
         command = ["qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "4",
                    "-m", "2048", "-kernel", str(images / "Image"), "-initrd",
                    str(images / "leon-initramfs.cpio.gz"), "-append",
-                   "console=ttyAMA0 leon.root=/dev/vda1 rootwait ro", "-drive",
+                   KERNEL_COMMAND_LINE, "-drive",
                    f"if=none,file={disk},format=raw,id=system", "-device",
                    "virtio-blk-pci,drive=system", "-device", "virtio-gpu-pci,xres=480,yres=960",
                    "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
@@ -604,10 +605,24 @@ def main():
                 while not endpoint.exists() and time.monotonic() < deadline:
                     time.sleep(.05)
                 qmp = QMP(endpoint)
+                boot_console_seen = False
                 while time.monotonic() < deadline:
                     text = log.read_text(errors="replace")
                     if proc.poll() is not None:
                         raise RuntimeError("QEMU exited before startup; see " + str(log))
+                    if not boot_console_seen:
+                        try:
+                            pixels = qmp.capture(artifacts / "boot-console.ppm", allow_blank=True)
+                            # fbcon is a black background with grayscale glyphs.
+                            # Two-color text is valid even though a blank-screen
+                            # heuristic used for Wayland would reject it.
+                            light = sum(pixels[i] > 120 and
+                                        abs(pixels[i] - pixels[i + 1]) < 4 and
+                                        abs(pixels[i] - pixels[i + 2]) < 4
+                                        for i in range(0, len(pixels), 48))
+                            boot_console_seen = pixels.count(b"\0\0\0") > 100000 and light > 100
+                        except RuntimeError:
+                            pass  # virtio-gpu has not committed its portrait mode yet.
                     if args.root_apps_probe and "exited root-applications-test status=1" in text:
                         result = Guest(proc, log).run("cat /run/leon/root-app-tests.txt")
                         (artifacts / "root-applications.txt").write_text(result + "\n")
@@ -617,8 +632,14 @@ def main():
                     time.sleep(.25)
                 else:
                     raise RuntimeError("Boot timed out; see " + str(log))
+                if not boot_console_seen:
+                    raise RuntimeError("No framebuffer startup log was observed before Wayland")
                 # Serial login is non-root. The broker provides controlled operations.
                 guest = Guest(proc, log)
+                consoles = guest.run("cat /proc/consoles")
+                (artifacts / "boot-consoles.txt").write_text(consoles + "\n")
+                if not all(re.search(rf"^{name}\s", consoles, re.M) for name in ("tty0", "ttyAMA0")):
+                    raise RuntimeError("Both framebuffer and serial kernel consoles are required")
                 if guest.run("id -u") != "1000":
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":

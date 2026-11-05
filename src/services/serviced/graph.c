@@ -15,7 +15,7 @@ int manager_load(struct manager *manager, const char *dir) {
     struct dirent **entries;
     int n = scandir(dir, &entries, NULL, alphasort);
     if (n < 0) {
-        perror(dir);
+        leon_boot_error(dir);
         return -1;
     }
     char error[512];
@@ -27,15 +27,14 @@ int manager_load(struct manager *manager, const char *dir) {
             snprintf(path, sizeof(path), "%s/%s", dir, entries[i]->d_name);
             if (manager->count == LM_MAX_SERVICES ||
                 service_load(path, &manager->services[manager->count], error, sizeof(error))) {
-                fprintf(stderr, "leond: %s\n",
+                leon_boot_log("leond: %s\n",
                         manager->count == LM_MAX_SERVICES ? "too many services" : error);
                 result = -1;
             } else {
                 if (service_policy_apply(manager->policy_directory,
                                          &manager->services[manager->count]))
-                    fprintf(stderr,
-                            "leond: invalid developer policy for %s; using built-in policy\n",
-                            manager->services[manager->count].name);
+                    leon_boot_log("leond: invalid developer policy for %s; using built-in policy\n",
+                                  manager->services[manager->count].name);
                 ++manager->count;
             }
         }
@@ -44,7 +43,7 @@ int manager_load(struct manager *manager, const char *dir) {
     free(entries);
     if (!result &&
         service_order(manager->services, manager->count, manager->order, error, sizeof(error))) {
-        fprintf(stderr, "leond: %s\n", error);
+        leon_boot_log("leond: %s\n", error);
         return -1;
     }
     return result;

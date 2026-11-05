@@ -66,6 +66,14 @@ The desktop is 480×960 portrait. Click the lock screen or swipe up to unlock. T
 
 `LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks. `LEON_IMAGES` selects a directory containing the kernel, initramfs and reference disk.
 
+Boot logs appear on the portrait screen once the kernel initializes virtio-gpu,
+followed by init/service status and the Wayland lock screen. The host terminal
+continues to receive serial logs. All launchers, tests and recorders read
+`distro/board/qemu-arm64/cmdline`; assembled releases include that file. The
+VT-bound seat prevents later kernel/status messages from drawing over Wayland
+and restores the text console when the compositor exits. See
+[architecture.md](architecture.md#boot-and-storage) for output routing.
+
 ## Install and update
 
 Build the example using the target SDK:

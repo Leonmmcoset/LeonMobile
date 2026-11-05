@@ -69,7 +69,7 @@ def main():
                 env=dict(os.environ,DISPLAY=display,SDL_VIDEODRIVER='x11')
                 endpoint=temp/'qmp.sock'
                 qemu=subprocess.Popen(['qemu-system-aarch64','-M','virt','-cpu','cortex-a72','-smp','4','-m','2048','-S',
-                    '-kernel',str(images/'Image'),'-initrd',str(images/'leon-initramfs.cpio.gz'),'-append','console=ttyAMA0 leon.root=/dev/vda1 rootwait ro',
+                    '-kernel',str(images/'Image'),'-initrd',str(images/'leon-initramfs.cpio.gz'),'-append',controls.KERNEL_COMMAND_LINE,
                     '-drive',f'if=none,file={disk},format=raw,id=system','-device','virtio-blk-pci,drive=system','-device','virtio-gpu-pci,xres=480,yres=960',
                     '-device','qemu-xhci','-device','usb-kbd','-device','usb-tablet','-netdev','user,id=net0','-device','virtio-net-pci,netdev=net0',
                     '-audiodev','none,id=audio','-device','intel-hda','-device','hda-duplex,audiodev=audio','-display','sdl,gl=off',

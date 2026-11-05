@@ -15,10 +15,12 @@ int main(int argc, char **argv) {
                             .policy_directory = "/data/leon/developer/services"};
     struct manager *manager = &state;
     const char *dir = "/etc/leon/services", *socket_path = "/run/leon/services.sock";
-    int check = 0;
+    int check = 0, boot_console = 0;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--check"))
             check = 1;
+        else if (!strcmp(argv[i], "--boot-console"))
+            boot_console = 1;
         else if (!strcmp(argv[i], "--config") && i + 1 < argc)
             dir = argv[++i];
         else if (!strcmp(argv[i], "--socket") && i + 1 < argc)
@@ -28,12 +30,14 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--policy-dir") && i + 1 < argc)
             manager->policy_directory = argv[++i];
         else {
-            fputs("usage: leond [--check] [--config DIR] [--socket PATH] [--log-dir DIR] "
+            fputs("usage: leond [--check] [--boot-console] [--config DIR] [--socket PATH] [--log-dir DIR] "
                   "[--policy-dir DIR]\n",
                   stderr);
             return 2;
         }
     }
+    if (boot_console && !check && !geteuid())
+        leon_boot_console_enable();
     if (manager_load(manager, dir))
         return 1;
     if (check) {

@@ -1,4 +1,5 @@
 #pragma once
+#include "boot_log.h"
 #include "config.h"
 enum service_state { STOPPED, RUNNING, FINISHED, FAILED, STARTING };
 struct manager {

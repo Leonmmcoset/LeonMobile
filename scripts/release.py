@@ -62,6 +62,9 @@ def main():
         (stage / "scripts").mkdir()
         for name in ("run-qemu.sh", "update-image.py"):
             shutil.copy2(REPO / "scripts" / name, stage / "scripts")
+        board = stage / "distro/board/qemu-arm64"
+        board.mkdir(parents=True)
+        shutil.copy2(REPO / "distro/board/qemu-arm64/cmdline", board / "cmdline")
         launcher = stage / "run.sh"
         launcher.write_text(
             '#!/usr/bin/env bash\nset -euo pipefail\n'
