@@ -211,9 +211,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -222,6 +222,19 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         # debugfs has its own command parser; no shell interprets these paths.
         commands.append("write " + json.dumps(str(source.resolve())) + " " + destination)
         commands.append("set_inode_field " + destination + " mode 0100755")
+    if root_apps_probe:
+        put(root_apps_probe, "/usr/bin/leon-test-root-apps")
+        put(root_apps_probe.parent / "root-app-fixture-package.lmpkg", "/usr/share/root-probe.lmpkg")
+        put(root_apps_package, "/usr/share/root-demo.lmpkg")
+        unit = temporary / "root-apps-test.toml"
+        unit.write_text('name="root-applications-test"\ncommand=["/usr/bin/leon-test-root-apps"]\n'
+                        'after=["root","authentication","apps"]\ntype="oneshot"\nrestart="never"\n')
+        put(unit, "/etc/leon/services/19-root-applications-test.toml")
+        unit = temporary / "root-apps-compositor.toml"
+        unit.write_text((REPO / "distro/rootfs-overlay/etc/leon/services/20-compositor.toml").read_text()
+                        .replace('"prepare", "seat"', '"prepare", "seat", "root-applications-test"'))
+        commands.append("rm /etc/leon/services/20-compositor.toml")
+        put(unit, "/etc/leon/services/20-compositor.toml")
     if notification_probe:
         put(notification_probe, "/usr/bin/leon-test-notifications")
     if applications_probe:
@@ -512,11 +525,20 @@ def main():
                         help="test-only AArch64 management observation client")
     parser.add_argument("--applications-only", action="store_true",
                         help="Settings application management, clear/uninstall and real reboot persistence")
+    parser.add_argument("--root-apps-probe", type=Path, help="disposable-disk Root application regression service")
+    parser.add_argument("--root-apps-package", type=Path, help="run focused Root application authorization UI and reboot checks")
     parser.add_argument("--root-only", action="store_true",
                         help="developer UI, sandboxed su, root protocol and two real reboot tests")
     parser.add_argument("--core-only",action="store_true",
                         help="run service fault probes and focused IME/permission UI validation")
     args = parser.parse_args()
+    if bool(args.root_apps_probe) != bool(args.root_apps_package):
+        parser.error("--root-apps-probe and --root-apps-package must be provided together")
+    if args.root_apps_probe and (args.root_probe or args.auth_probe or args.system_probe or args.applications_probe or args.core_only or args.root_only or args.auth_only or args.applications_only):
+        parser.error("Root application checks use a separate disposable disk from other destructive probes")
+    if args.root_apps_probe:
+        for path in (args.root_apps_probe, args.root_apps_package, args.root_apps_probe.parent / "root-app-fixture-package.lmpkg"):
+            if not path.is_file(): parser.error("Missing Root application fixture: " + str(path))
     if args.applications_only and (not args.applications_probe or not args.package or
                                    args.auth_only or args.root_only or args.core_only):
         parser.error("--applications-only requires --applications-probe and --package, excluding other focused modes")
@@ -544,14 +566,14 @@ def main():
     if args.terminal_probe and args.core_only:
         parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
-    artifacts = REPO / "build/qemu-test"
+    artifacts = REPO / ("build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
     artifacts.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="leon-qemu-") as temp:
         temp = Path(temp)
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -586,6 +608,10 @@ def main():
                     text = log.read_text(errors="replace")
                     if proc.poll() is not None:
                         raise RuntimeError("QEMU exited before startup; see " + str(log))
+                    if args.root_apps_probe and "exited root-applications-test status=1" in text:
+                        result = Guest(proc, log).run("cat /run/leon/root-app-tests.txt")
+                        (artifacts / "root-applications.txt").write_text(result + "\n")
+                        raise RuntimeError(result)
                     if "leond: started shell" in text and "\n$ " in text.replace("\r", ""):
                         break
                     time.sleep(.25)
@@ -597,6 +623,11 @@ def main():
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":
                     raise RuntimeError("Guest kernel version mismatch")
+                if args.root_apps_probe:
+                    result = guest.run("cat /run/leon/root-app-tests.txt")
+                    (artifacts / "root-applications.txt").write_text(result + "\n")
+                    if "ROOT_APP_TESTS_PASSED" not in result: raise RuntimeError(result)
+                    print(result, flush=True)
                 if args.root_probe:
                     from root_qemu import wait_probe
                     wait_probe(guest, artifacts, 1)
@@ -688,6 +719,15 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.root_apps_probe:
+                    from root_apps_qemu import exercise_root_applications
+                    exercise_root_applications(guest, qmp, artifacts, args.timeout)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=25)
+                    if proc.returncode: raise RuntimeError("Root application test shutdown failed")
+                    passed = True
+                    print("Root application sandbox/approval/revocation, trusted UI and actual reboot checks passed", flush=True)
+                    return
                 if args.applications_only:
                     from applications_qemu import exercise_applications_ui
                     exercise_applications_ui(guest, qmp, artifacts, args.package, args.timeout,

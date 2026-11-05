@@ -35,4 +35,23 @@ mkdir -p "$repo/build"
 "${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os \
     -I"$repo/output/host/aarch64-buildroot-linux-musl/sysroot/usr/include/cairo" \
     "$repo/tests/wayland_spoof.cpp" -llmui -o "$repo/build/auth-forged-probe"
-echo 'AArch64 application management, authentication, notification, system, root and terminal probes compiled under build/; no image was changed.'
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    -I"$repo/src/libraries/root-client" "$repo/tests/target/root_app.c" \
+    "$repo/build/root-wire-probe.o" -o "$repo/build/root-app-fixture"
+"${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os -pthread \
+    -I"$repo/src/libraries/root-client" "$repo/tests/target/root_applications.cpp" \
+    "$repo/build/root-wire-probe.o" -o "$repo/build/root-applications-probe"
+mkdir -p "$repo/build/root-probe-package/bin" "$repo/build/root-probe-package/libexec"
+cp "$repo/build/root-app-fixture" "$repo/build/root-probe-package/bin/app"
+cp "$repo/build/root-app-fixture" "$repo/build/root-probe-package/libexec/helper"
+python3 - "$repo/build/root-probe-manifest.json" <<'PY'
+import json, sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps(dict(format=1, id="org.example.rootprobe", version="1.0.0",
+    arch="aarch64", lmui=1, name="Root target fixture", entry="bin/app",
+    args=["/run/leon-root/control.sock", "@home"], permissions=["root.exec"],
+    root=dict(entry="libexec/helper", description="Harmless target cgroup and credential diagnostics"))))
+PY
+python3 "$repo/scripts/make-package.py" "$repo/build/root-probe-manifest.json" \
+    "$repo/build/root-probe-package" "$repo/build/root-app-fixture-package.lmpkg"
+echo 'AArch64 application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'

@@ -469,3 +469,56 @@ rebuilt; no management test helper is shipped and the older `dist/` release bund
 was not regenerated. Validation is limited to the QEMU developer prototype;
 storage counts are allocated-space estimates and interrupted multi-service
 cleanup can require retry, as documented in the protocol.
+
+## Third-party Root application authorization (2026-11-05)
+
+The native suite passed all 11 CTest checks and 79 Python integration tests.
+Root application fixtures use real Unix peer credentials and cover installed
+ELF identity, reserved installation markers, same-version reinstall rotation,
+trusted UI impersonation, malformed requests, one-use decisions, cancellation,
+policy corruption, persistent block/reset, concurrent capacity and password
+failure delays. The C++20 SDK tests cover binary output, nonzero exit status and
+pending/running cancellation. A relocated SDK export built the separate app and
+helper example successfully.
+
+Independent Weston rendered all eight built-ins, the shell and both shade
+stages, with motion and lifecycle checks. The Root-specific input check passed
+exact command display, masked private password entry, failed authentication,
+fresh confirmation for a second command, deny/block and a stalled service with
+responsive UI. Existing developer settings setup, kernel editing, disable,
+re-enable and password rotation also passed.
+
+The AArch64/musl production runtime and default image under `output/images/`
+were rebuilt. The focused QEMU suite passed real sandboxed app requests and a
+separate UID 0 helper, descriptor/environment exclusion, cgroup cleanup of
+detached descendants, replay rejection, persistent block/unblock, device-lock
+cancellation and rootd crash recovery. Actual application-broker stop, data
+clear and uninstall waited for Root writers; reinstalling the same version
+retained the app UID while invalidating the old installation request.
+
+The real compositor input sequence passed Root password setup, modal protection
+against a home gesture, masked input, bad-password cooldown, fresh command
+confirmation, deny/block, authenticated unblocking and authorization history.
+A real guest kernel reboot retained the Root switch/password and blocked app
+policy. After a successful diagnostic, `/proc/PID/status` and the screen
+confirmed the app remained at its own UID with NoNewPrivs and seccomp while the
+separate helper reported UID 0 and Linux 7.3.1 on AArch64. Page checks wait for
+enabled actions after asynchronous work before sending dependent input.
+
+The final combined QEMU regression also passed the existing authentication and
+Root protocol probes, core service fault/sandbox/cgroup/crash checks, terminal
+VT/PTY/vi/top/clipboard, live notifications, Chinese IME restart, permission/file
+selection, all eight built-ins, SDK package installation/removal, shade and
+lifecycle controls, Settings application management and clean UI poweroff.
+Offline ext4 inspection verified the exact saved editor and terminal data.
+
+Reproduction and trust boundaries are documented in
+[root-access.md](root-access.md) and [building.md](building.md). Evidence remains
+ignored in `build/third-party-root-*.log` and `build/qemu-root-apps-test/`.
+Neither the SDK demo nor privileged regression fixtures are shipped in the
+default image. The older `dist/` release bundle was not regenerated.
+
+This validation covers the QEMU developer prototype. Approved unrestricted
+Root can modify the system and escape its process controls; revocation cannot
+undo completed changes. The feature has not received an independent security
+audit or physical phone validation.
