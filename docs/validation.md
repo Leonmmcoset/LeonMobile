@@ -567,3 +567,15 @@ Evidence stays ignored in `build/boot-console-*.log`,
 `build/qemu-test/boot-console.*` and `build/qemu-boot-console-test/`, including
 the VT states, text cells, serial trace and recovery PNGs. These checks apply to
 the QEMU developer prototype; physical phone display/VT behavior is unverified.
+
+The standard recorder also completed a fresh production-image tour from boot
+through all eight built-ins and UI poweroff, without a privileged boot fixture.
+The native framebuffer and 480×960 Xvfb viewport matched. The uncut silent MP4
+contains 4,773 H.264/yuv420p video frames at 30 fps, runs 159.100 seconds and has
+twelve playback chapters. Full FFmpeg decoding completed without errors.
+Decoded frames were inspected for actual kernel messages, init mounts/leond
+starts, lock screen, calculator input and the native terminal's kernel version.
+The film, `boot-kernel.png`, `boot-services.png`, other captures and
+serial/encoder/probe evidence remain ignored under
+`build/recordings/LeonMobile-boot-console*`. Source provenance in `recording.json`
+points to the validated code commit before this documentation update.
