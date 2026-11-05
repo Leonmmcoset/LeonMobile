@@ -799,3 +799,15 @@ correctly through SCM_RIGHTS without exposing the host devpts mount. Its UI
 fixture now follows the actual service catalogue's pages and scroll position
 rather than assuming notificationd is on the first screen. Reports are in
 `build/isolation-qemu-root-apps.log` and `build/isolation-qemu-root.log`.
+
+The final combined QEMU regression passed authentication/Root probes, all
+system/isolation fault probes, all eight built-in identities, terminal VT/PTY,
+Ctrl-C, vi, top, clipboard and shell restart, live notification identity and
+scrolling, Chinese IME restart/portal decisions, SDK package install/launch/remove,
+Settings application stop/clear/uninstall, shade/navigation/settings and clean UI
+poweroff. Offline disk inspection confirmed the exact saved/imported editor
+contents and terminal probe, interrupt, edit, paste and restart results.
+`build/isolation-qemu-full.log` records this run. Graphical suites were completed
+serially; an earlier concurrent TCG run entered the existing fail-closed lock
+path. These checks validate the QEMU developer prototype, not physical phones or
+an independently audited production security boundary.
