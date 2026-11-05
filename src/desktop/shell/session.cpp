@@ -123,10 +123,13 @@ void Shell::refresh() {
         error = e.what();
     }
     try {
-        notifications = notification_rpc({{"op", "notifications"}}).at("notifications");
+        auto state=notification_rpc({{"op", "notifications"}});
+        notifications=state.at("notifications");
+        notifications_lock_epoch=state.value("privacy_locked",false)?state.value("lock_epoch",""):"";
         notifications_available = true;
     } catch (const std::exception &) {
         notifications = Json::array();
+        notifications_lock_epoch.clear();
         notifications_available = false;
     }
 }
@@ -145,6 +148,7 @@ void Shell::show_page(Page destination) {
         (!authentication.ok || authentication.locked))
         return;
     if (destination == Page::lock) {
+        notifications=Json::array();notifications_lock_epoch.clear();
         root_clear_prompt();
         clear_device_secret();
         unlock_entry = unlock_pending = false;

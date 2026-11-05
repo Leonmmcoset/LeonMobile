@@ -13,6 +13,8 @@ struct notification_options {
     const char *root;
     const char *builtin;
     const char *socket_path;
+    const char *auth_socket, *audio_socket;
+    int development;
 };
 
 struct notification {
@@ -25,6 +27,7 @@ struct notification_store {
     struct notification items[NOTIFICATION_CAPACITY];
     size_t start;
     size_t count;
+    void *policy;
 };
 
 #ifdef __cplusplus
@@ -41,6 +44,9 @@ char *notification_dispatch(struct notification_store *store,
                             const char *request, size_t size);
 char *notification_error(const char *message);
 int notification_serve(const struct notification_options *options);
+int notification_policy_load(struct notification_store *, const struct notification_options *);
+void notification_policy_free(struct notification_store *);
+void notification_policy_tick(struct notification_store *, const struct notification_options *);
 
 #ifdef __cplusplus
 }

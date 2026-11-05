@@ -11,13 +11,14 @@ void Shell::paint_lock(Canvas &c, const std::string &time) {
         c.save();
         cairo_translate(c.cr, 0, -offset);
         c.circle(w * .75, h * .45, w * .6, t.container);
-        c.text(time, {24, h * .22, w - 48, 130}, 92, t.primary, false, 1);
+        c.text(time, {24, h * .22, w - 48, 130}, prefs.value("clock_24h",true)?92:64, t.primary, false, 1);
         c.text("LeonMobile", {24, h * .22 + 140, w - 48, 50}, 24, t.text, true, 1);
         c.text(authentication.ok ? tr(en, "向上滑动解锁", "Swipe up to unlock")
                                  : tr(en, "认证服务正在恢复", "Authentication service recovering"),
                {24, h - 180, w - 48, 48}, 16, t.muted, false, 1);
         c.restore();
         paint_media(c, 420);
+        paint_lock_notifications(c,audio_state.contains("current")?550:420);
         return;
     }
     bool pin = !strcmp(authentication.kind, "pin");

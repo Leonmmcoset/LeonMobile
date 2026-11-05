@@ -212,9 +212,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None, platform_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None, platform_probe=None, preferences_probe=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe, platform_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe, platform_probe, preferences_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -223,6 +223,9 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         # debugfs has its own command parser; no shell interprets these paths.
         commands.append("write " + json.dumps(str(source.resolve())) + " " + destination)
         commands.append("set_inode_field " + destination + " mode 0100755")
+    if preferences_probe:
+        put(preferences_probe, "/usr/bin/leon-test-preferences")
+        commands.append("set_inode_field /usr/bin/leon-test-preferences mode 0104755")
     if platform_probe:
         put(platform_probe, "/usr/bin/leon-test-platform")
         unit = temporary / "platform-test.toml"
@@ -531,6 +534,7 @@ def verify_core_data(disk,temp):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform-probe", type=Path, help="AArch64 platform-service and media integration fixture")
+    parser.add_argument("--preferences-probe", type=Path, help="date/time and notification Settings UI, sound, recovery and reboot fixture")
     parser.add_argument("--timeout", type=int, default=150)
     parser.add_argument("--images", type=Path, default=REPO / "output/images",
                         help="image directory, including an assembled local release")
@@ -562,6 +566,14 @@ def main():
     parser.add_argument("--logging-only", action="store_true",
                         help="production logging diagnostics UI and previous history across real reboot")
     args = parser.parse_args()
+    if args.preferences_probe:
+        if not args.preferences_probe.is_file():
+            parser.error("--preferences-probe must name the compiled AArch64 fixture")
+        if any((args.platform_probe, args.notification_probe, args.system_probe, args.terminal_probe,
+                args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe,
+                args.root_apps_package, args.boot_console_probe, args.package, args.core_only,
+                args.root_only, args.auth_only, args.applications_only, args.logging_only)):
+            parser.error("Preferences checks require their own disposable image")
     if args.platform_probe:
         if not args.platform_probe.is_file():
             parser.error("--platform-probe must name the compiled AArch64 fixture")
@@ -615,7 +627,8 @@ def main():
     if args.terminal_probe and args.core_only:
         parser.error("--terminal-probe requires the full interactive sequence")
     images = args.images.resolve()
-    artifacts = REPO / ("build/qemu-platform-test" if args.platform_probe else
+    artifacts = REPO / ("build/qemu-preferences-test" if args.preferences_probe else
+                        "build/qemu-platform-test" if args.platform_probe else
                         "build/qemu-logging-test" if args.logging_only else
                         "build/qemu-boot-console-test" if args.boot_console_probe else
                         "build/qemu-root-apps-test" if args.root_apps_probe else "build/qemu-test")
@@ -625,7 +638,7 @@ def main():
         disk = temp / "disk.img"
         subprocess.run(["cp", "--reflink=auto", "--sparse=always",
                         images / "leonmobile-qemu-aarch64.img", disk], check=True)
-        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package, args.boot_console_probe, args.platform_probe)
+        inject_probes(images, disk, temp, args.notification_probe, args.system_probe, args.terminal_probe, args.root_probe, args.auth_probe, args.applications_probe, args.root_apps_probe, args.root_apps_package, args.boot_console_probe, args.platform_probe, args.preferences_probe)
         media = temp / "removable.ext4"
         if args.system_probe:
             with media.open("wb") as stream: stream.truncate(16 * 1024 * 1024)
@@ -639,7 +652,8 @@ def main():
                    "virtio-blk-pci,drive=system", "-device", "virtio-gpu-pci,xres=480,yres=960",
                    "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
                    "-netdev", "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
-                   "-audiodev", ("wav,id=audio,path=" + str(artifacts / "platform-audio.wav") if args.platform_probe else "none,id=audio"), "-device", "intel-hda", "-device",
+                   "-audiodev", ("wav,id=audio,path=" + str(artifacts / "preferences-audio.wav") if args.preferences_probe else
+                                 "wav,id=audio,path=" + str(artifacts / "platform-audio.wav") if args.platform_probe else "none,id=audio"), "-device", "intel-hda", "-device",
                    "hda-duplex,audiodev=audio", "-display", "none", "-monitor", "none",
                    "-serial", "stdio", "-qmp", f"unix:{endpoint},server=on,wait=off"]
         if args.system_probe:
@@ -829,6 +843,17 @@ def main():
                 qmp.click(240, 790)
                 time.sleep(1)
                 qmp.capture(artifacts / "home.ppm")
+                if args.preferences_probe:
+                    from preferences_qemu import exercise_preferences, verify_notification_audio
+                    exercise_preferences(guest, qmp, artifacts, args.timeout)
+                    guest.run("lmsys power '{\"op\":\"poweroff\"}'")
+                    proc.wait(timeout=30)
+                    if proc.returncode:
+                        raise RuntimeError("Preferences test shutdown failed")
+                    verify_notification_audio(artifacts / "preferences-audio.wav", artifacts / "audio-windows.json")
+                    passed = True
+                    print("Date/time and notification Settings, sound, privacy, recovery and real reboot passed", flush=True)
+                    return
                 if args.logging_only:
                     from logging_qemu import exercise_logging_ui
                     exercise_logging_ui(guest, qmp, artifacts, args.timeout, reboot=True)

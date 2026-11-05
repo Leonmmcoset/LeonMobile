@@ -41,7 +41,8 @@ void SettingsApplication::paint_header(Canvas &c) {
 void SettingsApplication::paint_content(Canvas &c, double bottom) {
     double top = page_ == Page::home ? 216 : 164;
     double end = 700;
-    if (page_ == Page::home)
+    if(page_==Page::datetime || page_==Page::notifications) end=preferences_bottom();
+    else if (page_ == Page::home)
         end = top + visible_entries().size() * 84;
     else if (page_ == Page::applications)
         end = applications_bottom();
@@ -52,7 +53,7 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     else if (page_ == Page::documents) end = 340 + platform_data_.value("documents", Json::array()).size() * 148;
     else if (page_ == Page::navigation) end = 500;
     else if (page_ == Page::system)
-        end = 760;
+        end = 844;
     else if (page_ == Page::diagnostics)
         end = diagnostics_bottom();
     else if (page_ == Page::security)
@@ -83,7 +84,9 @@ void SettingsApplication::paint_content(Canvas &c, double bottom) {
     c.save();
     c.clip(viewport_);
     cairo_translate(c.cr, 0, -scroll);
-    if (page_ == Page::defaults || page_ == Page::documents) paint_platform(c);
+    if(page_==Page::datetime) paint_datetime(c);
+    else if(page_==Page::notifications) paint_notification_settings(c);
+    else if (page_ == Page::defaults || page_ == Page::documents) paint_platform(c);
     else if (page_ == Page::applications)
         paint_applications(c);
     else if (page_ == Page::diagnostics)

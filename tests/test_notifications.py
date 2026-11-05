@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -139,6 +140,92 @@ class NotificationTests(unittest.TestCase):
             self.assertFalse(json.loads(self.raw(payload))["ok"])
         self.assertTrue(json.loads(self.raw(b" " * (8191 - 22) +
                                             b'{"op":"notifications"}\n'))["ok"])
+
+    def test_notification_policy_authorization_persistence_and_suppression(self):
+        for uid in (1000,11002,12000):
+            self.assertFalse(self.rpc({'op':'notification_policy'},uid)['ok'])
+            self.assertFalse(self.rpc({'op':'configure','values':{'dnd':True}},uid)['ok'])
+        initial=self.rpc({'op':'notification_policy'},11000)
+        self.assertTrue(initial['settings']['sound'])
+        self.assertEqual(initial['settings']['lockscreen'],'hide')
+        for values in ({'sound':1},{'dnd':'true'},{'lockscreen':True},{'lockscreen':'bad'},{'unknown':True},{}):
+            self.assertFalse(self.rpc({'op':'configure','values':values},11000)['ok'])
+        self.assertTrue(self.rpc({'op':'notify','title':'clear me'},11002)['ok'])
+        self.assertFalse(self.rpc({'op':'app_policy','app':'org.leon.gallery','enabled':1},11000)['ok'])
+        self.assertFalse(self.rpc({'op':'app_policy','app':'org.example.missing','enabled':False},11000)['ok'])
+        self.assertTrue(self.rpc({'op':'app_policy','app':'org.leon.gallery','enabled':False,'sound':False},11000)['ok'])
+        self.assertEqual(self.rpc({'op':'notifications'})['notifications'],[])
+        self.assertTrue(self.rpc({'op':'notify','title':'blocked'},11002)['suppressed'])
+        self.assertEqual(self.rpc({'op':'notifications'})['notifications'],[])
+        self.assertTrue(self.rpc({'op':'configure','values':{'dnd':True,'lockscreen':'none'}},11000)['ok'])
+        self.assertFalse(self.rpc({'op':'test_sound'},11000)['ok'])
+        self.stop(self.daemon);self.daemon=self.start()
+        result=self.rpc({'op':'notification_policy'},11000)
+        self.assertTrue(result['settings']['dnd'])
+        self.assertEqual(result['settings']['lockscreen'],'none')
+        self.assertFalse(result['apps'][0]['enabled'])
+        state=self.root/'system/notifications.json'
+        state.unlink();state.mkdir()
+        self.assertFalse(self.rpc({'op':'configure','values':{'dnd':False}},11000)['ok'])
+        self.assertTrue(self.rpc({'op':'notification_policy'},11000)['settings']['dnd'])
+        self.stop(self.daemon);state.rmdir();state.write_text('{"format":1,"settings":{}}')
+        refused=subprocess.run(self.command,capture_output=True,timeout=5)
+        self.assertNotEqual(refused.returncode,0)
+
+    def test_lockscreen_redaction_auth_failure_and_sound_dispatch(self):
+        self.stop(self.daemon)
+        auth_path=str(self.path/'auth.sock');audio_path=str(self.path/'audio.sock')
+        locked=[True];calls=[];stop=threading.Event()
+        def serve(path,handler):
+            listener=socket.socket(socket.AF_UNIX);listener.bind(path);listener.listen();listener.settimeout(.1)
+            def run():
+                with listener:
+                    while not stop.is_set():
+                        try: peer,_=listener.accept()
+                        except socket.timeout: continue
+                        with peer:
+                            peer.settimeout(1);wire=b''
+                            while b'\n' not in wire:
+                                part=peer.recv(4096)
+                                if not part: break
+                                wire+=part
+                            reply=handler(json.loads(wire))
+                            peer.sendall(json.dumps(reply).encode()+b'\n')
+            thread=threading.Thread(target=run);thread.start();return thread
+        threads=[serve(auth_path,lambda request:dict(ok=True,locked=locked[0])),
+                 serve(audio_path,lambda request:(calls.append(request) or dict(ok=True)))]
+        self.command.extend(['--auth-socket',auth_path,'--audio-socket',audio_path])
+        try:
+            self.daemon=self.start()
+            self.assertTrue(self.rpc({'op':'notify','title':'private'},11002)['ok'])
+            deadline=time.monotonic()+2
+            while not calls and time.monotonic()<deadline: time.sleep(.02)
+            self.assertEqual(calls,[{'op':'notification_sound'}])
+            item=self.rpc({'op':'notifications'},1000)['notifications'][0]
+            self.assertEqual(item['title'],'');self.assertTrue(item['redacted'])
+            relayed=self.rpc({'op':'notifications_for','uid':1000})['notifications'][0]
+            self.assertTrue(relayed['redacted']);self.assertEqual(relayed['title'],'')
+            for uid in (True,-1,11002,'1000'):
+                self.assertFalse(self.rpc({'op':'notifications_for','uid':uid})['ok'])
+            self.assertFalse(self.rpc({'op':'notifications_for','uid':0},1000)['ok'])
+            locked[0]=False
+            self.assertEqual(self.rpc({'op':'notifications'},1000)['notifications'][0]['title'],'private')
+            self.rpc({'op':'configure','values':{'dnd':True}},11000)
+            self.rpc({'op':'notify','title':'silent'},11002)
+            self.assertEqual(len(self.rpc({'op':'notifications'})['notifications']),2)
+            time.sleep(.25);self.assertEqual(len(calls),1)
+            self.rpc({'op':'configure','values':{'lockscreen':'none'}},11000)
+            locked[0]=True
+            self.assertEqual(self.rpc({'op':'notifications'},1000)['notifications'],[])
+            self.rpc({'op':'configure','values':{'lockscreen':'show'}},11000)
+            self.assertEqual(self.rpc({'op':'notifications'},1000)['notifications'][0]['title'],'private')
+            self.rpc({'op':'configure','values':{'lockscreen':'hide'}},11000)
+            stop.set()
+            for thread in threads: thread.join(2)
+            self.assertTrue(self.rpc({'op':'notifications'},1000)['notifications'][0]['redacted'])
+        finally:
+            stop.set()
+            for thread in threads: thread.join(2)
 
     def test_slow_clients_restart_and_socket_ownership(self):
         with socket.socket(socket.AF_UNIX) as idle, socket.socket(socket.AF_UNIX) as fragmented:

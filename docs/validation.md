@@ -378,6 +378,43 @@ terminal data, and clean compositor shutdown through the UI. The default
 `output/images/` image was regenerated; the older assembled `dist/` bundle was
 not regenerated.
 
+## Date/time and notification Settings (2026-11-05)
+
+The native build passes all 12 CTest checks and 106 Python integration checks.
+The notification-specific checks cover durable policy, real UID authorization,
+strict configuration types, storage failures, disabled-app suppression and
+queue removal, direct/legacy lock-screen redaction, authd outage behavior and
+audio dispatch. Audio tests check permission boundaries and focus release after
+the short system chime. Independent native Weston renders all eight apps, the
+shell and both shade stages and passes lifecycle and motion checks.
+
+The updated AArch64/musl image passes the focused preferences QEMU check.
+Actual Settings input disables automatic time, searches for `asia/shang`,
+selects Asia/Shanghai, switches to 12-hour format, rejects an invalid calendar
+date and applies a valid date in that timezone. A local UDP SNTP fixture supplies
+a correlated reply to the real timed; its successful synchronization timestamp
+and result are displayed and survive service restart and a real kernel reboot.
+
+The notification page controls real global sound, do not disturb, per-app sound
+and notification switches. Disabling an app removes its queued notifications
+and suppresses later submissions. All three lock-screen policies are exercised
+with authd and the compositor: redacted content, visible content, or no cards.
+Killing timed and notificationd preserves configuration; notificationd restart
+clears its volatile messages. Preferences also survive the actual kernel reboot.
+
+QEMU's WAV output contains the chime's 784/1046 Hz tones for both notification
+delivery and preview. Do-not-disturb, global-sound-off and per-app-sound-off
+windows contain no audio output. This verifies captured device output; host
+speaker playback and physical phones remain unverified.
+
+Reproduce with `scripts/build-target-probes.sh` followed by
+`python3 scripts/test-qemu.py --timeout 240 --preferences-probe build/preferences-probe`.
+Ignored evidence is in `build/preferences-{native-tests-final,ctest-final,
+wayland-interaction-final,qemu-final}.log` and `build/qemu-preferences-test/`:
+PNG/PPM captures, serial log, `preferences-proof.json`, `audio-windows.json`,
+`audio-proof.json` and `preferences-audio.wav`. The fixed-operation privileged
+test helper exists only in the cloned test image. No user disk is modified.
+
 Reproduction is documented in [root-access.md](root-access.md). Evidence stays
 ignored in `build/root-developer-*.log`, `build/rootd-native-tests.log`,
 `build/root-tools-only.log`, `build/screenshots/developer-*` and

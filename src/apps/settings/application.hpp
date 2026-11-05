@@ -11,6 +11,27 @@ class SettingsApplication final : public mobile::ApplicationWindow {
     ~SettingsApplication() override;
 
   private:
+    std::future<mobile::Json> preferences_job_;
+    mobile::Json preferences_data_=mobile::Json::object();
+    mobile::Json preferences_pending_=mobile::Json::object();
+    settings::Page preferences_page_{settings::Page::home};
+    settings::Page preferences_pending_page_{settings::Page::home};
+    unsigned preferences_generation_{},preferences_job_generation_{};
+    unsigned preferences_pending_generation_{};
+    bool preferences_mutating_{},preferences_job_mutating_{};
+    bool timezone_select_{},preferences_loaded_{};
+    int time_field_{-1};
+    std::string time_manual_,time_server_,timezone_query_,preferences_message_;
+    void preferences_refresh(mobile::Json command=mobile::Json::object());
+    void preferences_poll();
+    void preferences_enter();
+    bool preferences_back();
+    void time_text(const std::string &);
+    std::vector<std::string> visible_timezones() const;
+    double preferences_bottom() const;
+    void paint_datetime(mobile::Canvas &);
+    void paint_notification_settings(mobile::Canvas &);
+    void preference_toggle(mobile::Canvas &,double,const std::string &,const std::string &,bool,std::function<void()>);
     std::future<mobile::Json> platform_job_;
     mobile::Json platform_data_ = mobile::Json::object();
     settings::Page platform_page_{settings::Page::home};

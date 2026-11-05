@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <functional>
 #include <leon/ipc.hpp>
@@ -24,6 +25,12 @@ inline Json notification_rpc(const Json &message) {
 }
 inline std::string tr(bool en, const std::string &zh, const std::string &eng) {
     return en ? eng : zh;
+}
+inline std::string clock_text(const std::tm &tm, bool hours24, bool seconds = false) {
+    char text[32];
+    std::strftime(text,sizeof(text),hours24?(seconds?"%H:%M:%S":"%H:%M"):
+                   (seconds?"%I:%M:%S %p":"%I:%M %p"),&tm);
+    return !hours24 && text[0]=='0' ? text+1 : text;
 }
 inline void click(std::vector<Hit> &hits, Rect r, std::function<void()> action) {
     hits.push_back({r, std::move(action), {}});

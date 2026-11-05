@@ -73,6 +73,11 @@ built-in and installed application UIDs. It does not call the application broker
 to resolve identities. Shell and built-in notification clients connect directly
 to `/run/leon/notifications.sock`; the original application endpoint relays
 older clients' verified peer UIDs as root and holds no notification queue.
+Notification policy is kept in a separate durable store owned by notificationd.
+Its private policy adapter resolves per-app switches, checks authd before
+returning locked-session content, and requests bounded system chimes from
+audiod. Settings consumes the same protocol; the shell draws only the content
+allowed for its current lock epoch. See [date-time-notifications.md](date-time-notifications.md).
 
 Each component lists its own sources and dependencies in CMake. Installed
 executable paths and the version 1 service protocols do not depend on the

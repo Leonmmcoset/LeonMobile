@@ -12,6 +12,7 @@ struct audio_stream {
     unsigned rate, channels, focus, order;
     long long expires;
     int volume;
+    int system;
     struct pw_stream *stream;
     atomic_uint read_index, write_index, gain, paused, blocked, peak;
     atomic_ullong played, underruns;

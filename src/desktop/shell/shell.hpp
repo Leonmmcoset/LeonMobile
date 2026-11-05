@@ -22,6 +22,7 @@ class Shell {
     std::string error, active_id, timezone;
     bool background_pending{};
     bool en{}, connected{}, pressed{}, notifications_available{};
+    std::string notifications_lock_epoch;
     Shade shade;
     bool shade_gesture{}, shade_focused{}, volume_gesture{}, notification_gesture{}, power_menu{};
     int volume_preview{-1}, unmuted_volume{70};
@@ -94,6 +95,7 @@ class Shell {
     void paint_shade(lmui::Canvas &canvas, const std::string &time);
     void paint_quick(lmui::Canvas &canvas, double expansion);
     void paint_notifications(lmui::Canvas &canvas, double top, double bottom);
+    void paint_lock_notifications(lmui::Canvas &, double y);
     void paint_power_menu(lmui::Canvas &canvas);
     void paint_navigation(lmui::Canvas &canvas);
 };

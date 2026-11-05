@@ -52,7 +52,9 @@ void audio_tick(struct lm_daemon *d) {
         struct audio_stream *p = &s->streams[i];
         if (!p->token[0])
             continue;
-        if (now >= p->expires || !lm_identity_matches(d, p->uid, p->app, p->installation)) {
+        if (now >= p->expires || (p->system && atomic_load(&p->played) &&
+             atomic_load(&p->read_index)==atomic_load(&p->write_index)) ||
+            (!p->system && !lm_identity_matches(d, p->uid, p->app, p->installation))) {
             audio_close(s, p);
             continue;
         }
@@ -87,6 +89,34 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
     struct audio *s = d->data;
     const char *op = lm_string(lm_get(r, "op"), "");
     int trusted = lm_trusted(uid) || uid == 11000;
+    if (!strcmp(op,"notification_sound")) {
+        if(uid) return lm_failure("permission denied");
+        if(!s->test && !audio_backend_ready(s->backend)) return lm_failure("audio output unavailable");
+        size_t slot=AUDIO_STREAMS;
+        for(size_t i=0;i<AUDIO_STREAMS;++i) {
+            if(s->streams[i].system) return lm_success();
+            if(!s->streams[i].token[0]) slot=i;
+        }
+        if(slot==AUDIO_STREAMS || s->order==UINT32_MAX) return lm_failure("audio stream quota reached");
+        struct audio_stream *p=&s->streams[slot];memset(p,0,sizeof(*p));
+        if(lm_token(p->token)) return lm_failure("random source unavailable");
+        p->system=1;p->rate=16000;p->channels=1;p->focus=2;p->order=++s->order;
+        p->volume=70;p->expires=lm_now_ms()+2000;
+        snprintf(p->app,sizeof(p->app),"org.leon.system");
+        snprintf(p->title,sizeof(p->title),"Notification");
+        for(unsigned i=0;i<3840;++i) {
+            unsigned part=i%1920,frequency=i<1920?784:1046;
+            int triangle=(int)((part*frequency*4/16000)%4);
+            unsigned phase=(unsigned)(((uint64_t)part*frequency*65536/16000)%65536);
+            int wave=triangle<2?(int)phase*4-65536:196608-(int)phase*4;
+            // A short decaying two-note system chime, bounded below media peaks.
+            int16_t sample=(int16_t)((int64_t)wave*1800*(1920-part)/65536/1920);
+            p->ring[2*i]=(unsigned char)sample;p->ring[2*i+1]=(unsigned char)((uint16_t)sample>>8);
+        }
+        atomic_store(&p->write_index,7680);audio_focus(s);
+        if(audio_backend_open(s,p)<0) {audio_close(s,p);return lm_failure("cannot play notification sound");}
+        return lm_success();
+    }
     if (!strcmp(op, "status")) {
         lm_json *out = lm_success(), *streams = lm_array();
         lm_set_boolean(out, "backend_ready", s->test || audio_backend_ready(s->backend));
@@ -255,7 +285,8 @@ lm_json *audio_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
     for (size_t i = 0; i < AUDIO_STREAMS; ++i)
         if (*token && !strcmp(s->streams[i].token, token))
             p = &s->streams[i];
-    if (!p || lm_now_ms() >= p->expires || !lm_identity_matches(d, p->uid, p->app, p->installation))
+    if (!p || lm_now_ms() >= p->expires ||
+        (!p->system && !lm_identity_matches(d, p->uid, p->app, p->installation)))
         return lm_failure("unknown or expired stream");
     if (uid != p->uid && !trusted)
         return lm_failure("permission denied");

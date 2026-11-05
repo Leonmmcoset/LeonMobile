@@ -14,6 +14,7 @@ void SettingsApplication::open(Page page) {
     platform_data_ = Json::object();
     network_field_ = -1; network_loaded_ = false;
     platform_refresh();
+    preferences_enter();
     keyboard = false;
     scroll = 0;
     error.clear();
@@ -43,6 +44,7 @@ void SettingsApplication::open(Page page) {
     app.redraw();
 }
 void SettingsApplication::back() {
+    if(preferences_back()) return;
     if (page_ == Page::diagnostics && diagnostics_back())
         return;
     if (page_ == Page::diagnostics) {
@@ -71,6 +73,7 @@ void SettingsApplication::back() {
     app.redraw();
 }
 void SettingsApplication::text_input(const std::string &text) {
+    if(page_==Page::datetime) {time_text(text);return;}
     if (page_ == Page::network && network_field_ >= 0) {
         if (text == "\n") { keyboard = false; network_field_ = -1; }
         else if (text == "\b") backspace(network_fields_[network_field_]);
@@ -107,6 +110,7 @@ bool SettingsApplication::key_event(const KeyEvent &event) {
     return true;
 }
 void SettingsApplication::on_tick() {
+    preferences_poll();
     platform_poll();
     diagnostics_poll();
     applications_poll();
@@ -125,6 +129,7 @@ void SettingsApplication::on_tick() {
         return;
     status_ticks_ = 0;
     platform_refresh();
+    preferences_refresh();
     auto info = settings::read_device_info();
     if (device_ != info) {
         device_ = std::move(info);
@@ -176,6 +181,10 @@ std::string SettingsApplication::summary(Page page) const {
         return tr(en, "应用信息、权限与存储", "App info, permissions and storage");
     case Page::diagnostics:
         return tr(en, "日志、服务状态与崩溃记录", "Logs, service health and crash reports");
+    case Page::datetime:
+        return tr(en,"自动校时、时区与时间格式","Automatic time, timezone and clock format");
+    case Page::notifications:
+        return tr(en,"应用通知、声音、勿扰与锁屏隐私","App alerts, sounds, do not disturb and privacy");
     default:
         return {};
     }

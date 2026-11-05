@@ -157,6 +157,9 @@ static void accept_clients(int server, struct client *clients) {
 
 int notification_serve(const struct notification_options *options) {
     struct notification_store store = {0};
+    if(notification_policy_load(&store,options)) {
+        fputs("notificationd: invalid or unavailable notification policy\n",stderr);return 1;
+    }
     struct client clients[CLIENT_LIMIT];
     for (int i = 0; i < CLIENT_LIMIT; ++i)
         clients[i] = (struct client){.fd = -1};
@@ -176,6 +179,7 @@ int notification_serve(const struct notification_options *options) {
             close(signals);
         if (server >= 0)
             close(server);
+        notification_policy_free(&store);
         return 1;
     }
     if (listen(server, CLIENT_LIMIT)) {
@@ -183,12 +187,14 @@ int notification_serve(const struct notification_options *options) {
         close(signals);
         close(server);
         unlink(options->socket_path);
+        notification_policy_free(&store);
         return 1;
     }
     int result = 0;
     leon_service_ready();
     for (;;) {
         leon_service_watchdog();
+        notification_policy_tick(&store,options);
         struct pollfd fds[CLIENT_LIMIT + 2] = {{server, POLLIN, 0}, {signals, POLLIN, 0}};
         for (int i = 0; i < CLIENT_LIMIT; ++i) {
             if (clients[i].fd >= 0 && now_ms() >= clients[i].deadline)
@@ -225,5 +231,6 @@ int notification_serve(const struct notification_options *options) {
     close(signals);
     close(server);
     unlink(options->socket_path);
+    notification_policy_free(&store);
     return result;
 }

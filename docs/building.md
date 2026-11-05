@@ -121,6 +121,19 @@ The launcher creates a separate persistent `leonmobile-user.img` next to the rel
 
 ## Target validation
 
+Date/time and notification Settings have a focused target check, including
+manual local time, a real local SNTP exchange, captured notification sounds,
+lock-screen privacy, daemon recovery and a real reboot:
+
+```sh
+./scripts/build-target-probes.sh
+python3 scripts/test-qemu.py --timeout 240 --preferences-probe build/preferences-probe
+```
+
+Evidence is written to `build/qemu-preferences-test/`. The fixed-operation
+privileged fixture is injected only into a disposable image. See
+[date-time-notifications.md](date-time-notifications.md) for behavior and scope.
+
 The platform-service integration check includes a real reboot, sandboxed app
 delivery, revocable documents, two mixed PCM streams captured from QEMU's audio
 device, backend recovery and the desktop chooser/picker/media/Settings flow:

@@ -345,6 +345,26 @@ class PlatformServices(unittest.TestCase):
         with self.daemon("netd") as (s, _):
             self.assertEqual(rpc(s, {"op": "status"})["configuration"]["method"], "static")
 
+    def test_system_notification_chime_releases_audio_focus(self):
+        with self.daemon('settingsd'), self.daemon('audiod') as (audio, _):
+            for uid in (1000,11000,11002):
+                self.assertFalse(rpc(audio, {'op':'notification_sound'},uid)['ok'])
+            stream=rpc(audio, {'op':'open','title':'Background'},11002)['token']
+            self.assertTrue(rpc(audio, {'op':'notification_sound'})['ok'])
+            initial=rpc(audio, {'op':'status'})
+            self.assertEqual(initial['current']['title'],'Background')
+            # The native renderer may consume the entire short chime before
+            # this separate status request. Completion is a valid observation.
+            self.assertTrue(all(s['app'] in ('org.leon.gallery','org.leon.system')
+                                for s in initial['streams']))
+            deadline=time.monotonic()+3
+            while time.monotonic()<deadline:
+                state=rpc(audio, {'op':'status'})
+                if len(state['streams'])==1: break
+                time.sleep(.02)
+            self.assertEqual(len(state['streams']),1)
+            self.assertFalse(rpc(audio, {'op':'stream','token':stream},11002)['stream']['focus_lost'])
+
     def test_audio_tracks_live_settings_changes(self):
         with self.daemon("settingsd") as (settings, _), self.daemon("audiod") as (audio, _):
             for volume in (37, 70, 25, 100):

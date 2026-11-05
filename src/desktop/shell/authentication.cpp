@@ -14,6 +14,7 @@ void Shell::authentication_refresh() {
     authentication = next;
     if (!next.ok || next.locked) {
         if (page != Page::lock || changed) {
+            notifications=Json::array();notifications_lock_epoch.clear();
             root_clear_prompt();
             clear_device_secret();
             unlock_entry = unlock_pending = false;

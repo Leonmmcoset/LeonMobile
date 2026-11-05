@@ -33,7 +33,7 @@ void Shell::paint_notifications(Canvas &c, double top, double bottom) {
         c.circle(50, y + 27, 12, t.container);
         c.text("•", {38, y + 15, 24, 24}, 18, t.primary, true, 1);
         c.text(name, {72, y + 12, w - 112, 28}, 12, t.muted);
-        c.text(n.at("title"), {40, y + 44, w - 80, 36}, 16, t.text);
+        c.text(n.value("redacted",false)?tr(en,"通知内容已隐藏","Notification content hidden"):n.at("title").get<std::string>(), {40, y + 44, w - 80, 36}, 16, t.text);
         Rect row{24, std::max(y, notification_bounds.y), w - 48,
                  std::min(y + 92, bottom) - std::max(y, notification_bounds.y)};
         if (row.h > 0)
@@ -41,5 +41,19 @@ void Shell::paint_notifications(Canvas &c, double top, double bottom) {
         y += 104;
     }
     c.restore();
+}
+void Shell::paint_lock_notifications(Canvas &c,double y) {
+    if(!authentication.ok || notifications_lock_epoch.empty() || notifications_lock_epoch!=authentication.epoch) return;
+    size_t count=0;
+    for(auto it=notifications.rbegin();it!=notifications.rend() && count<2;++it,++count) {
+        if(y+88>c.height-200) break;
+        c.rounded({24,y,double(c.width-48),88},c.theme.surface,24);
+        auto id=it->at("app").get<std::string>();std::string name=id;
+        for(const auto &app:apps) if(app.at("id")==id) name=app.value(en?"name_en":"name",id);
+        c.text(name,{40,y+8,double(c.width-80),28},13,c.theme.muted);
+        c.text(it->value("redacted",false)?tr(en,"通知内容已隐藏","Notification content hidden"):it->at("title").get<std::string>(),
+               {40,y+40,double(c.width-80),36},16,c.theme.text);
+        y+=100;
+    }
 }
 } // namespace leon::shell

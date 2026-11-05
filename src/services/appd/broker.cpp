@@ -81,7 +81,7 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
         Json relay;
         if (op == "notifications") {
             fail(shell, "permission denied");
-            relay = {{"op", "notifications"}};
+            relay = {{"op", "notifications_for"}, {"uid", caller}};
         } else
             relay = {{"op", "notify_for"}, {"uid", caller}, {"title", request.at("title")}};
         response = Json::parse(leon::request(options_.notifications_socket, relay));

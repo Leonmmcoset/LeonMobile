@@ -18,7 +18,7 @@ void Shell::paint_shade(Canvas &c, const std::string &time) {
     hits.back().feedback = false;
     c.save();
     c.clip({0, 42, w, std::max(0.0, bottom - 66)});
-    c.text(time, {24, 52, 176, 64}, 44, t.text);
+    c.text(time, {24, 52, w-190, 64}, prefs.value("clock_24h",true)?44:32, t.text);
     std::time_t now = std::time(nullptr);
     std::tm tm{};
     localtime_r(&now, &tm);

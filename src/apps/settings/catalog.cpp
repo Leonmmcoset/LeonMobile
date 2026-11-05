@@ -5,8 +5,8 @@
 #include <string>
 
 namespace leon::apps::settings {
-const std::array<Entry, 14> &entries() {
-    static const std::array<Entry, 14> catalog{{
+const std::array<Entry, 16> &entries() {
+    static const std::array<Entry, 16> catalog{{
         {Page::network, Icon::network, "网络与互联网", "Network & internet",
          "网络 互联网 以太网 IP ethernet connection", true},
         {Page::display, Icon::display, "显示", "Display",
@@ -31,6 +31,8 @@ const std::array<Entry, 14> &entries() {
          "诊断 日志 崩溃 状态 logging logs crash diagnostics services", false},
         {Page::defaults, Icon::applications, "默认应用", "Default apps", "默认 打开 链接 分享 default open links share", false},
         {Page::documents, Icon::applications, "文件访问", "Document access", "文件 授权 撤销 documents grants revoke", false},
+        {Page::datetime, Icon::system, "日期与时间", "Date & time", "日期 时间 时区 自动 校时 手动 24 date time clock timezone ntp", false},
+        {Page::notifications, Icon::sound, "通知管理", "Notifications", "通知 勿扰 提示音 锁屏 隐私 notification sound silent disturb privacy", true},
     }};
     return catalog;
 }

@@ -181,6 +181,7 @@ determine authorization; request fields cannot override an ordinary application'
 | `notify` | `title`, at most 160 UTF-8 bytes | installed application UID |
 | `notifications` | none | root or desktop UID 1000 |
 | `notify_for` | `uid`, `title` | root only; reserved for the legacy broker relay |
+| `notifications_for` | desktop `uid` (0 or 1000) | root-only legacy broker relay; preserves desktop lock-screen policy |
 
 The service resolves both built-in and installed application identities through
 the same validated catalog as the launcher, without calling the launcher. An
@@ -190,8 +191,8 @@ The queue retains the latest 64 entries, evicting the oldest first. Listing
 returns `notifications: [{"app": "APP_ID", "title": "TEXT"}, ...]` in oldest-first
 order. Submission returns `{"ok":true}`. Notifications contain no body, action,
 timestamp or persistent ID. They are not persisted, and restarting notificationd
-clears the queue. This protocol adds no clear/update operations, channels,
-permissions UI, sound/vibration or network push service.
+clears the queue. It has no application update operations, channels, vibration
+or network push service. Notification preferences and sound are described below.
 
 The root daemon accepts `--root DIR`, `--builtin DIR` and `--socket PATH` for
 isolated development. Its C17 entry point, concurrent socket loop and bounded
@@ -343,3 +344,36 @@ installer instance binding and `LeonRoot::Root` C++20 SDK are specified in
 portal permission protocol; it has no persistent allow grant. `libleon-root.so.1`
 exports the application request API; password/control adapters remain internal
 to the installed system UI. Buildroot's `leon-core` installs this SDK to staging.
+
+### Notification preferences
+
+`notification_policy` is root/Settings UID 11000 only. It returns `settings`
+(`sound` default true, `dnd` default false, `lockscreen` default `hide`) and the
+installed `apps` with effective boolean `enabled`/`sound` switches, plus the
+latest `audio_error`. `configure` accepts a nonempty `values` object containing
+only `sound`, `dnd` and `lockscreen` (`show`, `hide`, `none`). `app_policy` takes
+an installed `app` and one or both boolean `enabled`/`sound` values. Invalid
+changes fail before persistence. Policy is stored atomically with directory
+fsync in `/data/leon/system/notifications.json`; malformed policy prevents
+startup instead of silently enabling notifications.
+
+Disabling an app immediately removes its queued notifications; later submits
+return `ok:true,suppressed:true` and do not queue or alert. Do not disturb and
+sound switches suppress alerts without discarding enabled-app notifications.
+A short two-note PCM alert is requested from audiod, with a two-second global
+rate limit and no dependency on shell polling. Audio failure never discards a
+notification. Root/Settings `test_sound` schedules the same alert, honoring
+sound/do-not-disturb policy. Audiod's `notification_sound` endpoint is root-only,
+uses a bounded internal ducking stream, follows master volume/mute and releases
+focus on completion. Microphone or application resource access is not added.
+
+For desktop `notifications`, notificationd checks authd directly. While locked,
+`hide` blanks titles and marks `redacted:true`; `none` omits all items; `show`
+includes titles. Authd failure is treated as locked. Replies carry
+`privacy_locked` and `lock_epoch`; the shell uses the matching lock epoch and
+clears cached notifications on lock transitions. Root retains administrative
+queue access. Settings cannot read the notification queue or select a forged
+lock state. Policies are durable; queued notifications remain volatile.
+
+`notificationd --root DIR` isolates policy and disables host auth/audio access;
+`--auth-socket` and `--audio-socket` explicitly select private fixture endpoints.

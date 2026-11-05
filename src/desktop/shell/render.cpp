@@ -31,8 +31,7 @@ void Shell::paint(Canvas &c) {
     std::time_t now = std::time(nullptr);
     std::tm tm{};
     localtime_r(&now, &tm);
-    char time[16];
-    std::strftime(time, sizeof(time), "%H:%M", &tm);
+    auto time=clock_text(tm,prefs.value("clock_24h",true));
     paint_status(c, time);
     c.save();
     Rect content{0, 42, w, h - 106};

@@ -69,4 +69,7 @@ python3 "$repo/scripts/make-package.py" "$repo/build/root-probe-manifest.json" \
 "${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/platform.cpp" "$repo/build/platform-transport.o" \
     -lleon-platform -o "$repo/build/platform-probe"
-echo 'AArch64 boot console, platform services, application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'
+"${compiler%gcc}g++" -std=c++20 -Wall -Wextra -Werror -Wno-missing-field-initializers -Os \
+    "$repo/tests/target/preferences.cpp" "$repo/build/platform-transport.o" \
+    -o "$repo/build/preferences-probe"
+echo 'AArch64 boot console, platform services, preferences, application management, authentication, notification, system, root, third-party root and terminal probes compiled under build/; no image was changed.'

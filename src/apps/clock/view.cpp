@@ -12,10 +12,10 @@ void ClockApplication::paint_content(Canvas &c, double) {
     std::time_t now = std::time(nullptr);
     std::tm tm{};
     localtime_r(&now, &tm);
-    char time[32], date[64];
-    std::strftime(time, sizeof(time), "%H:%M:%S", &tm);
+    char date[64];
+    auto time=clock_text(tm,prefs.value("clock_24h",true),true);
     std::strftime(date, sizeof(date), "%Y-%m-%d", &tm);
-    c.text(time, {20, 160, w - 40, 110}, 64, t.primary, false, 1);
+    c.text(time, {20, 160, w - 40, 110}, prefs.value("clock_24h",true)?64:48, t.primary, false, 1);
     c.text(date, {20, 276, w - 40, 44}, 20, t.muted, false, 1);
     double seconds = stopwatch.seconds();
     std::ostringstream s;

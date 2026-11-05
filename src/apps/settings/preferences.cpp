@@ -89,6 +89,7 @@ void SettingsApplication::paint_preferences(Canvas &c) {
         link(c, {16, 500, w - 32, 76}, Page::diagnostics);
         link(c, {16, 584, w - 32, 76}, Page::defaults);
         link(c, {16, 668, w - 32, 76}, Page::documents);
+        link(c, {16, 752, w - 32, 76}, Page::datetime);
     } else if (page_ == Page::language) {
         for (bool english : {false, true}) {
             double y = english ? 248 : 164;
