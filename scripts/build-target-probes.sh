@@ -19,9 +19,23 @@ mkdir -p "$repo/build"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     -I"$repo/src/libraries/log-client" \
     "$repo/tests/target/system.c" "$repo/tests/target/system_transport.c" \
-    "$repo/tests/target/system_sandbox.c" "$repo/tests/target/logging.c" \
+    "$repo/tests/target/system_sandbox.c" "$repo/tests/target/logging.c" "$repo/tests/target/isolation.c" \
     "$repo/src/services/appd/sandbox.c" "$repo/build/log-client-probe.o" \
     -o "$repo/build/system-probe"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/isolation_app.c" -o "$repo/build/isolation-app"
+mkdir -p "$repo/build/isolation-payload/bin"
+cp "$repo/build/isolation-app" "$repo/build/isolation-payload/bin/app"
+for suffix in a b; do
+    python3 - "$repo/build/isolation-$suffix.json" "$suffix" <<'PY'
+import json, sys
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps(dict(format=1, id="org.example.isolation" + sys.argv[2],
+    version="1.0.0", arch="aarch64", lmui=1, name="Isolation regression fixture", entry="bin/app")))
+PY
+    python3 "$repo/scripts/make-package.py" "$repo/build/isolation-$suffix.json" \
+        "$repo/build/isolation-payload" "$repo/build/isolation-$suffix.lmpkg"
+done
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/applications.c" "$repo/tests/target/system_transport.c" \
     -o "$repo/build/applications-probe"

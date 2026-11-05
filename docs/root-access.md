@@ -65,7 +65,11 @@ groups and inherited environment, uses a private root home, and passes the maste
 FD through `SCM_RIGHTS`. Window resizing, interactive job control and command exit
 status are retained. A fresh broker child allows deliberate root administration
 without inheriting the terminal's Landlock/seccomp restrictions. Normal terminal
-commands keep their existing sandbox. Sessions and descendants use dedicated
+commands keep their private mount/PID/IPC namespaces, minimal device view,
+Landlock and seccomp policy. The authorized root PTY is passed as a descriptor;
+the terminal's own devpts instance never exposes other host PTYs. Root helpers
+run in rootd's system namespaces and do not move the requesting app out of its
+sandbox. Sessions and descendants use dedicated
 `/sys/fs/cgroup/leon/root/sPID` groups; disconnect, disable, password rotation,
 policy corruption, daemon shutdown and restart clean up these groups, including
 detached children. Root can deliberately escape/modify the security policy; the

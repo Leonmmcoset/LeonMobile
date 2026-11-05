@@ -2,6 +2,7 @@
 #include "internal.hpp"
 #include "root.hpp"
 #include "sandbox.h"
+#include "namespace.h"
 #include <chrono>
 #include <climits>
 #include <csignal>
@@ -89,9 +90,8 @@ void Processes::foreground(const std::string &id) {
 }
 void Processes::priority(const std::string &id, bool foreground) {
     clients_.at(id).foreground = foreground;
-    if (!options_.development) {
-        auto path = "/proc/" + std::to_string(running_.at(id)) + "/oom_score_adj";
-        int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (!options_.development && clients_.at(id).process_fd >= 0) {
+        int fd = openat(clients_.at(id).process_fd, "oom_score_adj", O_WRONLY | O_CLOEXEC);
         if (fd >= 0) {
             const char *value = foreground ? "0" : "500";
             (void)write(fd, value, strlen(value));
@@ -159,40 +159,67 @@ void Processes::reap() {
             leon_log_capture_drain(&client.log, options_.log_socket.c_str(), client.uid,
                                    running_.at(id), LEON_LOG_APP, id.c_str());
     poll_clients();
-    pid_t p;
-    int status;
-    while ((p = waitpid(-1, &status, WNOHANG)) > 0) {
-        for (auto i = running_.begin(); i != running_.end();)
-            if (i->second == p) {
+    std::map<pid_t, int> reaped;
+    pid_t child;
+    int child_status;
+    while ((child = waitpid(-1, &child_status, WNOHANG)) > 0)
+        reaped[child] = child_status;
+    for (auto i = running_.begin(); i != running_.end();) {
+        auto &client = clients_.at(i->first);
+        pid_t p = i->second;
+        int status = 125 << 8;
+        bool done = false;
+        if (client.namespace_fd >= 0) {
+            int result = leon_namespace_receive(client.namespace_fd, LEON_NS_EXITED,
+                                                 client.supervisor, client.uid, nullptr, &status);
+            done = result == 1 || reaped.contains(client.supervisor);
+            if (result < 0 && !reaped.contains(client.supervisor))
+                kill(client.supervisor, SIGKILL);
+            if (result != 1 && reaped.contains(client.supervisor)) {
+                status = reaped.at(client.supervisor);
+                if (WIFEXITED(status)) status = 125 << 8;
+            }
+        } else if (reaped.contains(p)) {
+            status = reaped.at(p);
+            done = true;
+        }
+        if (done) {
+            if (options_.development)
                 kill(-p, SIGKILL);
-                auto &client = clients_.at(i->first);
-                if (!options_.log_socket.empty())
-                    leon_log_capture_close(&client.log, options_.log_socket.c_str(), client.uid,
-                                           p, LEON_LOG_APP, i->first.c_str());
-                if (client.log.count || client.log.lost) {
-                    if (retired_logs_.size() == 16) {
-                        retired_logs_.erase(retired_logs_.begin());
-                        std::fputs("application logging: retired offline buffer evicted\n", stderr);
-                    }
-                    retired_logs_.push_back({i->first, client.uid, p, client.log});
+            if (!options_.log_socket.empty())
+                leon_log_capture_close(&client.log, options_.log_socket.c_str(), client.uid,
+                                       p, LEON_LOG_APP, i->first.c_str());
+            if (client.log.count || client.log.lost) {
+                if (retired_logs_.size() == 16) {
+                    retired_logs_.erase(retired_logs_.begin());
+                    std::fputs("application logging: retired offline buffer evicted\n", stderr);
                 }
-                if (!options_.development && leon_cgroup_kill(client.uid))
-                    perror("application cgroup cleanup");
-                if (client.fd >= 0)
-                    close(client.fd);
-                if (!options_.development)
-                    publish_exit(i->first, p,
-                                 WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status));
-                exits_.push_back(
-                    {{"app", i->first},
-                     {"pid", p},
-                     {"status", WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status)}});
-                if (exits_.size() > 64)
-                    exits_.erase(exits_.begin());
-                clients_.erase(i->first);
-                i = running_.erase(i);
-            } else
-                ++i;
+                retired_logs_.push_back({i->first, client.uid, p, client.log});
+            }
+            if (!options_.development && leon_cgroup_kill(client.uid))
+                perror("application cgroup cleanup");
+            if (client.namespace_fd >= 0) {
+                close(client.namespace_fd);
+                if (!reaped.contains(client.supervisor))
+                    kill(client.supervisor, SIGKILL);
+            }
+            if (client.fd >= 0)
+                close(client.fd);
+            if (client.process_fd >= 0)
+                close(client.process_fd);
+            if (!options_.development)
+                publish_exit(i->first, p,
+                             WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status));
+            exits_.push_back(
+                {{"app", i->first},
+                 {"pid", p},
+                 {"status", WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status)}});
+            if (exits_.size() > 64)
+                exits_.erase(exits_.begin());
+            clients_.erase(i->first);
+            i = running_.erase(i);
+        } else
+            ++i;
     }
     advance_stops();
 }
@@ -206,18 +233,22 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
     unsigned uid = m.at("uid");
     fs::path home = packages.root / "data" / id;
     fs::create_directories(home);
-    fail(!chown(home.c_str(), uid, uid) && !chmod(home.c_str(), 0700),
-         "cannot create application home");
     std::string runtime = options_.runtime_prefix + "/" + std::to_string(uid);
     fs::create_directories(runtime);
-    fail(!chown(runtime.c_str(), uid, uid) && !chmod(runtime.c_str(), 0700),
-         "cannot create runtime directory");
+    for (const auto &path : {home, fs::path(runtime)}) {
+        int fd = open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+        bool valid = fd >= 0 && !fchown(fd, uid, uid) && !fchmod(fd, 0700);
+        if (fd >= 0) close(fd);
+        fail(valid, "cannot prepare private application directory");
+    }
     auto exe = fs::canonical(packages.executable(m));
     std::vector<std::string> args{exe.string()};
     for (const auto &a : m.value("args", Json::array()))
         args.push_back(a.get<std::string>());
     /* Pin both executable and working directory to the selected version. */
     auto work = m.value("builtin", false) ? packages.builtin.parent_path() : exe.parent_path();
+    auto package = m.value("builtin", false) ? fs::path{} :
+                   fs::canonical(packages.root / "apps" / id / "current");
     bool network = false;
     if (!options_.development && m.contains("permissions")) {
         for (const auto &permission : m.at("permissions"))
@@ -229,6 +260,23 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
                 network = response.value("granted", false);
             }
     }
+    struct NamespaceChannel {
+        int fd[2]{-1, -1};
+        explicit NamespaceChannel(bool enabled) {
+            if (!enabled) return;
+            fail(!socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC | SOCK_NONBLOCK, 0, fd),
+                 "cannot create namespace control channel");
+            int enabled_credentials = 1;
+            if (setsockopt(fd[0], SOL_SOCKET, SO_PASSCRED, &enabled_credentials,
+                           sizeof(enabled_credentials))) {
+                close(fd[0]); close(fd[1]);
+                fail(false, "cannot authenticate namespace identity");
+            }
+        }
+        ~NamespaceChannel() {
+            for (int value : fd) if (value >= 0) close(value);
+        }
+    } isolation(!options_.development);
     int gate[2];
     fail(!pipe2(gate, O_CLOEXEC), "cannot create launch gate");
     int executed[2];
@@ -262,7 +310,7 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         if (pair[0] >= 0) { close(pair[0]); close(pair[1]); }
         fail(false, "cannot create application log pipe");
     }
-    pid_t pid = fork();
+    pid_t pid = options_.development ? fork() : leon_namespace_clone();
     if (pid < 0) {
         close(executed[0]);
         close(executed[1]);
@@ -275,6 +323,7 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         fail(false, "cannot fork application");
     }
     if (!pid) {
+        if (isolation.fd[0] >= 0) close(isolation.fd[0]);
         for (const auto &[other, client] : clients_)
             if (client.log.fd >= 0)
                 close(client.log.fd);
@@ -286,7 +335,8 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
             (void)write(executed[1], &cause, sizeof(cause));
             _exit(status);
         };
-        if (prctl(PR_SET_PDEATHSIG, SIGKILL) || getppid() != parent)
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL) ||
+            getppid() != (options_.development ? parent : 0))
             child_fail(126);
         close(gate[1]);
         char go;
@@ -295,6 +345,12 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         close(gate[0]);
         if (pair[0] >= 0)
             close(pair[0]);
+        if (!options_.development) {
+            if (leon_namespace_filesystem(home.c_str(), runtime.c_str(), package.c_str(), uid) ||
+                leon_namespace_fork(isolation.fd[1], executed[1], uid))
+                child_fail(126);
+            parent = 1;
+        }
         sigset_t empty;
         sigemptyset(&empty);
         if (sigprocmask(SIG_SETMASK, &empty, nullptr))
@@ -340,25 +396,37 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         setenv("LANG", "C.UTF-8", 1);
         setenv("TERM", "xterm-256color", 1);
         setenv("LEON_APP_ID", id.c_str(), 1);
-        setenv("TMPDIR", (home / ".tmp").c_str(), 1);
-        mkdir((home / ".tmp").c_str(), 0700);
+        setenv("TMPDIR", options_.development ? (home / ".tmp").c_str() : "/tmp", 1);
+        if (options_.development) mkdir((home / ".tmp").c_str(), 0700);
+        int lifecycle_fd = -1;
         if (pair[1] >= 0) {
             int fd = fcntl(pair[1], F_DUPFD, 32);
             if (fd < 0)
                 child_fail(126);
             close(pair[1]);
+            lifecycle_fd = fd;
             setenv("LEON_LIFECYCLE_FD", std::to_string(fd).c_str(), 1);
         }
         std::vector<char *> av;
         for (auto &a : args)
             av.push_back(a.data());
         av.push_back(nullptr);
-        if (!options_.development && leon_sandbox(home.c_str(), runtime.c_str(), network)) {
+        if (!options_.development && leon_sandbox(home.c_str(), runtime.c_str(), network, 1)) {
             perror("application sandbox");
             child_fail(126);
         }
+        if (!options_.development) {
+            int keep[] = {executed[1], isolation.fd[1], lifecycle_fd};
+            if (leon_namespace_close_fds(3, keep, 3) || leon_namespace_identify(isolation.fd[1]))
+                child_fail(126);
+            close(isolation.fd[1]);
+        }
         execv(exe.c_str(), av.data());
         child_fail(127);
+    }
+    if (isolation.fd[1] >= 0) {
+        close(isolation.fd[1]);
+        isolation.fd[1] = -1;
     }
     if (output.write >= 0) {
         close(output.write);
@@ -407,14 +475,40 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
             close(pair[0]);
         throw std::runtime_error(std::string("application setup/exec failed: ") + strerror(cause));
     }
-    running_[id] = pid;
+    pid_t application = pid;
+    if (!options_.development &&
+        (leon_namespace_receive(isolation.fd[0], LEON_NS_STARTED, 0, uid, &application, nullptr) != 1 ||
+         application == pid)) {
+        kill(pid, SIGKILL);
+        waitpid(pid, nullptr, 0);
+        if (pair[0] >= 0) close(pair[0]);
+        fail(false, "cannot authenticate application namespace PID");
+    }
+    running_[id] = application;
     clients_[id].fd = pair[0];
     clients_[id].uid = uid;
+    clients_[id].supervisor = pid;
+    clients_[id].namespace_fd = isolation.fd[0];
+    isolation.fd[0] = -1;
+    if (!options_.development) {
+        // Pin proc lookups to this process rather than a recyclable numeric
+        // path. If it already exited, priority updates are unnecessary.
+        auto path = "/proc/" + std::to_string(application);
+        int fd = open(path.c_str(), O_PATH | O_DIRECTORY | O_CLOEXEC);
+        struct stat actual {}, expected {};
+        auto init_ns = "/proc/" + std::to_string(pid) + "/ns/pid";
+        if (fd >= 0 && !fstatat(fd, "ns/pid", &actual, 0) &&
+            !stat(init_ns.c_str(), &expected) && actual.st_ino == expected.st_ino &&
+            actual.st_dev == expected.st_dev)
+            clients_[id].process_fd = fd;
+        else if (fd >= 0)
+            close(fd);
+    }
     clients_[id].log = output.capture;
     output.capture.fd = -1;
     clients_[id].root_helper = m.contains("root");
     foreground(id);
-    return pid;
+    return application;
 }
 void Processes::request_stop(const std::string &id) {
     if (!running_.contains(id))
@@ -443,15 +537,20 @@ void Processes::advance_stops() {
             continue;
         pid_t pid = running_.at(id);
         if (client.stop_phase == StopPhase::shutdown) {
-            kill(-pid, SIGTERM);
+            if (client.namespace_fd >= 0)
+                leon_namespace_signal(client.namespace_fd, SIGTERM);
+            else
+                kill(-pid, SIGTERM);
             client.stop_phase = StopPhase::term;
             client.stop_deadline = now + 1000;
         } else {
             if (!options_.development && leon_cgroup_kill(client.uid))
                 perror("application cgroup termination");
-            kill(-pid, SIGKILL);
-            // Only waitpid may remove a task or report its exit status. A
-            // successful signal does not mean the process has already exited.
+            if (client.namespace_fd >= 0)
+                kill(client.supervisor, SIGKILL);
+            else
+                kill(-pid, SIGKILL);
+            // Reaping or the authenticated PID 1 report retires the task.
             client.stop_phase = StopPhase::kill;
             client.stop_deadline = now + 1000;
         }
@@ -480,9 +579,16 @@ Processes::~Processes() {
     for (const auto &[id, pid] : running_) {
         if (!options_.development)
             leon_cgroup_kill(clients_.at(id).uid);
-        kill(-pid, SIGKILL);
+        auto &client = clients_.at(id);
+        if (client.namespace_fd >= 0) {
+            kill(client.supervisor, SIGKILL);
+            close(client.namespace_fd);
+        } else
+            kill(-pid, SIGKILL);
         if (clients_.at(id).fd >= 0)
             close(clients_.at(id).fd);
+        if (client.process_fd >= 0)
+            close(client.process_fd);
         if (!options_.log_socket.empty())
             leon_log_capture_close(&clients_.at(id).log, options_.log_socket.c_str(),
                                    clients_.at(id).uid, pid, LEON_LOG_APP, id.c_str());

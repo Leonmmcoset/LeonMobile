@@ -295,6 +295,8 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
         put(helper, "/etc/leon/services/98-root-helper.toml")
     if system_probe:
         put(system_probe, "/usr/bin/leon-test-system")
+        for suffix in ("a", "b"):
+            put(system_probe.parent / f"isolation-{suffix}.lmpkg", f"/usr/share/isolation-{suffix}.lmpkg")
         unit = temporary / "test-service.toml"
         unit.write_text('name = "system-test"\ncommand = ["/usr/bin/leon-test-system"]\n'
                         'after = ["logging", "apps", "memory", "power", "storage", "network", "time", "crash", "portal", "input-method"]\n'

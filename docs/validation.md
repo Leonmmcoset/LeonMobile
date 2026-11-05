@@ -762,3 +762,29 @@ browser. Settings watches use resynchronizable generation polling. Documents
 grant only temporary read access, and revocation cannot recall bytes already
 read. Current images remain under `output/images/`; the older `dist/` bundle is
 not regenerated.
+## Per-application namespaces (2026-11-05)
+
+The production launcher now requires mount/PID/IPC namespaces, a private
+read-only root/proc view, bounded scratch mounts, minimal devices and a separate
+devpts instance. The initial implementation passed 12 native CTest checks,
+106 Python checks and the independent native Weston rendering/lifecycle/motion
+smoke. The AArch64 core package, target probes and reference image rebuilt.
+
+The focused QEMU `--core-only --system-probe build/system-probe` run passed all
+system service checks and two real installed isolation fixtures. These cover
+distinct namespace inodes, hidden cross-app homes/packages and host temp files,
+SysV IPC separation, private PTY zero while a host PTY is occupied, device-node
+absence, denied mount/namespace/mknod operations, capability/FD hygiene and
+orphan reaping. Normal exit 37, detached-child exit 42, SIGTERM 143, SIGSEGV 139
+with actual host-PID core capture, forced stop 137 and unexpected PID 1 death
+all produced expected cleanup. Invalid staging/home symlinks failed closed;
+broker SIGKILL/restart removed the old task and allowed a fresh launch.
+Runtime timezone replacement reached an already running app through the public
+directory bind. The real Chinese IME restart, permission deny/allow/file picker,
+exact offline saved/imported data and clean shutdown checks passed afterward.
+
+The raw-status retirement path was corrected after target fault injection
+exposed EOF arriving before waitpid on forced stop. OOM priority writes now use
+a pinned proc-directory descriptor instead of a recyclable numeric PID path.
+Evidence remains ignored under `build/isolation-{ctest,python,wayland}.log`,
+`build/isolation-qemu-core.log` and `build/qemu-test/`.

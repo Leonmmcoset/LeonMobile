@@ -18,7 +18,7 @@
 static const char *home = "/data/leon/data/org.leon.gallery", *runtime = "/run/leon/apps/11002";
 static int child(int network) {
     if (setgroups(0, NULL) || setgid(11002) || setuid(11002) ||
-        leon_sandbox(home, runtime, network))
+        leon_sandbox(home, runtime, network, 0))
         return 10;
     int fd = open("/data/leon/shared/sandbox-public", O_RDONLY);
     if (fd >= 0) {
@@ -152,7 +152,7 @@ int probe_sandbox(void) {
     pid_t pid = fork();
     if (!pid) {
         if (setgroups(0, NULL) || setgid(11002) || setuid(11002) ||
-            leon_sandbox(home, runtime, 0) || prctl(PR_SET_DUMPABLE, 1))
+            leon_sandbox(home, runtime, 0, 0) || prctl(PR_SET_DUMPABLE, 1))
             _exit(30);
         raise(SIGSEGV);
         _exit(31);

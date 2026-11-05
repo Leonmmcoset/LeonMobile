@@ -111,7 +111,8 @@ disabled policy. Compatible `enable`/`disable` save policy and schedule applicat
 Children reset inherited signal masks and die with netd.
 
 DHCP hooks publish lease DNS to `/run/leon/dhcp-resolv.conf`. netd exclusively
-publishes the system resolver atomically and world-readable, choosing configured
+publishes `/run/leon-system/resolv.conf` atomically and world-readable
+(`/run/resolv.conf` remains a compatibility link), choosing configured
 DNS overrides when supplied. An empty DNS array follows DHCP (or provides no DNS
 in static mode). Disabling clears DNS on the next sample. The service samples
 once per second and publishes `/run/leon/network-state.json`. Real changes
@@ -147,7 +148,10 @@ server, synchronization/error state and RTC availability/time. It also exposes
 never), `last_result` and `rtc_error`. Settings/root/
 desktop may use `configure` with optional `timezone`, `automatic`, and `server`.
 Zones must be installed TZif files. Configuration is durable and switches
-`/run/localtime`; `/etc/localtime` points there. Long-running built-ins and the
+`/run/leon-system/localtime`; `/run/localtime` is a compatibility link and
+`/etc/localtime` points there. The root-owned public runtime directory is bound
+read-only into app namespaces so atomic timezone and DNS updates stay visible.
+Long-running built-ins and the
 shell follow timed's zone and call `tzset`, including under musl's timezone cache.
 
 `timezones` lists installed TZif zones from zone1970.tab plus Etc/UTC; optional

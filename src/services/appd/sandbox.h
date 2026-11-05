@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-int leon_sandbox(const char *home, const char *runtime, int network);
+int leon_sandbox(const char *home, const char *runtime, int network, int private_mounts);
 int leon_cgroup(pid_t pid, uid_t uid);
 int leon_cgroup_kill(uid_t uid);
 int leon_cgroup_reset(void);

@@ -162,7 +162,21 @@ The desktop session uses UID 1000. Built-ins have stable UIDs 11000–11007; ins
 
 The service manager accepts state-changing commands only from UID 0. The application broker identifies callers with `SO_PEERCRED`; the trusted desktop can launch/install/remove apps and request power operations. The settings app can change the supported preferences. Other applications can read preferences. The independent notification daemon also checks `SO_PEERCRED`, accepts bounded notifications under the installed app's own identity, and restricts list access to root/desktop. The broker may relay legacy notification submissions as root with the original peer UID; ordinary clients cannot use that relay operation directly.
 
-Applications now enter Landlock, inherited seccomp socket/syscall policy and cgroup v2 resource limits before exec. The independent permission service owns durable decisions and selected-file copies; the desktop owns confirmation UI. The shared input method uses Wayland text-input-v3 and input-method-v2. All apps still share the Wayland server and AF_UNIX IPC, whose privileged endpoints authorize peers. Device credentials and one-use unlock grants are owned by authd; the compositor conceals application scenes and clears input focus while locked. Full namespaces, package signatures and an independent security audit remain outside the developer platform. ELF architecture checks and SHA-256 package checksums provide compatibility and integrity checks, not publisher authentication. See the application format and core service documents for exact enforcement and recovery limits.
+Applications enter private mount/PID/IPC namespaces, Landlock, inherited seccomp
+socket/syscall policy and cgroup v2 resource limits before exec. A C17 PID 1
+reaps each app's descendants while the broker retains the actual ELF host PID.
+Private scratch mounts, devpts and minimal devices accompany a read-only OS view;
+other app data, hardware and host sysfs are absent. See
+[application-isolation.md](application-isolation.md) for identity and cleanup.
+The independent permission service owns durable decisions and selected-file
+copies; the desktop owns confirmation UI. The shared input method uses Wayland
+text-input-v3 and input-method-v2. Apps still share the network namespace,
+Wayland server and AF_UNIX IPC, whose privileged endpoints authorize peers.
+Device credentials and one-use unlock grants are owned by authd; the compositor
+conceals application scenes and clears input focus while locked. Package
+signatures and an independent security audit remain outside the developer
+platform. ELF architecture checks and SHA-256 package checksums provide
+compatibility and integrity checks, not publisher authentication.
 
 The developer serial console logs in automatically as the non-root `leon` user, with no network login service enabled. No device or production security claim is attached to this console policy.
 

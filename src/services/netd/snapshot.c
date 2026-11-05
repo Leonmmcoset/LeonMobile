@@ -54,7 +54,7 @@ lm_json *network_status(struct lm_daemon *d) {
             ++line;
     }
     text[0] = 0;
-    lm_read_text(d->options.test ? d->options.state : "/run/resolv.conf", text, sizeof(text));
+    lm_read_text(d->options.test ? d->options.state : "/run/leon-system/resolv.conf", text, sizeof(text));
     lm_set_string(out, "resolver", text);
     lm_set_boolean(out, "carrier", link);
     lm_set_boolean(out, "connected",

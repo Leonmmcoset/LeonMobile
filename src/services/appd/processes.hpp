@@ -31,6 +31,9 @@ class Processes {
         leon_log_capture log{};
         Client() { log.fd = -1; }
         int fd{-1};
+        int namespace_fd{-1};
+        int process_fd{-1};
+        pid_t supervisor{};
         unsigned sequence{};
         long long deadline{};
         long long stop_deadline{};

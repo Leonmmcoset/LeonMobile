@@ -9,7 +9,12 @@ chmod 0755 /run/leon/wayland
 mkdir -p /data/leon/system
 chown 0:0 /data/leon/system
 chmod 0700 /data/leon/system
-ln -sfn /usr/share/zoneinfo/Etc/UTC /run/localtime
+mkdir -p /run/leon-system /run/leon-root /run/leon-auth /run/leon-log
+chown 0:0 /run/leon-system /run/leon-root /run/leon-auth /run/leon-log
+chmod 0755 /run/leon-system /run/leon-root /run/leon-auth /run/leon-log
+ln -sfn /usr/share/zoneinfo/Etc/UTC /run/leon-system/localtime
+ln -sfn leon-system/localtime /run/localtime
+ln -sfn leon-system/resolv.conf /run/resolv.conf
 mount -t tmpfs -o mode=0755,nosuid,nodev,noexec tmpfs /media
 mkdir -p /sys/fs/cgroup
 mount -t cgroup2 -o nosuid,nodev,noexec cgroup2 /sys/fs/cgroup
@@ -22,7 +27,7 @@ echo '+memory +pids' > /sys/fs/cgroup/leon/apps/cgroup.subtree_control
 chown 1000:1000 /run/leon
 chmod 0755 /run/leon
 ln -sfn /proc/self/mounts /run/mtab
-touch /run/resolv.conf
+touch /run/leon-system/resolv.conf
 dbus-uuidgen --ensure=/var/lib/dbus/machine-id
 /sbin/udevd --daemon
 /sbin/udevadm trigger --action=add

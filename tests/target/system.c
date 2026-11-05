@@ -16,6 +16,7 @@
 #include <unistd.h>
 static FILE *report;
 int probe_logging(FILE *);
+int probe_isolation(FILE *);
 #define CHECK(condition)                                                                           \
     do {                                                                                           \
         if (!(condition)) {                                                                        \
@@ -213,7 +214,7 @@ static void stamp(unsigned char *p, time_t seconds, long nano) {
 static int timed(void) {
     CHECK(RPC("time", "{\"op\":\"configure\",\"automatic\":false,\"timezone\":\"Asia/Shanghai\"}"));
     char path[256];
-    ssize_t n = readlink("/run/localtime", path, sizeof(path) - 1);
+    ssize_t n = readlink("/run/leon-system/localtime", path, sizeof(path) - 1);
     CHECK(n > 0);
     path[n] = 0;
     CHECK(strstr(path, "Asia/Shanghai"));
@@ -424,7 +425,7 @@ int main(void) {
         return 2;
     setbuf(report, NULL);
     if (geteuid() || probe_logging(report) || sample_memory() || power() || storage() || network() || portal() || timed() ||
-        cleanup() || app_management() || crash()) {
+        cleanup() || app_management() || crash() || probe_isolation(report)) {
         fputs("SYSTEM_TESTS_FAILED\n", report);
         fclose(report);
         return 1;

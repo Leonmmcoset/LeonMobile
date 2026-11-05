@@ -78,6 +78,17 @@ static int filter(int network) {
         DENY(__NR_perf_event_open), DENY(__NR_keyctl), DENY(__NR_reboot), DENY(__NR_kexec_load),
         DENY(__NR_init_module), DENY(__NR_finit_module), DENY(__NR_delete_module),
         DENY(__NR_userfaultfd),
+#ifdef __NR_mknod
+        DENY(__NR_mknod),
+#endif
+        DENY(__NR_mknodat), DENY(__NR_process_vm_readv), DENY(__NR_process_vm_writev),
+#ifdef __NR_fsopen
+        DENY(__NR_fsopen), DENY(__NR_fsconfig), DENY(__NR_fsmount), DENY(__NR_move_mount),
+        DENY(__NR_open_tree),
+#endif
+#ifdef __NR_mount_setattr
+        DENY(__NR_mount_setattr),
+#endif
 #ifdef __NR_open_by_handle_at
         DENY(__NR_open_by_handle_at),
 #endif
@@ -103,7 +114,7 @@ static int filter(int network) {
     struct sock_fprog program = {sizeof(instructions) / sizeof(instructions[0]), instructions};
     return prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &program);
 }
-int leon_sandbox(const char *home, const char *runtime, int network) {
+int leon_sandbox(const char *home, const char *runtime, int network, int private_mounts) {
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
         return -1;
     int abi = (int)syscall(LL_CREATE, NULL, 0, 1);
@@ -118,7 +129,7 @@ int leon_sandbox(const char *home, const char *runtime, int network) {
         return -1;
     const char *readable[] = {
         "/bin", "/sbin",           "/usr",      "/lib", "/lib64", "/etc", "/proc",
-        "/sys", "/data/leon/apps", "/run/leon", NULL};
+        "/sys", "/data/leon/apps", "/run/leon", "/run/leon-system", NULL};
     int failed = 0;
     for (int i = 0; readable[i]; ++i)
         if (rule(rules, readable[i], FS_READ | FS_DIR | FS_EXEC))
@@ -127,8 +138,12 @@ int leon_sandbox(const char *home, const char *runtime, int network) {
         rule(rules, "/dev/null", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/zero", FS_READ | FS_WRITE) || rule(rules, "/dev/urandom", FS_READ) ||
         rule(rules, "/dev/tty", FS_READ | FS_WRITE) ||
+        rule(rules, "/dev/full", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/random", FS_READ) || rule(rules, "/dev/ptmx", FS_READ | FS_WRITE) ||
         rule(rules, "/dev/pts", FS_READ | FS_WRITE | FS_DIR))
+        failed = 1;
+    if (private_mounts && (rule(rules, "/tmp", all) || rule(rules, "/var/tmp", all) ||
+                           rule(rules, "/dev/shm", all)))
         failed = 1;
     if (failed || syscall(LL_RESTRICT, rules, 0)) {
         close(rules);

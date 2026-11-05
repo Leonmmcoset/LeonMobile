@@ -37,8 +37,8 @@ static void resolver(struct lm_daemon *d) {
         } else if (!strcmp(lm_string(lm_get(s->policy, "method"), ""), "dhcp"))
             lm_read_text("/run/leon/dhcp-resolv.conf", text, sizeof(text));
     }
-    if (lm_read_text("/run/resolv.conf", old, sizeof(old)) || strcmp(text, old))
-        if (lm_write_text("/run/resolv.conf", text) || chmod("/run/resolv.conf", 0644))
+    if (lm_read_text("/run/leon-system/resolv.conf", old, sizeof(old)) || strcmp(text, old))
+        if (lm_write_text("/run/leon-system/resolv.conf", text) || chmod("/run/leon-system/resolv.conf", 0644))
             snprintf(s->error, sizeof(s->error), "cannot publish resolver");
 }
 void network_tick(struct lm_daemon *d) {

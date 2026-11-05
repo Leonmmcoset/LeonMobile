@@ -21,8 +21,8 @@ int time_zone_apply(struct lm_daemon *d, const char *zone) {
     if (!d->options.test) {
         char source[PATH_MAX];
         snprintf(source, sizeof(source), "/usr/share/zoneinfo/%s", zone);
-        unlink("/run/localtime.new");
-        if (symlink(source, "/run/localtime.new") || rename("/run/localtime.new", "/run/localtime")) return -1;
+        unlink("/run/leon-system/localtime.new");
+        if (symlink(source, "/run/leon-system/localtime.new") || rename("/run/leon-system/localtime.new", "/run/leon-system/localtime")) return -1;
     }
     // Test roots may change only this daemon's environment, never host clocks/files.
     setenv("TZ", zone, 1);tzset();

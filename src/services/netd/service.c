@@ -78,7 +78,7 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
 }
 int netd_run(int argc, char **argv) {
     struct network_state state = {.interface = "eth0"};
-    struct lm_daemon d = {.options = {"/run/leon/network.sock", "/run/resolv.conf", "/data/leon",
+    struct lm_daemon d = {.options = {"/run/leon/network.sock", "/run/leon-system/resolv.conf", "/data/leon",
                                       "/usr/share/leon/apps", "/proc", "/sys", 0},
                           .data = &state,
                           .handle = handle,

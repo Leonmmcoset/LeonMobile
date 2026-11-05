@@ -93,13 +93,16 @@ new sessions. Broker startup removes stale app processes left by an earlier
 broker crash. Foreground/background OOM priorities and cooperative checkpointing
 remain part of the lifecycle protocol.
 
-Landlock ABI 3 or later restricts writes to the app's home/runtime and the
-explicit PTY/null/random devices. Read/execute rules cover installed applications,
-OS libraries/programs, configuration, proc/sysfs and the public service directory;
-ordinary Unix permissions still apply. Other private homes and shared documents
-cannot be opened directly. `/tmp` is not granted; `TMPDIR` is the app's private
-`.tmp` directory. Apps should use HOME/XDG directories rather than shared scratch
-paths. Selected files arrive through the portal as private copies.
+Each production app has private mount, PID and IPC namespaces, a read-only
+system/package view, its own home/runtime binds and read-only private `/proc`.
+Only its own pinned installed package is visible under `/data/leon/apps`.
+Landlock ABI 3 or later restricts writes to home/runtime, private scratch mounts
+and explicit minimal devices. `TMPDIR=/tmp`; `/tmp`, `/var/tmp` and `/dev/shm`
+are separate bounded per-launch tmpfs mounts, discarded on exit. The private
+`/dev` supplies minimal character devices and a separate devpts instance;
+hardware devices and host sysfs are absent. Selected files arrive through system
+proxies. See [application-isolation.md](application-isolation.md) for paths,
+limits, translated host PIDs, PID 1 reaping and cleanup contracts.
 
 The inherited seccomp policy permits AF_UNIX and grants AF_INET/AF_INET6 socket
 creation only when the manifest declares network and the portal has approved it.
@@ -110,11 +113,11 @@ limit is 512 and core limit is 8 MiB. Policies are inherited across fork/exec.
 
 This is an actual kernel-enforced developer policy with stated boundaries.
 AF_UNIX IPC and the Wayland server are shared; each privileged service must still
-authorize peers. Publisher signatures, full per-app namespaces, credential-based
-screen unlock, hardware device permission APIs and an adversarial security audit
+authorize peers. The kernel and network namespace remain shared. Publisher
+signatures, hardware device permission APIs and an adversarial security audit
 are outside this implementation. A granted app can communicate with other apps;
 this is not a claim of complete information-flow isolation. Explicit development
-roots (`leon-launchd --root`) bypass target cgroups/Landlock to support native host
+roots (`leon-launchd --root`) bypass target namespaces/cgroups/Landlock to support native host
 fixtures; distribution services never pass that option.
 
 Third-party Root helpers use an explicit declaration, in addition to `entry`:
