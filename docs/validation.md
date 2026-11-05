@@ -415,6 +415,17 @@ PNG/PPM captures, serial log, `preferences-proof.json`, `audio-windows.json`,
 `audio-proof.json` and `preferences-audio.wav`. The fixed-operation privileged
 test helper exists only in the cloned test image. No user disk is modified.
 
+The separate general QEMU regression also passes boot, all eight native app
+identities, calculator and lifecycle controls, Settings navigation, actual
+PipeWire volume, DHCP/routing/DNS, twelve direct/legacy notifications, scrolling
+and activation, lock-screen protection and clean poweroff through the UI.
+Its final shutdown step holds a complete USB contact and waits for the rendered
+power menu before selecting poweroff; a short down/up pair could previously be
+missed under TCG and hit the notification underneath. Evidence is in
+`build/preferences-qemu-regression.log` and `build/qemu-test/`, including
+`poweroff-menu-ready.ppm` and the serial trace showing clean compositor exit,
+data unmount and kernel powerdown.
+
 Reproduction is documented in [root-access.md](root-access.md). Evidence stays
 ignored in `build/root-developer-*.log`, `build/rootd-native-tests.log`,
 `build/root-tools-only.log`, `build/screenshots/developer-*` and

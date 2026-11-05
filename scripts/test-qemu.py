@@ -1388,9 +1388,25 @@ def main():
                                    "Home did not settle after management checks")
                 qmp.click(400, 22)
                 wait_shade_stage("shade-before-poweroff.ppm", 700)
-                qmp.click(432, 628)
-                time.sleep(.3)
-                qmp.click(240, 426)  # Explicit power-off choice
+                # Under TCG, a 50 ms down/up pair can finish before the guest
+                # USB seat polls it. Hold a full contact and observe the menu
+                # before selecting poweroff, so a missed tap cannot activate a
+                # notification at the same coordinates underneath the dialog.
+                qmp.move(432, 628)
+                time.sleep(.1)
+                qmp.button(True)
+                time.sleep(.25)
+                qmp.button(False)
+                surface = bytes.fromhex("211d29" if preferences.get("dark") else "fffbff")
+                qmp.wait_frame(artifacts / "poweroff-menu-ready.ppm",
+                               lambda frame: pixel(frame, 80, 426) == primary and
+                                             pixel(frame, 30, 480) == surface,
+                               "Power menu did not appear before the shutdown choice")
+                qmp.move(240, 426)
+                time.sleep(.1)
+                qmp.button(True)
+                time.sleep(.25)
+                qmp.button(False)  # Explicit power-off choice
                 try:
                     proc.wait(timeout=20)
                 except subprocess.TimeoutExpired as error:
