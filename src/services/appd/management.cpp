@@ -1,5 +1,6 @@
 #include "management.hpp"
 #include "internal.hpp"
+#include "root.hpp"
 #include "sandbox.h"
 #include "storage.hpp"
 #include <chrono>
@@ -38,7 +39,8 @@ void stop_writers(Processes &processes, const Options &options, const std::strin
     do {
         std::ifstream events(path);
         if (!events.is_open()) {
-            fail(!fs::exists(fs::path(path).parent_path()), "cannot inspect application resource group");
+            fail(!fs::exists(fs::path(path).parent_path()),
+                 "cannot inspect application resource group");
             return; // Never launched.
         }
         std::string key;
@@ -86,9 +88,9 @@ Json managed_info(Packages &packages, const Processes &processes, const Options 
     app["permissions"] = permissions;
     app["permissions_available"] = permissions_available;
     app["storage"] = {{"package", program_usage},
-                        {"data", storage_usage(packages.root / "data" / id)},
-                        {"runtime", storage_usage(fs::path(options.runtime_prefix) /
-                                                   std::to_string(manifest.at("uid").get<uid_t>()))}};
+                      {"data", storage_usage(packages.root / "data" / id)},
+                      {"runtime", storage_usage(fs::path(options.runtime_prefix) /
+                                                std::to_string(manifest.at("uid").get<uid_t>()))}};
     return {{"app", app}};
 }
 void manage_application(Packages &packages, Processes &processes, const Options &options,
@@ -99,6 +101,8 @@ void manage_application(Packages &packages, Processes &processes, const Options 
     fail(!uninstall || !manifest.value("builtin", false), "cannot remove a system application");
     uid_t uid = manifest.at("uid");
     stop_writers(processes, options, id, uid);
+    if (manifest.contains("root"))
+        revoke_root(options, id, op != "app_stop");
     if (op == "app_stop")
         return;
     // Root-only reset has no callback to apps.sock: avoid a broker/portal cycle.

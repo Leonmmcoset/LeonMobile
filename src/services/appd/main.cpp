@@ -23,6 +23,8 @@ int main(int argc, char **argv) {
             options.socket_name = value;
         else if (option == "--notifications-socket")
             options.notifications_socket = value;
+        else if (option == "--root-socket")
+            options.root_socket = value;
         else if (option == "--portal-socket")
             options.portal_socket = value;
         else if (option == "--runtime-dir")

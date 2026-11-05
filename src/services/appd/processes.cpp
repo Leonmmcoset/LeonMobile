@@ -1,5 +1,6 @@
 #include "processes.hpp"
 #include "internal.hpp"
+#include "root.hpp"
 #include "sandbox.h"
 #include <chrono>
 #include <climits>
@@ -360,6 +361,7 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
     running_[id] = pid;
     clients_[id].fd = pair[0];
     clients_[id].uid = uid;
+    clients_[id].root_helper = m.contains("root");
     foreground(id);
     return pid;
 }
@@ -370,6 +372,13 @@ void Processes::request_stop(const std::string &id) {
     // Repeated taps must not extend the checkpoint or termination deadline.
     if (client.stop_phase != StopPhase::none)
         return;
+    if (client.root_helper) {
+        try {
+            revoke_root(options_, id);
+        } catch (const std::exception &e) {
+            std::fprintf(stderr, "Root cancellation: %s\n", e.what());
+        }
+    }
     priority(id, false);
     event(id, "shutdown");
     client.stop_phase = StopPhase::shutdown;

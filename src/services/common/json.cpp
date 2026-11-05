@@ -62,6 +62,7 @@ int64_t lm_integer(const lm_json *json, int64_t fallback) {
 int lm_boolean(const lm_json *json, int fallback) {
     return json && value(json)->is_boolean() ? int(value(json)->get<bool>()) : fallback;
 }
+int lm_is_array(const lm_json *json) { return json && value(json)->is_array(); }
 int lm_is_object(const lm_json *json) { return json && value(json)->is_object(); }
 int lm_is_string(const lm_json *json) { return json && value(json)->is_string(); }
 void lm_set(lm_json *json, const char *key, lm_json *child) {
@@ -106,6 +107,13 @@ lm_json *lm_app(const char *root, const char *builtin, uid_t uid) {
     } catch (...) {
     }
     return nullptr;
+}
+lm_json *lm_apps(const char *root, const char *builtin) {
+    try {
+        return wrap(new J(leon::Packages(root, builtin).list()));
+    } catch (...) {
+        return nullptr;
+    }
 }
 lm_json *lm_root_app(const char *root, const char *builtin, uid_t uid, pid_t pid) {
     try {

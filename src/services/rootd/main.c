@@ -1,4 +1,6 @@
 #include "../serviced/notify.h"
+#include "apps.h"
+#include "auth.h"
 #include "rootd.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -56,6 +58,17 @@ static void serve(const struct root_options *o, int socket, int notice, struct u
     }
     const char *op = lm_string(lm_get(request, "op"), "");
     int settings = settings_peer(o, peer);
+    if (!strncmp(op, "app_", 4)) {
+        int shell = !peer.uid || (o->test ? peer.uid == 1000
+                                          : auth_peer(peer.pid, peer.uid, 1000,
+                                                      "/usr/bin/leon-shell", "/usr/sbin/leond"));
+        lm_json *reply = root_apps_serve(o, socket, notice, peer, request, settings, shell);
+        clear_passwords(request);
+        lm_free(request);
+        if (reply)
+            root_reply(socket, reply, -1);
+        return;
+    }
     int terminal = peer.uid == 0 || peer.uid == 1000 || peer.uid == 11005;
     lm_json *reply = NULL;
     struct root_policy policy = {0};
@@ -139,7 +152,7 @@ done:
 }
 struct worker {
     pid_t pid;
-    int notice;
+    int notice, untrusted;
     int64_t generation, deadline;
 };
 static int listener(const struct root_options *o) {
@@ -158,7 +171,8 @@ static int listener(const struct root_options *o) {
     struct stat info;
     if (lstat(parent, &info) || info.st_uid || (info.st_mode & 022))
         return -1;
-    /* umask 077 protects persistent state, but allowed clients must traverse this socket directory. */
+    /* umask 077 protects persistent state, but allowed clients must traverse this socket directory.
+     */
     if (chmod(parent, 0755))
         return -1;
     if (!lstat(o->socket, &info)) {
@@ -180,8 +194,9 @@ static int listener(const struct root_options *o) {
 }
 int main(int argc, char **argv) {
     struct root_options o = {
-        "/data/leon/rootd",   LEON_ROOT_SOCKET,          "/proc", "/lib/modules",
-        "/etc/leon/services", "/run/leon/services.sock", 0};
+        "/data/leon/rootd",     LEON_ROOT_SOCKET,          "/proc", "/lib/modules",
+        "/etc/leon/services",   "/run/leon/services.sock", 0,       "/data/leon",
+        "/usr/share/leon/apps", LEON_AUTH_SOCKET};
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--test")) {
             o.test = 1;
@@ -192,6 +207,9 @@ int main(int argc, char **argv) {
                              : !strcmp(argv[i], "--proc")           ? &o.proc
                              : !strcmp(argv[i], "--modules")        ? &o.modules
                              : !strcmp(argv[i], "--services")       ? &o.services
+                             : !strcmp(argv[i], "--root")           ? &o.app_root
+                             : !strcmp(argv[i], "--builtin")        ? &o.builtin
+                             : !strcmp(argv[i], "--auth-socket")    ? &o.auth_socket
                              : !strcmp(argv[i], "--service-socket") ? &o.service_socket
                                                                     : NULL;
         if (!field || i + 1 == argc)
@@ -229,6 +247,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     root_session_cleanup(&o, 0);
+    if (root_apps_cleanup(&o, 0))
+        return 1;
     struct worker workers[WORKERS] = {0};
     int running = 1;
     leon_service_ready();
@@ -258,12 +278,14 @@ int main(int argc, char **argv) {
                 kill(w->pid, SIGKILL);
             }
         }
+        root_apps_cleanup(&o, -1);
         int status;
         pid_t exited;
         while ((exited = waitpid(-1, &status, WNOHANG)) > 0)
             for (size_t i = 0; i < WORKERS; ++i)
                 if (workers[i].pid == exited) {
                     root_session_cleanup(&o, exited);
+                    root_apps_cleanup(&o, exited);
                     close(workers[i].notice);
                     workers[i] = (struct worker){0};
                 }
@@ -283,7 +305,17 @@ int main(int argc, char **argv) {
             struct ucred peer;
             socklen_t size = sizeof(peer);
             int pipe[2] = {-1, -1};
-            if (slot == WORKERS || getsockopt(client, SOL_SOCKET, SO_PEERCRED, &peer, &size) ||
+            int untrusted = 0, used = 0;
+            if (!getsockopt(client, SOL_SOCKET, SO_PEERCRED, &peer, &size)) {
+                untrusted = peer.uid != 0 && !settings_peer(&o, peer) &&
+                            !(o.test ? peer.uid == 1000
+                                     : auth_peer(peer.pid, peer.uid, 1000, "/usr/bin/leon-shell",
+                                                 "/usr/sbin/leond"));
+                for (size_t i = 0; i < WORKERS; ++i)
+                    used += workers[i].pid && workers[i].untrusted;
+            }
+            if (slot == WORKERS || (untrusted && used >= 6) ||
+                getsockopt(client, SOL_SOCKET, SO_PEERCRED, &peer, &size) ||
                 pipe2(pipe, O_CLOEXEC | O_NONBLOCK)) {
                 close(client);
                 continue;
@@ -316,7 +348,7 @@ int main(int argc, char **argv) {
             if (child < 0)
                 close(pipe[0]);
             else
-                workers[slot] = (struct worker){child, pipe[0], 0, lm_now_ms() + 15000};
+                workers[slot] = (struct worker){child, pipe[0], untrusted, 0, lm_now_ms() + 15000};
         }
     }
     for (size_t i = 0; i < WORKERS; ++i)
@@ -327,6 +359,7 @@ int main(int argc, char **argv) {
         }
     while (waitpid(-1, NULL, 0) > 0 || errno == EINTR) {
     }
+    root_apps_cleanup(&o, 0);
     close(server);
     close(signals);
     close(instance);

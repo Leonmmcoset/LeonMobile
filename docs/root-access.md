@@ -147,3 +147,69 @@ password setup, rotation and editing against private kernel fixtures.
 The generated reference image
 and personal `build/leonmobile-user.img` remain untouched. Probe reports and serial
 evidence are ignored under `build/qemu-test/`.
+
+## Third-party single-command requests (protocol 1)
+
+`root.exec` packages declare a separate `root.entry` ELF and a bounded purpose
+(see `application-format.md`). rootd authenticates `SO_PEERCRED`, the installed
+application entry's device/inode and PID start time, a fresh installer instance
+ID, immutable helper path, Root generation and authd's unlocked-session epoch.
+The helper is opened before confirmation and executed by descriptor. An app
+cannot choose a system executable, supply environment variables, descriptors,
+stdin, passwords, or run an interactive shell through this protocol.
+
+`app_request` accepts **only** `op` and `args`: an array of at most four printable
+ASCII strings, each at most 64 bytes, 160 bytes combined. The exact arguments
+are confirmed by the system UI. No shell interpolation occurs. A declared helper
+can implement arbitrary Root operations; review its source before approving.
+Requests expire after 90 seconds. There are two application request slots, one
+per UID, within the six-session shared Root limit. Two control workers remain
+reserved against untrusted peers. Pending records use a private lock and atomic
+files because each connection is handled in a separate process.
+
+The original connection receives newline JSON frames: `ok/state=pending/token`,
+then `state=running/pid`, zero or more `output_hex` frames (combined stdout/stderr,
+lossless bytes), then `state=finished/status`. A failed request has `ok=false`
+and an `error`. Applications must keep the connection open and drain output;
+closing it cancels execution. The application remains at its own UID. A new
+process runs the pinned helper at UID/GID 0, with no supplementary groups,
+inherited application descriptors, terminal or application environment. Stdin is
+`/dev/null`; cwd and HOME are `/`. Root helpers receive the verified
+`LEON_CALLER_APP` and `LEON_CALLER_UID`. Execution is limited to 30 wall seconds,
+30 CPU seconds and 64 KiB output. Successful exit also ends descendants.
+
+Only the installed shell (UID 1000, executable and leond ancestry) or a Root
+administration/test peer can call `app_pending`/`app_decide`. The latter takes
+`token`, boolean `allow`, an optional `block` on denial, and the Root password
+on approval. A successful decision is single-use and bound to the trusted UI
+PID/start time. Every approval checks the password afresh, using the existing
+persistent failure limits. Neither a portal grant nor a former approval permits
+execution. Password changes and disabling Root revoke requests and executions.
+
+Settings can read `app_list` (eight apps per `offset` page) and `app_history`
+(eight newest events per page, 64 retained). `app_revoke` cancels pending and
+running work without increasing privilege. `app_policy` takes `id`, `blocked`
+and a fresh Root `password`. Restrictions persist per installation; updates and
+reinstallation return to asking. No persistent allow/remember grant exists.
+`apps-policy.json` is bounded to 128 identities, failing closed on corruption or
+capacity exhaustion. Audit records contain identity, instance, event, timestamp
+and exit status; never passwords, arguments or output. Active request arguments
+are transient Root-private files, removed on completion/restart.
+
+The Root-only broker calls `app_cancel` on stop and `app_reset` before clearing
+private data or uninstalling a Root app. It waits for Root cgroup writers to
+exit and refuses a successful reset if cleanup is unavailable. `leon-launchd
+--root-socket PATH` selects an isolated test endpoint. rootd accepts `--root`,
+`--builtin` and `--auth-socket` for isolated catalogs/authentication. Production
+identity, owner/mode and unlocked-session checks are enforced in these paths;
+`--test` only relaxes trusted UI executable checks, ARM64 helper machine checks
+and host cgroup/management mutations.
+
+Caller death, disconnect, update/reinstall, revocation, expiry, authd failure or
+locking the device cancel the request/helper. A rootd restart kills stale Root
+cgroups and drops every pending decision. Helpers use parent-death signals and
+cgroup cleanup. These are reliable process-lifecycle controls for cooperative
+Root helpers, not containment of deliberately hostile UID 0 code: unrestricted
+Root can change the system, escape its cgroup, read secrets, and undo controls.
+Revocation cannot undo changes already made. Packages remain unsigned; this is
+a QEMU developer prototype with no claim of an independent security audit.

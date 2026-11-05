@@ -17,7 +17,7 @@
 #include <unistd.h>
 #define SESSION_ROOT "/sys/fs/cgroup/leon/root"
 /* Leave two workers available for status, password changes and revocation. */
-static int session_slot(const struct root_options *o) {
+int root_session_slot(const struct root_options *o) {
     for (int i = 0; i < 6; ++i) {
         char path[PATH_MAX];
         if (snprintf(path, sizeof(path), "%s/session-%d.lock", o->directory, i) >=
@@ -41,7 +41,7 @@ static int session_slot(const struct root_options *o) {
     }
     return -1;
 }
-static int group_create(const struct root_options *o) {
+int root_session_group(const struct root_options *o) {
     if (o->test)
         return 0;
     char path[PATH_MAX];
@@ -97,7 +97,7 @@ int root_session(const struct root_options *o, int socket, int notice, struct uc
         root_reply(socket, lm_failure("invalid root terminal size or command"), -1);
         return -1;
     }
-    int slot = session_slot(o);
+    int slot = root_session_slot(o);
     if (slot < 0) {
         root_reply(socket, lm_failure("root session limit reached or session policy unavailable"),
                    -1);
@@ -107,7 +107,7 @@ int root_session(const struct root_options *o, int socket, int notice, struct uc
     int lock = root_policy_lock(o);
     struct root_policy policy;
     if (lock < 0 || root_policy_load(o, &policy) || !policy.enabled ||
-        policy.generation != generation || group_create(o)) {
+        policy.generation != generation || root_session_group(o)) {
         if (lock >= 0)
             close(lock);
         root_reply(socket, lm_failure("root access was revoked or session isolation failed"), -1);

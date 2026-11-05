@@ -11,6 +11,9 @@
 #include <unistd.h>
 
 static int declared(const lm_json *app, const char *permission) {
+    // Root is always mediated by rootd with a fresh password, never a portal grant.
+    if (!strcmp(permission, "root.exec"))
+        return 0;
     const lm_json *list = lm_get(app, "permissions");
     for (size_t i = 0; i < lm_size(list); ++i)
         if (!strcmp(lm_string(lm_at(list, i), ""), permission))
@@ -66,10 +69,12 @@ static lm_json *handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
             lm_json *item = lm_object();
             lm_set_string(item, "name", name);
             const lm_json *decision = lm_get(lm_get(s->grants, id), name);
-            lm_set_string(item, "state", portal_granted(s, app, name) ? "allowed"
-                                            : pending                  ? "pending"
-                                            : decision                 ? "denied"
-                                                                       : "not-requested");
+            lm_set_string(item, "state",
+                          !strcmp(name, "root.exec")     ? "system-confirmation"
+                          : portal_granted(s, app, name) ? "allowed"
+                          : pending                      ? "pending"
+                          : decision                     ? "denied"
+                                                         : "not-requested");
             lm_append(permissions, item);
         }
         lm_set(out, "permissions", permissions);

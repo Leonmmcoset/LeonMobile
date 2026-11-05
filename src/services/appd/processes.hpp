@@ -32,7 +32,7 @@ class Processes {
         long long deadline{};
         long long stop_deadline{};
         StopPhase stop_phase{StopPhase::none};
-        bool foreground{}, pending{}, responsive{true};
+        bool foreground{}, pending{}, responsive{true}, root_helper{};
         std::string event;
     };
     std::map<std::string, Client> clients_;

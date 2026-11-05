@@ -1,3 +1,4 @@
+#include "../common/linux_openat2.h"
 #include "../serviced/config.h"
 #include "../serviced/policy.h"
 #include "rootd.h"
@@ -5,7 +6,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "../common/linux_openat2.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

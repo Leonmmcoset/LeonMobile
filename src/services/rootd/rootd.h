@@ -6,6 +6,7 @@
 struct root_options {
     const char *directory, *socket, *proc, *modules, *services, *service_socket;
     int test;
+    const char *app_root, *builtin, *auth_socket;
 };
 struct root_policy {
     int enabled, present, failures;

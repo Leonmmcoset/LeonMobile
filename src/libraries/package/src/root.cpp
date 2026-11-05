@@ -22,11 +22,11 @@ fs::path trusted(const fs::path &path, bool file) {
 }
 } // namespace
 Json Packages::root_identity(uid_t uid, pid_t pid) const {
-    require(uid >= 12000 && uid < 60000 && pid > 1, "not a third-party application");
+    require(uid >= 12000 && uid < 60000 && (pid == 0 || pid > 1), "not a third-party application");
     Fd lock(open((root / "installer.lock").c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
     struct stat info {};
     require(!fstat(lock, &info) && S_ISREG(info.st_mode) && !info.st_uid && !(info.st_mode & 077) &&
-                info.st_nlink == 1 && !flock(lock, LOCK_SH),
+                info.st_nlink == 1 && !flock(lock, LOCK_SH | LOCK_NB),
             "installer identity unavailable");
     Json m;
     for (const auto &app : list())
@@ -49,9 +49,9 @@ Json Packages::root_identity(uid_t uid, pid_t pid) const {
         "invalid installation identity");
     struct stat installed {
     }, caller{};
-    require(!stat(entry.c_str(), &installed) &&
-                !stat(("/proc/" + std::to_string(pid) + "/exe").c_str(), &caller) &&
-                installed.st_dev == caller.st_dev && installed.st_ino == caller.st_ino,
+    require(pid == 0 || (!stat(entry.c_str(), &installed) &&
+                         !stat(("/proc/" + std::to_string(pid) + "/exe").c_str(), &caller) &&
+                         installed.st_dev == caller.st_dev && installed.st_ino == caller.st_ino),
             "request must originate in the installed application executable");
     m["installation"] = std::string(token, 32);
     m["executable"] = entry.string();

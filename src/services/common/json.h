@@ -18,6 +18,7 @@ size_t lm_size(const lm_json *json);
 const char *lm_string(const lm_json *json, const char *fallback);
 int64_t lm_integer(const lm_json *json, int64_t fallback);
 int lm_boolean(const lm_json *json, int fallback);
+int lm_is_array(const lm_json *json);
 int lm_is_object(const lm_json *json);
 int lm_is_string(const lm_json *json);
 void lm_set(lm_json *json, const char *key, lm_json *value);
@@ -30,6 +31,7 @@ lm_json *lm_copy(const lm_json *json);
 lm_json *lm_app_by_id(const char *root, const char *builtin, const char *id);
 int lm_grants_valid(const lm_json *json);
 lm_json *lm_app(const char *root, const char *builtin, uid_t uid);
+lm_json *lm_apps(const char *root, const char *builtin);
 lm_json *lm_root_app(const char *root, const char *builtin, uid_t uid, pid_t pid);
 #ifdef __cplusplus
 }
