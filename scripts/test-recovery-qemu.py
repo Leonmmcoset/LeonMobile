@@ -190,9 +190,10 @@ def wait_screen(qmp, path, predicate, description, timeout=30):
 
 
 def unlock_pin(qmp, guest, path):
-    qmp.click(240, 790)
+    qmp.drag(240, 790, 240, 300)
     wait_screen(qmp, ARTIFACTS / "device-pin-entry.png",
-                lambda frame: display_pixel(frame, 240, 285) == bytes.fromhex("eaddff"),
+                lambda frame: display_pixel(frame, 240, 285) == bytes.fromhex("eaddff") and
+                              display_pixel(frame, 240, 370) == bytes.fromhex("fff8ff"),
                 "Device PIN entry screen did not appear")
     for digit in PIN:
         number = int(digit)
@@ -501,10 +502,13 @@ def run_target_test(probe, package):
             if guest.run("cat /data/home/leon/recovery-witness") != "LeonMobile recovery preserves user data":
                 raise RuntimeError("User home data did not survive system restore")
             unlock_pin(qmp, guest, ARTIFACTS / "restored-home.png")
-            guest.run("lmpkg launch org.example.hello")
+            # Select the installed Hello icon through the shell. A CLI launch
+            # starts the process but does not dismiss the shell's home scene.
+            qmp.click(96, 408)
             guest.wait_lifecycle("org.example.hello")
             wait_screen(qmp, ARTIFACTS / "restored-hello-app.png",
-                        lambda frame: len({frame[i:i + 3] for i in range(0, len(frame), 48)}) > 20,
+                        lambda frame: display_pixel(frame, 40, 286) == PRIMARY and
+                                      display_pixel(frame, 240, 330) == LOCK_BACKGROUND,
                         "Installed application did not render after system restore")
             guest.run("lmsys power '{\"op\":\"poweroff\"}'")
             proc.wait(timeout=30)
