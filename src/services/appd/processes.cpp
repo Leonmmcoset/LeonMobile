@@ -2,6 +2,9 @@
 #include "internal.hpp"
 #include "root.hpp"
 #include "sandbox.h"
+extern "C" {
+#include "state.h"
+}
 #include "namespace.h"
 #include <chrono>
 #include <climits>
@@ -230,6 +233,8 @@ pid_t Processes::launch(Packages &packages, const std::string &id) {
         return running_[id];
     }
     auto m = packages.lookup(id);
+    fail(options_.development || !leon_boot_safe() || m.value("builtin", false),
+         "third-party applications are disabled in safe mode");
     unsigned uid = m.at("uid");
     fs::path home = packages.root / "data" / id;
     fs::create_directories(home);

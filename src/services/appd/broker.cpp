@@ -2,7 +2,11 @@
 #include "internal.hpp"
 #include "management.hpp"
 #include "sandbox.h"
+extern "C" {
+#include "state.h"
+}
 #include <csignal>
+#include <algorithm>
 #include <leon/ipc.hpp>
 #include <unistd.h>
 namespace leon::appd {
@@ -31,7 +35,12 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
         }
     } else if (op == "list") {
         fail(shell, "permission denied");
-        response = {{"apps", packages_.list()},
+        auto apps = packages_.list();
+        if (!options_.development && leon_boot_safe())
+            apps.erase(std::remove_if(apps.begin(), apps.end(), [](const auto &m) {
+                return !m.value("builtin", false);
+            }), apps.end());
+        response = {{"apps", apps},
                     {"running", processes_.running()},
                     {"applications", processes_.lifecycle().at("applications")}};
     } else if (op == "launch") {

@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
         leon_boot_error("leond fork");
     while (!action) {
         int status;
-        pid_t pid = waitpid(-1, &status, 0);
+        pid_t pid = waitpid(-1, &status, WNOHANG);
         if (pid == manager) {
             leon_boot_log("LeonMobile: service manager exited; restarting in 2 seconds\n");
             sleep(2);
@@ -49,8 +49,9 @@ int main(int argc, char **argv) {
         } else if (pid > 0) {
             // Reap and terminate an orphaned service's remaining process group.
             kill(-pid, SIGKILL);
-        } else if (pid < 0 && errno != EINTR)
-            pause();
+        }
+        if (leon_boot_health_tick()) action = SIGUSR2;
+        if (!action) usleep(100000);
     }
     leon_shutdown(manager, action);
 }

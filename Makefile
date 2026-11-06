@@ -1,4 +1,4 @@
-.PHONY: all configure build test image run release clean legal-info
+.PHONY: all configure build test image run release clean legal-info recovery
 JOBS ?= 4
 all: build
 configure:
@@ -12,6 +12,8 @@ image:
 	./scripts/build.sh
 run:
 	./scripts/run-qemu.sh
+recovery:
+	LEON_RECOVERY=1 ./scripts/run-qemu.sh
 release:
 	./scripts/release.sh
 legal-info:

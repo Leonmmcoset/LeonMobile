@@ -14,6 +14,11 @@ mkdir -p "$repo/build"
     -I"$repo/src/services/common" -I"$repo/src/services/serviced" \
     "$repo/tests/target/boot_console.c" "$repo/src/services/common/boot_log.c" \
     -o "$repo/build/boot-console-probe"
+"$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
+    -c "$repo/src/services/boot/state.c" -o "$repo/build/recovery-state-probe.o"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/recovery.c" "$repo/tests/target/system_transport.c" \
+    "$repo/build/recovery-state-probe.o" -o "$repo/build/recovery-target-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/notifications.c" -o "$repo/build/notifications-probe"
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \

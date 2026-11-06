@@ -124,7 +124,9 @@ build units does not introduce an on-device package repository or OTA service.
 
 ## Boot and storage
 
-QEMU directly loads `Image` and the small `leon-initramfs.cpio.gz`. Early `leon-init` mounts proc/sysfs/devtmpfs, waits for the root device, moves early mounts and switches to the root filesystem. The main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs, mounts `/data`, binds persistent `/data/var` over `/var`, and starts `leond`. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
+QEMU directly loads `Image` and `leon-initramfs.cpio.gz`. Early init mounts proc/sysfs/devtmpfs, mounts `/data` first, records a durable boot attempt, then mounts the system partition read-only and checks essential files before switching root. Missing system files, mount/state errors and three unfinished attempts enter the independently packaged Recovery program. PID 1 marks startup healthy only after required services report READY and the trusted compositor confirms a current desktop output commit. The 180-second deadline is supervised outside leond. Main init mounts `/run`, `/tmp` and `/dev/shm` as tmpfs and starts `leond`; `/data` remains mounted across the switch. The seatd session uses Buildroot's `video` group (GID 28); keyboard layouts come from `xkeyboard-config`.
+
+The generated `leon-recovery.cpio.gz` is a separate initramfs with its own musl runtime, BusyBox, e2fsck and recovery executable. It can be selected directly or entered by early-init failure handling. It provides normal/safe startup, offline read-only checks, diagnostics and an explicitly confirmed restore of only the system partition. A restore source must match the build's fixed size, ext4 marker and SHA-256; the target is read back and hashed after writing. Persistent repair state makes an interrupted restore return to Recovery. Root and device authentication policies, installed packages and private app data live on `/data` and are retained. This is a QEMU development path, not signed boot, A/B rollback, atomic update or physical-device recovery.
 
 The shared `distro/board/qemu-arm64/cmdline` enables both the framebuffer VT
 (`console=tty0`) and the serial console (`console=ttyAMA0`, last so it remains
@@ -154,7 +156,7 @@ The GPT disk contains `system` (768 MiB ext4, mounted read-only) and `data` (512
 
 `prepare` is a oneshot service that must exit successfully before dependent services start. Other services run in the foreground and are supervised by process group. Notify services hold their dependants until an authenticated READY packet arrives. Ready timeouts, event-loop watchdogs and bounded process-group restarts detect startup failures and stalls; simple services retain process-start ordering.
 
-System updates replace the whole system partition while QEMU is stopped. There is no A/B boot, rollback, online updater or claim of recovery from power loss during system replacement. Local application upgrades use a different transaction mechanism described in the application format document.
+System updates replace the whole system partition while QEMU is stopped or through the offline Recovery writer. There is no A/B boot, rollback protection or online updater; recovery records interrupted writes and requires a trusted matching image to retry. Local application upgrades use a different transaction mechanism described in the application format document.
 
 ## Session and trust boundaries
 

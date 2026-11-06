@@ -1,0 +1,5 @@
+find_package(OpenSSL REQUIRED)
+add_executable(leon-recovery main.c console.c image.c repair.c diagnostics.c ../rootd/policy.c)
+target_compile_definitions(leon-recovery PRIVATE _GNU_SOURCE)
+target_link_libraries(leon-recovery PRIVATE leon-boot-state leon-system leon-root-wire OpenSSL::Crypto)
+install(TARGETS leon-recovery RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR} COMPONENT Runtime)

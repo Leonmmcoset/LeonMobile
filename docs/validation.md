@@ -846,3 +846,30 @@ Settings stop/clear/uninstall and clean UI poweroff passed. Offline inspection
 confirmed exact editor/import contents and terminal probe/edit/restart data.
 The final run is recorded in ignored `build/isolation-qemu-full.log` and
 `build/qemu-test/`; it validates the current QEMU developer graphics prototype.
+
+## Boot health and independent Recovery (2026-11-07)
+
+`make test` passed 13 CTest checks and 110 Python tests. The native boot-state
+fixtures cover persisted pending attempts, recovery after three unfinished
+boots, safe/normal requests, boot-ID checks, checksum corruption and unsafe
+filesystem objects. The independent native Wayland smoke passed all eight
+built-ins, shell and both control-panel states, with lifecycle and motion
+checks.
+
+The AArch64 QEMU test used a disposable disk and passed real initial, safe and
+normal boots; persistent device-PIN setup and lock/unlock; safe-mode app policy;
+missing-essential-file entry into the independent Recovery archive; read-only
+ext4 check; cancelled restore; invalid-image rejection without system writes;
+Root-password-authenticated diagnostic export; matching-image restore and
+read-back hash; and a subsequent normal boot with the PIN, Root policy,
+third-party package, application-private data and home file retained. Direct
+Recovery archive startup and return to the normal desktop also passed. The
+restored third-party app launched and rendered. QEMU frames and serial logs are
+ignored under `build/qemu-recovery-test/`; the screenshots are execution
+evidence, not generated mockups.
+
+The native state-machine tests cover the three-failure threshold, but the
+180-second PID 1 deadline was not accelerated or waited out in QEMU. This run
+does not test physical boot firmware, actual handset storage/power loss, secure
+boot, signatures, or rollback resistance. Recovery is an early text console
+and requires a matching host-supplied kernel/initramfs and verified local image.

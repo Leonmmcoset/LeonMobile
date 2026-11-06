@@ -13,7 +13,7 @@ from release_legal import REPO, collect, sha256
 def main():
     version = (REPO / "VERSION").read_text().strip()
     images = REPO / "output/images"
-    image_names = ("Image", "leon-initramfs.cpio.gz", "rootfs.ext4",
+    image_names = ("Image", "leon-initramfs.cpio.gz", "leon-recovery.cpio.gz", "rootfs.ext4",
                    "leonmobile-qemu-aarch64.img")
     for name in image_names:
         if not (images / name).is_file():

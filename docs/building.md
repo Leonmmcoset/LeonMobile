@@ -119,6 +119,42 @@ sha256sum --check SHA256SUMS
 
 The launcher creates a separate persistent `leonmobile-user.img` next to the release files. Use the same `LEON_DISK`, `LEON_DISPLAY` and `LEON_AUDIO` settings as the repository launcher. The included `scripts/update-image.py` can replace a stopped runtime disk's system partition.
 
+## Recovery and boot-health validation
+
+The reference image contains `leon-initramfs.cpio.gz` for normal startup and a
+separate `leon-recovery.cpio.gz` for direct Recovery selection. Both have an
+independent musl runtime and recovery tools. Start Recovery against a separate
+development disk and attach the exact matching root image read-only:
+
+```sh
+LEON_DISK="$PWD/build/leonmobile-recovery-user.img" make recovery
+LEON_DISK="$PWD/build/leonmobile-recovery-user.img" \
+  LEON_REPAIR_IMAGE="$PWD/output/images/rootfs.ext4" make recovery
+```
+
+The text menu accepts keyboard or serial input. It offers normal/safe boot,
+read-only ext4 checks, boot diagnostics and a confirmed system-only restore.
+Restoring requires typing `RESTORE`; the image size, ext4 marker and SHA-256
+must match the build metadata. `/data` holds credentials, packages and user
+files and is not rewritten. The image hash pins a local artifact, not a
+publisher signature. Recovery does not provide a shell or network service.
+
+The end-to-end test uses its own temporary QEMU disk. It checks the recovery
+archive directly, real safe and normal boots, policy overrides, a deliberate
+missing system executable, read-only fsck, cancellation and invalid media
+rejection, valid system replacement and offline verification of Root/PIN,
+installed package, application-private data and user files:
+
+```sh
+./scripts/build-target-probes.sh
+./scripts/build-example.sh
+python3 scripts/test-recovery-qemu.py
+```
+
+QEMU logs and PNG screenshots are stored in `build/qemu-recovery-test/`. This
+is reference-target evidence only; it does not validate hardware boot firmware,
+secure boot, publisher signatures or physical-device recovery.
+
 ## Target validation
 
 Date/time and notification Settings have a focused target check, including

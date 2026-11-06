@@ -1,1 +1,1 @@
-console=tty0 console=ttyAMA0 printk.time=1 consoleblank=0 leon.root=/dev/vda1 rootwait ro
+console=tty0 console=ttyAMA0 printk.time=1 consoleblank=0 leon.root=/dev/vda1 rootwait ro panic=5

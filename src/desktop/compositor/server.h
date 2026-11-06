@@ -49,6 +49,7 @@ struct leon_server {
     struct wlr_keyboard fallback_keyboard;
     struct wl_listener touch_down, touch_up, touch_motion;
     bool session_locked, session_modal;
+    long long boot_frame;
     bool auth_live, auth_consuming, lock_ready;
     int auth_fd;
     struct wl_event_source *auth_source, *auth_timer;

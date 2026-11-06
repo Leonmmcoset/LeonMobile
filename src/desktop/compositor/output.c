@@ -10,10 +10,13 @@ static void output_frame(struct wl_listener *listener, void *data) {
     struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
 
     /* Render the scene if needed and commit the output */
-    wlr_scene_output_commit(scene_output, NULL);
+    bool committed = wlr_scene_output_commit(scene_output, NULL);
 
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
+    if (committed && output->server->shell && output->server->auth_live &&
+        (!output->server->session_locked || output->server->lock_ready))
+        output->server->boot_frame = now.tv_sec;
     wlr_scene_output_send_frame_done(scene_output, &now);
     /* Let a hidden shell replace its old buffer despite an animation callback. */
     if (output->server->session_locked && !output->server->lock_ready && output->server->shell)

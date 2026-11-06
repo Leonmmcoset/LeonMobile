@@ -188,8 +188,8 @@ class QMP:
             raise RuntimeError("QEMU display is blank")
         return pixels
 
-    def wait_frame(self, path, predicate, description):
-        deadline = time.monotonic() + 10
+    def wait_frame(self, path, predicate, description, timeout=10):
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             # New windows and transparent page transitions may expose a blank
             # frame before the client commits. The expected geometry below,
@@ -212,9 +212,9 @@ class QMP:
             "Notification shade did not settle to " + str(bottom))
 
 
-def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None, platform_probe=None, preferences_probe=None):
+def inject_probes(images, disk, temporary, notification_probe, system_probe, terminal_probe=None, root_probe=None, auth_probe=None, applications_probe=None, root_apps_probe=None, root_apps_package=None, boot_console_probe=None, platform_probe=None, preferences_probe=None, recovery_probe=None, recovery_package=None):
     """Inject test-only helpers into the cloned disk; release images stay intact."""
-    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe, platform_probe, preferences_probe)):
+    if not any((notification_probe, system_probe, terminal_probe, root_probe, auth_probe, applications_probe, root_apps_probe, boot_console_probe, platform_probe, preferences_probe, recovery_probe)):
         return
     rootfs = temporary / "test-root.ext4"
     subprocess.run(["cp", "--reflink=auto", "--sparse=always", images / "rootfs.ext4", rootfs], check=True)
@@ -226,6 +226,14 @@ def inject_probes(images, disk, temporary, notification_probe, system_probe, ter
     if preferences_probe:
         put(preferences_probe, "/usr/bin/leon-test-preferences")
         commands.append("set_inode_field /usr/bin/leon-test-preferences mode 0104755")
+    if recovery_probe:
+        put(recovery_probe, "/usr/bin/leon-test-recovery")
+        put(recovery_package, "/usr/share/recovery-demo.lmpkg")
+        unit = temporary / "recovery-test.toml"
+        unit.write_text('name="recovery-test"\ncommand=["/usr/bin/leon-test-recovery", "--watch"]\n'
+                        'after=["root", "authentication", "apps", "compositor", "shell"]\n'
+                        'restart="never"\n')
+        put(unit, "/etc/leon/services/19-recovery-test.toml")
     if platform_probe:
         put(platform_probe, "/usr/bin/leon-test-platform")
         unit = temporary / "platform-test.toml"

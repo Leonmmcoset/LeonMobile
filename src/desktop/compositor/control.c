@@ -2,6 +2,7 @@
  * Based on wlroots 0.20 tinywl; mobile policy additions by LeonMobile. */
 #include "server.h"
 #include <sys/time.h>
+#include <time.h>
 /* The shell owns navigation. This socket is mode 0600 and its peers must have
  * the compositor's UID; isolated applications cannot focus arbitrary clients. */
 static int mobile_control(int fd, uint32_t mask, void *data) {
@@ -26,7 +27,12 @@ static int mobile_control(int fd, uint32_t mask, void *data) {
     setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     ssize_t n = read(client, command, sizeof(command) - 1);
     if (n > 0) {
-        if (!strcmp(command, "modal")) {
+        if (!strcmp(command, "boot-status")) {
+            struct timespec now; clock_gettime(CLOCK_MONOTONIC, &now);
+            bool ready = peer.uid == 0 && server->shell && server->auth_live &&
+                         server->boot_frame && now.tv_sec - server->boot_frame < 5;
+            (void)send(client, ready ? "ready\n" : "waiting\n", ready ? 6 : 8, MSG_NOSIGNAL);
+        } else if (!strcmp(command, "modal")) {
             server->session_modal = true;
             focus_toplevel(server->shell);
         } else if (!strcmp(command, "unmodal"))

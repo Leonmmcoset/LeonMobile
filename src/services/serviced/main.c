@@ -1,4 +1,5 @@
 #include "manager.h"
+#include "state.h"
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -40,6 +41,7 @@ int main(int argc, char **argv) {
     }
     if (boot_console && !check && !geteuid())
         leon_boot_console_enable();
+    if (leon_boot_safe()) manager->policy_directory = NULL;
     if (manager_load(manager, dir))
         return 1;
     if (check) {

@@ -1,10 +1,16 @@
 #include "../control.hpp"
 #include "../shell.hpp"
+#include <fstream>
 using namespace mobile;
 namespace leon::shell {
 void Shell::paint_home(Canvas &c) {
     auto t = c.theme;
     double w = c.width, h = c.height;
+    std::ifstream boot_status("/run/leon-boot/status");
+    std::string boot_mode; std::getline(boot_status, boot_mode);
+    if (boot_mode == "mode=safe")
+        c.text(tr(en, "安全模式 · 第三方应用已暂停", "Safe mode · Third-party apps paused"),
+               {24, h - 194, w - 48, 36}, 14, t.primary, true, 1);
 
     if (page == Page::home) {
         c.circle(w * .88, 220, 180, t.container);
