@@ -9,7 +9,7 @@ On Debian/Ubuntu, install the cross-build prerequisites:
 ```sh
 sudo apt-get install build-essential bison flex gawk gettext texinfo libssl-dev \
   libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils \
-  qemu-system-arm qemu-utils e2fsprogs fdisk
+  qemu-system-arm qemu-utils e2fsprogs fdisk mtools dosfstools git
 ```
 
 Native component development additionally uses:
@@ -60,11 +60,11 @@ library symlink, pkg-config file and CMake package belong to `Development` and
 are installed into Buildroot's staging sysroot. See [development.md](development.md)
 for component ownership, native build options and SDK consumption.
 
-The relevant outputs in `output/images` are `Image`, `leon-initramfs.cpio.gz`, `rootfs.ext4`, `data.ext4`, and `leonmobile-qemu-aarch64.img`. `make run` creates a separate writable disk at `build/leonmobile-user.img` on first use. Repeated runs reuse that disk, preserving data. `LEON_DISK` selects another writable image. The generated reference image is never used as a writable runtime disk by the launcher.
+The outputs include `Image`, both initramfs archives, `rootfs.ext4`, `data.ext4`, `leonmobile-qemu-aarch64.img`, `leon-efi.vfat`, `leonmobile-recovery-aarch64.img` and the two `leon-uefi-*.fd` flash banks. `make run` boots through EDK II and the disk's GRUB; the host does not load the kernel/initramfs directly. It creates `build/leonmobile-user.img` and a separate `.vars.fd` file on first use, preserving them on subsequent runs. `LEON_DISK` selects another writable image. Old two-partition disks require explicit migration or `LEON_BOOT=direct`; see [disk-boot.md](disk-boot.md). The generated reference disk and firmware code bank remain read-only inputs.
 
 The desktop is 480×960 portrait. Click the lock screen or swipe up to unlock. The status bar opens notifications on the left and quick settings on the right. Bottom gestures navigate home and tasks; three-button navigation can be selected in settings. Mouse clicks and drags act as single-touch input. The developer serial console automatically logs in as the non-root `leon` user.
 
-`LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks. `LEON_IMAGES` selects a directory containing the kernel, initramfs and reference disk.
+`LEON_DISPLAY=none make run` runs without a visible window. `LEON_AUDIO=pa make run` selects a PulseAudio host backend when supported by QEMU and the host; the default `none` backend retains the guest audio device for automated tests without requiring a host sound server. Guest PipeWire/ALSA operation and host audible playback are separate checks. `LEON_IMAGES` selects the directory containing the reference disk and firmware artifacts. Press Esc at the LeonMobile startup prompt for the hidden menu; `LEON_BOOT_MODE=safe` requests a one-shot safe boot and `LEON_RECOVERY_MEDIA=1` attaches the independent USB recovery disk.
 
 Boot logs appear on the portrait screen once the kernel initializes virtio-gpu,
 followed by init/service status and the Wayland lock screen. The host terminal

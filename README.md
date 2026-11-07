@@ -27,7 +27,7 @@ ctest --test-dir build/core --output-on-failure
 make test                     # 原生编译、组件及安装事务测试
 ./scripts/test-wayland.sh      # 在独立 Wayland 服务端中渲染桌面与应用
 make image                    # 完整 ARM64 / musl 系统镜像
-make run                      # 使用持久化磁盘副本启动 QEMU
+make run                      # UEFI → 磁盘 GRUB → 内核，使用持久化磁盘副本
 LEON_DISK="$PWD/build/leonmobile-recovery-user.img" make recovery  # 进入独立恢复环境
 LEON_REPAIR_IMAGE="$PWD/output/images/rootfs.ext4" LEON_DISK="$PWD/build/leonmobile-recovery-user.img" make recovery
 python3 scripts/test-qemu.py   # 目标系统启动与图形交互验收
@@ -64,7 +64,9 @@ LMUI 与系统界面使用 Material 3 非线性动效，覆盖触控涟漪、开
 
 应用默认使用独立的挂载、PID、IPC 命名空间，私有临时目录和 PTY，以及最小设备视图；保留 Unix UID、Landlock、seccomp 和 cgroup 限制。隔离范围、运行目录及清理机制见[应用隔离](docs/application-isolation.md)。
 
-启动健康监测记录未完成的启动；连续失败会进入独立的文本恢复环境。可从恢复环境选择普通／安全启动、只读文件系统检查，或校验匹配的系统镜像后只恢复系统分区，保留 `/data` 中的应用、Root 和设备凭据。恢复介质和启动镜像目前由 QEMU 宿主机提供，不是签名更新或实体手机恢复方案；操作和验证范围见[恢复环境](docs/recovery.md)。
+启动默认通过 EDK II UEFI → 磁盘内的 ARM64 GRUB → 内核与 initramfs；启动菜单默认隐藏，提示出现后按 Esc 可选普通、安全或恢复模式。普通启动文件损坏时尝试独立恢复内核；EFI 启动分区损坏时可挂载独立 USB 恢复镜像。旧用户盘不会自动改分区，迁移、离线启动分区修复及边界见[磁盘引导](docs/disk-boot.md)。
+
+启动健康监测记录未完成的启动；连续失败会进入独立的文本恢复环境。可从恢复环境选择普通／安全启动、只读文件系统检查，或校验匹配的系统镜像后只恢复系统分区，保留 `/data` 中的应用、Root 和设备凭据。恢复校验不是签名更新或实体手机恢复方案；操作和验证范围见[恢复环境](docs/recovery.md)。
 
 当前边界：仅 QEMU，尚未设置设备凭据时使用滑动锁屏；内核、网络命名空间、Wayland 与 AF_UNIX 仍共享，尚无独立安全审计；软件包未签名；恢复校验不是发布者签名，启动链不防回滚；尚无实体手机、动态壁纸取色、Android 兼容、应用商店或 OTA。
 

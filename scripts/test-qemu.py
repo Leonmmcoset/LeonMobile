@@ -13,6 +13,8 @@ import tempfile
 import shutil
 import time
 
+from qemu_boot import boot_arguments
+
 REPO = Path(__file__).resolve().parents[1]
 KERNEL_COMMAND_LINE = (REPO / "distro/board/qemu-arm64/cmdline").read_text().strip()
 
@@ -548,6 +550,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=150)
     parser.add_argument("--images", type=Path, default=REPO / "output/images",
                         help="image directory, including an assembled local release")
+    parser.add_argument("--boot", choices=("uefi", "direct"), default="uefi",
+                        help="UEFI disk boot by default; direct kernel loading only for diagnosis")
     parser.add_argument("--package", type=Path, help="also install, launch and remove the SDK hello package")
     parser.add_argument("--notification-probe", type=Path,
                         help="AArch64 tests/target/notifications.c executable for live notification checks")
@@ -655,17 +659,16 @@ def main():
             subprocess.run(["mkfs.ext4", "-q", "-F", media], check=True)
         endpoint = temp / "qmp.sock"
         command = ["qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "4",
-                   "-m", "2048", "-kernel", str(images / "Image"), "-initrd",
-                   str(images / "leon-initramfs.cpio.gz"), "-append",
-                   KERNEL_COMMAND_LINE, "-drive",
+                   "-m", "2048", "-drive",
                    f"if=none,file={disk},format=raw,id=system", "-device",
-                   "virtio-blk-pci,drive=system", "-device", "virtio-gpu-pci,xres=480,yres=960",
+                   "virtio-blk-pci,drive=system,bootindex=2", "-device", "virtio-gpu-pci,xres=480,yres=960",
                    "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
                    "-netdev", "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
                    "-audiodev", ("wav,id=audio,path=" + str(artifacts / "preferences-audio.wav") if args.preferences_probe else
                                  "wav,id=audio,path=" + str(artifacts / "platform-audio.wav") if args.platform_probe else "none,id=audio"), "-device", "intel-hda", "-device",
                    "hda-duplex,audiodev=audio", "-display", "none", "-monitor", "none",
                    "-serial", "stdio", "-qmp", f"unix:{endpoint},server=on,wait=off"]
+        command += boot_arguments(images, disk, temp / "uefi-vars.fd", method=args.boot)
         if args.system_probe:
             command += ["-drive", f"if=none,file={media},format=raw,id=removable",
                         "-device", "usb-storage,drive=removable,removable=on"]
@@ -757,6 +760,11 @@ def main():
                     raise RuntimeError("Development console must be non-root")
                 if guest.run("uname -r") != "7.3.1-leonmobile":
                     raise RuntimeError("Guest kernel version mismatch")
+                if args.boot == "uefi":
+                    evidence = guest.run("test -d /sys/firmware/efi && cat /proc/cmdline")
+                    if "leon.boot=uefi" not in evidence:
+                        raise RuntimeError("Guest did not boot through UEFI and the disk GRUB configuration")
+                    (artifacts / "uefi-boot.txt").write_text(evidence + "\n")
                 if args.root_apps_probe:
                     result = guest.run("cat /run/leon/root-app-tests.txt")
                     (artifacts / "root-applications.txt").write_text(result + "\n")

@@ -1,17 +1,21 @@
 # Boot health and independent Recovery
 
 LeonMobile 1.0.0 implements this flow for the QEMU AArch64 reference target.
-The host still loads the kernel and initramfs directly. This is not an A/B
+The default boot chain uses EDK II and disk-resident GRUB, kernel and initramfs.
+See [disk-boot.md](disk-boot.md) for the EFI layout, boot-file failure handling,
+legacy-disk migration and standalone recovery medium. This is not an A/B
 updater, signed boot chain or physical phone recovery implementation.
 
 ## Entry and layout
 
 `make run` uses `leon-initramfs.cpio.gz`, containing early init and a complete
-Recovery runtime. `make recovery` loads the separate `leon-recovery.cpio.gz`
-instead. Both include their own musl loader, required ELF libraries, BusyBox,
+Recovery runtime. `make recovery` makes a one-shot disk menu request for the
+separate `leon-recovery.cpio.gz` and recovery kernel copy instead.
+Both include their own musl loader, required ELF libraries, BusyBox,
 Recovery and e2fsck; they never execute tools from the system partition. Kernel
 `panic=5` reboots an early kernel/init crash instead of hanging indefinitely.
-A kernel that cannot run at all still requires host selection/replacement.
+GRUB tries the separate recovery copy when an ordinary payload fails its hash
+or load check; boot-medium damage requires the standalone recovery medium.
 
 ```sh
 # Stop the guest first. Reuse the same LEON_DISK when specified for make run.
@@ -91,7 +95,8 @@ marker. An interrupted restore returns to Recovery on the next boot and can be
 retried with the same trusted medium. Restoring the baseline replaces all Root
 changes on the system partition; user applications and data remain on data.
 The hash pins a build artifact; it is not a publisher signature or rollback
-protection. The host must supply a matching kernel/initramfs and trusted media.
+protection. The boot partition or independent medium must supply a matching
+kernel/initramfs, and the attached repair source must be trusted.
 
 ## Diagnostics and privacy
 

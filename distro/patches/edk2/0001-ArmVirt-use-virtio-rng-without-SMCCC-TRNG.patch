@@ -1,0 +1,24 @@
+From: LeonMobile developers <developers@leonmobile.local>
+Subject: [PATCH] ArmVirt: avoid firmware TRNG calls on the QEMU reference board
+
+The reference target runs QEMU 6.2 and a Cortex-A72 without an SMCCC TRNG
+backend. Probing SMCCC_VERSION via HVC raises an undefined-instruction
+exception before the boot manager can run on that emulator. Use the null
+ArmTrngLib (which returns unsupported) and provide actual entropy through
+VirtioRngDxe and the mandatory virtio-rng-pci device instead. This does not
+replace entropy with timer or software pseudo-random output.
+
+Upstream-Status: Inappropriate [LeonMobile QEMU reference board policy]
+Signed-off-by: LeonMobile developers <developers@leonmobile.local>
+---
+--- a/ArmVirtPkg/ArmVirt.dsc.inc
++++ b/ArmVirtPkg/ArmVirt.dsc.inc
+@@ -147,7 +147,7 @@
+   OpensslLib|CryptoPkg/Library/OpensslLib/OpensslLibCrypto.inf
+ !endif
+   RngLib|MdePkg/Library/BaseRngLib/BaseRngLib.inf
+-  ArmTrngLib|ArmPkg/Library/ArmTrngLib/ArmTrngLib.inf
++  ArmTrngLib|MdePkg/Library/BaseArmTrngLibNull/BaseArmTrngLibNull.inf
+   ArmMonitorLib|ArmPkg/Library/ArmMonitorLib/ArmMonitorLib.inf
+ 
+   #

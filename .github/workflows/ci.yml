@@ -36,7 +36,7 @@ jobs:
       - name: Install cross-build host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils e2fsprogs fdisk
+          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils e2fsprogs fdisk mtools dosfstools git
       - uses: actions/cache@v4
         with:
           path: .cache/downloads
@@ -45,8 +45,11 @@ jobs:
       - run: ./scripts/build-example.sh
       - run: ./scripts/build-target-probes.sh
       - run: python3 scripts/test-qemu.py --timeout 240 --system-probe build/system-probe --notification-probe build/notifications-probe --terminal-probe build/terminal-probe --package build/hello/org.example.hello-1.0.0.lmpkg
+      - run: python3 scripts/test-disk-boot-qemu.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qemu-boot-evidence
-          path: build/qemu-test/
+          path: |
+            build/qemu-test/
+            build/qemu-disk-boot-test/

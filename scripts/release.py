@@ -14,7 +14,8 @@ def main():
     version = (REPO / "VERSION").read_text().strip()
     images = REPO / "output/images"
     image_names = ("Image", "leon-initramfs.cpio.gz", "leon-recovery.cpio.gz", "rootfs.ext4",
-                   "leonmobile-qemu-aarch64.img")
+                   "leonmobile-qemu-aarch64.img", "leonmobile-recovery-aarch64.img",
+                   "leon-efi.vfat", "leon-uefi-code.fd", "leon-uefi-vars.fd")
     for name in image_names:
         if not (images / name).is_file():
             raise RuntimeError(f"Missing {name}: run make image first")
@@ -60,7 +61,8 @@ def main():
             shutil.copy2(REPO / name, stage)
         shutil.copytree(REPO / "docs", stage / "docs")
         (stage / "scripts").mkdir()
-        for name in ("run-qemu.sh", "update-image.py"):
+        for name in ("run-qemu.sh", "run-qemu.py", "qemu_boot.py", "leon_image.py", "update-image.py",
+                     "migrate-boot.py", "repair-boot.py"):
             shutil.copy2(REPO / "scripts" / name, stage / "scripts")
         board = stage / "distro/board/qemu-arm64"
         board.mkdir(parents=True)
@@ -78,7 +80,8 @@ def main():
         (stage / "software-manifest.json").write_text(json.dumps(packages, indent=2) + "\n")
         info = {"distribution": "LeonMobile", "version": version, "kernel": "7.3.1",
                 "buildroot": "2026.08.1", "arch": "aarch64", "commit": commit,
-                "source_dirty": dirty, "status": "developer-prototype"}
+                "source_dirty": dirty, "status": "developer-prototype",
+                "boot": "uefi-grub-arm64", "secure_boot": False}
         (stage / "build-info.json").write_text(json.dumps(info, indent=2) + "\n")
         package = REPO / "build/hello/org.example.hello-1.0.0.lmpkg"
         if package.is_file():

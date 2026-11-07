@@ -130,10 +130,12 @@ or reconfigure `root` itself; an authenticated root shell can administer it.
 
 Core inspection reports the actual kernel release/architecture/command line and
 presence/size of init, leond, rootd, app broker, LMUI, musl, compositor and shell.
-It is an inventory, not an integrity or firmware update system. QEMU loads its
-kernel from the host `-kernel` argument: replacing a file inside the device does
-not replace that boot kernel. Kernel-image installation and OTA are outside this
-interface.
+It is an inventory, not an integrity or firmware update system. The default QEMU
+boot uses the kernel on the separate EFI partition through UEFI/GRUB; replacing
+a file on the root filesystem does not replace that kernel. The explicit
+`LEON_BOOT=direct` diagnostic path still loads the host kernel. See
+[disk-boot.md](disk-boot.md) for offline boot-image handling. Kernel installation
+and OTA are outside this interface.
 
 ## Reproducing root tests
 

@@ -13,6 +13,8 @@ import time
 
 from PIL import Image
 
+from qemu_boot import boot_arguments
+
 REPO = Path(__file__).resolve().parents[1]
 BUILD = REPO / "build"
 IMAGES = REPO / "output/images"
@@ -37,10 +39,9 @@ def launch_qemu(disk, repair, tag, initramfs=None):
         pass
     log = ARTIFACTS / f"{tag}-serial.log"
     command = ["qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a72", "-smp", "4",
-               "-m", "2048", "-kernel", str(IMAGES / "Image"), "-initrd",
-               str(initramfs or IMAGES / "leon-initramfs.cpio.gz"), "-append", COMMAND_LINE,
+               "-m", "2048",
                "-drive", f"if=none,file={disk},format=raw,id=system", "-device",
-               "virtio-blk-pci,drive=system", "-drive",
+               "virtio-blk-pci,drive=system,bootindex=2", "-drive",
                f"if=none,file={repair},format=raw,readonly=on,id=repair", "-device",
                "virtio-blk-pci,drive=repair", "-device", "virtio-gpu-pci,xres=480,yres=960",
                "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
@@ -48,6 +49,8 @@ def launch_qemu(disk, repair, tag, initramfs=None):
                "-audiodev", "none,id=audio", "-device", "intel-hda", "-device",
                "hda-duplex,audiodev=audio", "-display", "none", "-monitor", "none",
                "-serial", "stdio", "-qmp", f"unix:{endpoint},server=on,wait=off"]
+    command += boot_arguments(IMAGES, disk, disk.with_suffix('.vars.fd'),
+                              recovery_media=initramfs is not None)
     output = log.open("wb")
     proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=output,
                             stderr=subprocess.STDOUT)

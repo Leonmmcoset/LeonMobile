@@ -12,13 +12,17 @@ SCRIPT = REPO / "scripts/update-image.py"
 
 
 class ImageUpdateTests(unittest.TestCase):
-    def make_disk(self, path):
+    def make_disk(self, path, with_boot=False):
         image = bytearray(256 * 512)
         entries = bytearray(128 * 128)
         linux = uuid.UUID("0fc63daf-8483-4772-8e79-3d69d8477de4").bytes_le
-        for i, (name, first, last) in enumerate((("system", 34, 65), ("data", 66, 100))):
+        layout = [("system", 34, 65), ("data", 66, 100)]
+        if with_boot:
+            layout.append(("boot", 101, 150))
+        for i, (name, first, last) in enumerate(layout):
             off = i * 128
-            entries[off:off+16] = linux
+            entries[off:off+16] = (uuid.UUID("c12a7328-f81f-11d2-ba4b-00a0c93ec93b").bytes_le
+                                  if name == "boot" else linux)
             entries[off+16:off+32] = uuid.UUID(int=i+1).bytes_le
             struct.pack_into("<QQ", entries, off+32, first, last)
             encoded = name.encode("utf-16-le")
@@ -31,6 +35,8 @@ class ImageUpdateTests(unittest.TestCase):
         image[512:1024] = header
         image[1024:1024+len(entries)] = entries
         image[66*512:101*512] = b"D" * (35*512)
+        if with_boot:
+            image[101*512:151*512] = b"B" * (50*512)
         path.write_bytes(image)
         return bytes(image)
 

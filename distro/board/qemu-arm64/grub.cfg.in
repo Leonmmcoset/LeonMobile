@@ -1,0 +1,45 @@
+# Generated for the QEMU AArch64 reference target. Secure Boot is disabled.
+set superusers=leon-disabled
+export superusers
+set timeout_style=hidden
+set timeout=3
+set default=normal
+
+function leon_recovery {
+    echo LEON_BOOT_RECOVERY
+    if hashsum --hash sha256 --check /EFI/LeonMobile/recovery/SHA256SUMS; then
+        if linux /EFI/LeonMobile/recovery/Image @CMDLINE@ leon.boot=uefi leon.recovery=1; then
+            if initrd /EFI/LeonMobile/recovery/initramfs; then
+                boot
+            fi
+        fi
+    fi
+    echo LEON_BOOT_RECOVERY_UNAVAILABLE
+    echo Attach the standalone LeonMobile recovery disk.
+    sleep 15
+}
+
+function leon_system {
+    echo LEON_BOOT_SYSTEM $1
+    if hashsum --hash sha256 --check /EFI/LeonMobile/normal/SHA256SUMS; then
+        if linux /EFI/LeonMobile/normal/Image @CMDLINE@ leon.boot=uefi $1; then
+            if initrd /EFI/LeonMobile/normal/initramfs; then
+                boot
+            fi
+        fi
+    fi
+    echo LEON_BOOT_SYSTEM_UNAVAILABLE
+    leon_recovery
+}
+
+@DEFAULT@
+echo LEON_BOOT_MENU_READY
+echo Press Esc for LeonMobile startup options.
+
+@SYSTEM_ENTRIES@
+menuentry 'LeonMobile 1.0.0 - Recovery' --id recovery --unrestricted {
+    leon_recovery
+}
+menuentry 'Power off' --id poweroff --unrestricted {
+    halt
+}

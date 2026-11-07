@@ -12,6 +12,8 @@ import tempfile
 import time
 from PIL import Image
 
+from qemu_boot import boot_arguments
+
 REPO=Path(__file__).resolve().parents[1]
 
 
@@ -69,11 +71,11 @@ def main():
                 env=dict(os.environ,DISPLAY=display,SDL_VIDEODRIVER='x11')
                 endpoint=temp/'qmp.sock'
                 qemu=subprocess.Popen(['qemu-system-aarch64','-M','virt','-cpu','cortex-a72','-smp','4','-m','2048','-S',
-                    '-kernel',str(images/'Image'),'-initrd',str(images/'leon-initramfs.cpio.gz'),'-append',controls.KERNEL_COMMAND_LINE,
-                    '-drive',f'if=none,file={disk},format=raw,id=system','-device','virtio-blk-pci,drive=system','-device','virtio-gpu-pci,xres=480,yres=960',
+                    '-drive',f'if=none,file={disk},format=raw,id=system','-device','virtio-blk-pci,drive=system,bootindex=2','-device','virtio-gpu-pci,xres=480,yres=960',
                     '-device','qemu-xhci','-device','usb-kbd','-device','usb-tablet','-netdev','user,id=net0','-device','virtio-net-pci,netdev=net0',
                     '-audiodev','none,id=audio','-device','intel-hda','-device','hda-duplex,audiodev=audio','-display','sdl,gl=off',
-                    '-monitor','none','-serial','stdio','-qmp',f'unix:{endpoint},server=on,wait=off'],env=env,stdin=subprocess.PIPE,stdout=serial,stderr=subprocess.STDOUT)
+                    '-monitor','none','-serial','stdio','-qmp',f'unix:{endpoint},server=on,wait=off']+
+                    boot_arguments(images,disk,temp/'uefi-vars.fd'),env=env,stdin=subprocess.PIPE,stdout=serial,stderr=subprocess.STDOUT)
                 end=time.monotonic()+15; window=None
                 while time.monotonic()<end:
                     if qemu.poll() is not None: raise RuntimeError('QEMU exited; inspect serial.log')
