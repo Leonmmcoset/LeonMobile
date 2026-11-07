@@ -979,3 +979,28 @@ document data. Integrity validation does not establish publisher identity.
 Already running applications must be reopened to use their upgraded executable;
 old package versions remain on disk. These results cover the QEMU developer
 prototype, not physical phones or arbitrary power-loss certification.
+
+The general regression also passes on the regenerated default EFI image with
+the notification/terminal probes and SDK example package:
+
+```sh
+python3 scripts/test-qemu.py --timeout 240 \
+  --notification-probe build/notifications-probe \
+  --terminal-probe build/terminal-probe \
+  --package build/hello/org.example.hello-1.0.0.lmpkg
+```
+
+It verifies all nine built-in ELF/UID identities and lifecycle acknowledgements,
+actual terminal VT/PTY/Ctrl-C/vi/top/clipboard/restart, twelve notifications,
+shade gestures/focus/lock controls, Settings preferences, Ethernet/DNS state,
+real PipeWire volume, SDK installation/launch/removal, task dismissal and clean
+UI poweroff. Offline terminal files match their expected contents. Evidence is
+in `build/qemu-test/` and `build/installer-system-regression.log`.
+Initial attempts exposed test assumptions about fixed app-grid positions,
+startup delays and shared card colors. Final tests use catalog-derived icon
+positions, foreground acknowledgements and distinct settled-page geometry;
+search clearing waits for the returned page before clicking. The EFI health
+helper waits for the final boot printk before sending framed serial commands,
+preventing log text from splitting a command marker. The final complete run
+passes with these synchronization changes. CI's optional image job now runs
+the independent graphical installer check and collects its evidence.

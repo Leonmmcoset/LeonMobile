@@ -45,6 +45,7 @@ jobs:
       - run: ./scripts/build-example.sh
       - run: ./scripts/build-target-probes.sh
       - run: python3 scripts/test-qemu.py --timeout 240 --system-probe build/system-probe --notification-probe build/notifications-probe --terminal-probe build/terminal-probe --package build/hello/org.example.hello-1.0.0.lmpkg
+      - run: python3 scripts/test-installer-qemu.py
       - run: python3 scripts/test-disk-boot-qemu.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -52,4 +53,5 @@ jobs:
           name: qemu-boot-evidence
           path: |
             build/qemu-test/
+            build/qemu-installer-test/
             build/qemu-disk-boot-test/

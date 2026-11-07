@@ -104,7 +104,7 @@ compatible with generation 1 SDK binaries. New application callbacks and the
 reduced-motion policy use setter methods backed by private state.
 
 Built-in applications read the persisted boolean `reduce_motion` preference.
-Settings exposes it under Display → Reduce motion. All eight built-ins share
+Settings exposes it under Display → Reduce motion. All built-ins share
 release activation and ripples; keyboard expansion, content resizing, error
 messages, settings selections and folder/page navigation use the same motion
 policy. Settings and file lists track touch drags immediately, then apply a

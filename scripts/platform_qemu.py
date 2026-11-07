@@ -94,6 +94,8 @@ def exercise_platform(guest, qmp, artifacts):
 
     def pixel(frame, x, y):
         return frame[(y * 480 + x) * 3:(y * 480 + x) * 3 + 3]
+    catalogue = json.loads(guest.run("lmpkg list"))
+    settings_index = next(i for i, app in enumerate(catalogue) if app["id"] == "org.leon.settings")
     wait(lambda: "Volume: 0.70" in guest.run("XDG_RUNTIME_DIR=/run/user/1000 wpctl get-volume @DEFAULT_AUDIO_SINK@"),
          "PipeWire output volume does not match the restored preference")
     qmp.wait_frame(artifacts / "platform-boot-lock.ppm",
@@ -163,7 +165,7 @@ def exercise_platform(guest, qmp, artifacts):
                    lambda frame: pixel(frame, 100, 240) == bytes.fromhex("6750a4"),
                    "Media lock did not return home")
     drawer()
-    click(96, 426)  # Settings, third row
+    click(96 + settings_index % 3 * 144, 190 + settings_index // 3 * 118)
     wait(lambda: foreground() == {"org.leon.settings"}, "Settings did not open")
     qmp.wait_frame(artifacts / "platform-settings-home.ppm",
                    lambda frame: pixel(frame, 28, 206) == bytes.fromhex("eaddff"),
@@ -251,7 +253,7 @@ def exercise_platform(guest, qmp, artifacts):
                    "Opened document did not commit")
     home()
     drawer()
-    click(96, 426)
+    click(96 + settings_index % 3 * 144, 190 + settings_index // 3 * 118)
     wait(lambda: foreground() == {"org.leon.settings"}, "Settings did not resume")
     documents = system("documents", {"op": "list"})["documents"]
     source_index = next(i for i, doc in enumerate(documents) if doc["app"] == "org.leon.files")

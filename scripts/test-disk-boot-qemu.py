@@ -100,6 +100,9 @@ def session(images, disk, tag, mode=None, recovery_media=False):
 def healthy(proc, guest, log, offset=0, mode='normal'):
     wait_text(proc, log, 'leond: started shell', offset)
     wait_text(proc, log, 'LEON_CONSOLE_READY', offset)
+    # Wait for PID 1's final boot message before sending framed serial queries;
+    # otherwise that printk can split a transport marker between two writes.
+    wait_text(proc, log, 'leon-init: boot healthy (services ready and desktop presented)', offset)
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         text = guest.run('cat /run/leon-boot/status')

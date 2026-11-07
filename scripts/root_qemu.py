@@ -147,7 +147,9 @@ def exercise_developer_ui(guest, qmp, artifacts):
 
     click(240, 940)  # Home, then terminal through all apps
     click(240, 838)
-    click(240, 426)
+    catalogue = json.loads(guest.run("lmpkg list"))
+    terminal_index = next(i for i, app in enumerate(catalogue) if app["id"] == "org.leon.terminal")
+    click(96 + terminal_index % 3 * 144, 190 + terminal_index // 3 * 118)
     guest.wait_lifecycle("org.leon.terminal")
     qmp.wait_frame(artifacts / "developer-terminal-ready.ppm",
                    lambda frame: frame[(180 * 480 + 24) * 3:(180 * 480 + 24) * 3 + 3]

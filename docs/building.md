@@ -267,7 +267,8 @@ boot, waits, application launches, animations and shutdown stay at their actual
 speed. Kernel boot text remains on the serial console; the graphical capture
 starts blank until the compositor appears. The tour has no audio track.
 
-The tour opens all eight built-ins from their icons. It calculates `7 + 3`,
+The tour opens Calculator, Settings, Clock, Editor, Files, the LMUI demo,
+Images and Terminal from their icons. It calculates `7 + 3`,
 changes settings, runs the stopwatch, types with the screen keyboard and saves
 a note, creates a file, posts an LMUI notification, opens the shade, displays a
 small PNG example, runs kernel/architecture commands in the terminal and

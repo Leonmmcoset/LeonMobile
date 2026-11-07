@@ -809,12 +809,12 @@ def main():
                     raise RuntimeError("Notification service launched an unexpected executable")
                 guest.run("test -x /usr/sbin/notificationd && test -S /run/leon/notifications.sock")
                 apps = json.loads(guest.run("lmpkg list"))
-                if len(apps) != 8 or any(app["arch"] != "aarch64" for app in apps):
+                if len(apps) != 9 or any(app["arch"] != "aarch64" for app in apps):
                     raise RuntimeError("Native system application manifest checks failed")
                 entries = {app["entry"] for app in apps}
                 expected = {f"/usr/bin/leon-{name}" for name in (
                     "settings", "calculator", "gallery", "files", "editor",
-                    "terminal", "images", "clock")}
+                    "terminal", "images", "clock", "installer")}
                 if entries != expected or any(app.get("args") for app in apps):
                     raise RuntimeError("Built-in apps must have independent ELF entry points")
                 guest.run(" && ".join(f"test -x {shlex.quote(entry)}" for entry in sorted(entries)))
@@ -945,7 +945,8 @@ def main():
                 if args.notification_probe or args.terminal_probe:
                     qmp.click(240, 838)  # All apps
                     time.sleep(.5)
-                    qmp.click(240, 426)  # Terminal
+                    terminal_index = next(i for i, app in enumerate(apps) if app["id"] == "org.leon.terminal")
+                    qmp.click(96 + terminal_index % 3 * 144, 190 + terminal_index // 3 * 118)
                     qmp.wait_frame(
                         artifacts / "shade-notification-terminal.ppm",
                         lambda frame: frame[(180 * 480 + 24) * 3:(180 * 480 + 24) * 3 + 3]
@@ -1216,7 +1217,7 @@ def main():
                 for code in "volume":
                     qmp.key(code)
                 time.sleep(.5)
-                qmp.capture(artifacts / "settings-search.ppm")
+                search_results = qmp.capture(artifacts / "settings-search.ppm")
                 qmp.click(180, 296)  # Matching Sound result
                 qmp.wait_frame(
                     artifacts / "settings-sound-ready.ppm",
@@ -1229,9 +1230,17 @@ def main():
                 guest.wait_setting("volume", 50)
                 qmp.capture(artifacts / "settings-sound.ppm")
                 qmp.click(36, 75)
-                time.sleep(.3)
+                qmp.wait_frame(
+                    artifacts / "settings-search-returned.ppm",
+                    lambda frame: frame[160 * 480 * 3:240 * 480 * 3]
+                                  == search_results[160 * 480 * 3:240 * 480 * 3],
+                    "Search results did not settle before clearing the query")
                 qmp.click(436, 206)  # Clear search, restore all categories
-                time.sleep(.3)
+                qmp.wait_frame(
+                    artifacts / "settings-categories-restored.ppm",
+                    lambda frame: frame[(380 * 480 + 430) * 3:(380 * 480 + 430) * 3 + 3]
+                                  == bytes.fromhex("211d29"),
+                    "Clearing search did not restore all categories")
                 qmp.click(180, 296)  # Network & internet
                 time.sleep(.5)
                 qmp.capture(artifacts / "settings-network.ppm")
@@ -1248,7 +1257,7 @@ def main():
                 qmp.click(180, 244)  # Languages
                 time.sleep(.3)
                 qmp.click(180, 328)  # English
-                time.sleep(.5)
+                guest.wait_setting("language", "en")
                 qmp.capture(artifacts / "settings-english.ppm")
                 preferences = json.loads(guest.run("lmsys settings '{\"op\":\"status\"}'"))["settings"]
                 if preferences.get("language") != "en":
@@ -1306,6 +1315,10 @@ def main():
                     uid = re.search(r"^Uid:\s+(\d+)", identity, re.M)
                     if not uid or int(uid[1]) != app["uid"]:
                         raise RuntimeError("Built-in identity changed: " + app_id)
+                    # Cold font caches can outlast the process-identity check.
+                    # Do not launch the next app before this one's event loop
+                    # acknowledges its initial foreground event.
+                    guest.wait_lifecycle(app_id, pids={app_id: pid})
                 if args.system_probe:
                     exercise_core_ui(guest,qmp,artifacts,preferences)
                 if args.package:
@@ -1322,10 +1335,12 @@ def main():
                         raise RuntimeError("SDK package removal failed")
                 qmp.click(80, 940)  # Recent tasks
                 container = bytes.fromhex("30293c" if preferences.get("dark") else "eaddff")
+                background = bytes.fromhex("15121b" if preferences.get("dark") else "fff8ff")
                 for attempt in range(40):
                     before_tasks = qmp.capture(artifacts / "tasks-before-dismiss.ppm")
                     point = (180 * 480 + 30) * 3
-                    if before_tasks[point:point + 3] == container:
+                    gap = (244 * 480 + 30) * 3
+                    if before_tasks[point:point + 3] == container and before_tasks[gap:gap + 3] == background:
                         break
                     time.sleep(.1)
                 else:
@@ -1338,7 +1353,8 @@ def main():
                 for attempt in range(40):
                     after_tasks = qmp.capture(artifacts / "tasks-after-dismiss.ppm")
                     point = (180 * 480 + 30) * 3
-                    if after_tasks[point:point + 3] == container:
+                    gap = (244 * 480 + 30) * 3
+                    if after_tasks[point:point + 3] == container and after_tasks[gap:gap + 3] == background:
                         break
                     time.sleep(.1)
                 else:
