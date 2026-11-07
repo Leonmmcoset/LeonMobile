@@ -67,8 +67,14 @@ void validate_manifest(const Json &m, bool builtin) {
                                  [](unsigned char c) { return c < 32 || c == 127; }),
                 "invalid root purpose");
     }
-    require(m.at("name").is_string() && !m.at("name").get<std::string>().empty(),
-            "missing application name");
+    for (const auto *key : {"name", "name_en"}) {
+        if (std::string(key) == "name_en" && !m.contains(key)) continue;
+        require(m.at(key).is_string(), "invalid application name");
+        auto name = m.at(key).get<std::string>();
+        require(!name.empty() && name.size() <= 160 &&
+                    std::none_of(name.begin(), name.end(), [](unsigned char c) { return c < 32 || c == 127; }),
+                "application name must be 1..160 bytes without controls");
+    }
     std::string entry = m.at("entry");
     require(builtin ? entry.starts_with("/usr/bin/") : safe_path(entry), "invalid executable path");
     if (m.contains("args")) {

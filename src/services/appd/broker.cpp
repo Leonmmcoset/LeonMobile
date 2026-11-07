@@ -12,17 +12,19 @@ extern "C" {
 namespace leon::appd {
 Broker::Broker(const Options &options)
     : options_(options), packages_(options.root, options.builtin), processes_(options),
-      settings_(options) {
+      settings_(options), installer_(options) {
     if (!options_.development)
         fail(!leon_cgroup_reset(), "cannot clean stale application resource groups");
 }
 Json Broker::dispatch(const Json &request, uid_t caller) {
-    processes_.reap();
+    reap();
     Json response;
     auto op = request.at("op").get<std::string>();
     bool shell = caller == 0 || caller == 1000;
     bool settings = shell || caller == 11000;
-    if (op == "app_list" || op == "app_info" || op == "app_stop" || op == "app_clear" ||
+    if (op.starts_with("package_"))
+        response = installer_.dispatch(request, caller);
+    else if (op == "app_list" || op == "app_info" || op == "app_stop" || op == "app_clear" ||
         op == "app_uninstall") {
         fail(settings, "permission denied");
         if (op == "app_list")
@@ -30,6 +32,8 @@ Json Broker::dispatch(const Json &request, uid_t caller) {
         else if (op == "app_info")
             response = managed_info(packages_, processes_, options_, request.at("id"));
         else {
+            fail(request.at("id") != "org.leon.installer" || !installer_.installing(),
+                 "wait for the installer to finish committing");
             manage_application(packages_, processes_, options_, op, request.at("id"));
             response = {{"completed", op}, {"id", request.at("id")}};
         }

@@ -24,4 +24,6 @@ void durable_dir(const fs::path &path);
 bool safe_path(const std::string &path);
 std::array<unsigned, 3> version(const std::string &text);
 Json unpack_and_validate(const fs::path &archive, const fs::path &stage);
+std::string file_digest(const fs::path &path);
+Json installed_baseline(const fs::path &root, const std::string &id);
 } // namespace leon::detail

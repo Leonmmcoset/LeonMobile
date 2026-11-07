@@ -33,7 +33,7 @@ Json Packages::list() const {
             }
     /* Builtin UID is tied to the app ID, never directory enumeration order. */
     static const std::vector<std::string> names = {"settings", "calculator", "gallery", "files",
-                                                   "editor",   "terminal",   "images",  "clock"};
+                                                   "editor",   "terminal",   "images",  "clock", "installer"};
     for (auto &m : apps)
         if (m.value("builtin", false)) {
             auto id = m.at("id").get<std::string>();

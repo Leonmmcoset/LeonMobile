@@ -5,6 +5,12 @@
 namespace leon {
 using namespace detail;
 void Packages::install(const fs::path &filename) {
+    install_impl(filename, nullptr);
+}
+void Packages::install_reviewed(const fs::path &filename, const Json &review) {
+    install_impl(filename, &review);
+}
+void Packages::install_impl(const fs::path &filename, const Json *review) {
     fs::create_directories(root);
     Fd lock(
         open((root / "installer.lock").c_str(), O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600));
@@ -31,11 +37,22 @@ void Packages::install(const fs::path &filename) {
         write_all(marker, instance.data(), instance.size());
         require(!fsync(marker), "installation identity sync failed");
         std::string id = m.at("id"), ver = m.at("version");
+        Json installed = nullptr;
         for (const auto &app : list())
             if (app.at("id") == id) {
+                installed = app;
                 require(!app.value("builtin", false), "cannot replace a system application");
                 require(version(ver) > version(app.at("version")), "version must increase");
             }
+        if (review) {
+            require(review->at("package").at("id") == id &&
+                        review->at("package").at("version") == ver,
+                    "review does not match package");
+            Json current = nullptr;
+            if (!installed.is_null())
+                current = installed_baseline(root, id);
+            require(current == review->at("baseline"), "installed application changed; review again");
+        }
         Json identities = fs::exists(root / "identities.json")
                               ? read_json(root / "identities.json")
                               : Json{{"next", 12000}, {"apps", Json::object()}};

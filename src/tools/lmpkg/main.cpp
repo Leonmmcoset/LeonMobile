@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
         }
         if (i >= argc)
             throw std::runtime_error(
-                "usage: lmpkg [--root DIR] list | install FILE | remove ID "
+                "usage: lmpkg [--root DIR] list | inspect FILE | install FILE | remove ID "
                 "[--purge-data] | launch ID | save ID | close ID | running | lifecycle");
         std::string verb = argv[i++];
         if ((verb == "running" || verb == "lifecycle") && i == argc) {
@@ -36,6 +36,11 @@ int main(int argc, char **argv) {
         if (i >= argc)
             throw std::runtime_error("missing argument");
         std::string argument = argv[i++];
+        if (verb == "inspect" && i == argc) {
+            if (!offline && geteuid()) throw std::runtime_error("use the graphical installer to inspect a package");
+            std::cout << packages.inspect(argument).dump(2) << '\n';
+            return 0;
+        }
         if ((verb == "launch" || verb == "save" || verb == "close") && i == argc)
             std::cout << broker({{"op", verb}, {"id", argument}}).dump() << '\n';
         else {

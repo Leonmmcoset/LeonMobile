@@ -8,7 +8,7 @@
 #include <set>
 #include <sstream>
 namespace leon::detail {
-static std::string digest(const fs::path &path) {
+std::string file_digest(const fs::path &path) {
     std::ifstream f(path, std::ios::binary);
     require(bool(f), "cannot hash file");
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
@@ -83,7 +83,7 @@ Json unpack_and_validate(const fs::path &filename, const fs::path &stage) {
         require(checksums.size() + 1 == files.size(), "checksum coverage mismatch");
         for (const auto &name : files)
             if (name != "checksums.json")
-                require(checksums.contains(name) && checksums[name] == digest(stage / name),
+                require(checksums.contains(name) && checksums[name] == file_digest(stage / name),
                         "checksum mismatch: " + name);
         std::vector<std::string> executables = {m.at("entry").get<std::string>()};
         if (m.contains("root"))

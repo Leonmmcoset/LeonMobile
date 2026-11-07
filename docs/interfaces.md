@@ -64,6 +64,7 @@ It retains bounded send/receive timeouts and a 1 MiB response limit.
 | `save` | running cooperative `id` | root/desktop |
 | `background`, `lifecycle` | none | root/desktop |
 | `install` | absolute `file` path | root/desktop |
+| `package_prepare`, `package_status`, `package_commit`, `package_cancel` | reviewed transaction; see below | root/system installer |
 | `remove` | `id`, optional `purge` | root/desktop |
 | `app_list` | none | root/desktop/settings app |
 | `app_info` | installed `id` | root/desktop/settings app |
@@ -86,6 +87,9 @@ The application management operations, their storage accounting and destructive
 action semantics are specified in [application-management.md](application-management.md).
 `leon-launchd --portal-socket PATH` selects an isolated permission service for
 development. The production default is `/run/leon/portal.sock`.
+
+The asynchronous review/confirmation state machine and its immutable input,
+limits and failure semantics are specified in [package-installer.md](package-installer.md).
 
 Settings are `dark` (boolean), `reduce_motion` (boolean), `clock_24h` (boolean, default true), `language` (`zh-CN` or `en`), `navigation` (`gestures` or `buttons`), and `volume` (integer 0–100). Preferences are owned by settingsd; audiod applies volume to the selected PipeWire sink and retains the preference while outputs are unavailable. Defaults are light theme, full motion, simplified Chinese, gestures and a preferred volume of 70. Existing stores without `reduce_motion` read as false. The stored volume represents the user's last requested volume.
 

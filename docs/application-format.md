@@ -63,6 +63,7 @@ App data is `/data/leon/data/ID`, owned by that app's UID with mode 0700. Normal
 
 ```sh
 lmpkg list
+lmpkg --root ./offline-store inspect ./org.example.hello-1.0.0.lmpkg
 lmpkg running
 lmpkg install ./org.example.hello-1.0.0.lmpkg
 lmpkg launch org.example.hello
@@ -71,6 +72,11 @@ lmpkg remove org.example.hello --purge-data
 ```
 
 On-device installation/removal by the trusted `leon` desktop user goes through the broker. UID 0 may also operate locally. `--root DIR` creates an isolated offline store for tooling and tests and uses `DIR/builtin` for any built-in test manifests.
+
+The [graphical installer](package-installer.md) adds a separate inspected,
+explicitly confirmed transaction for local packages, without granting the
+requesting application the desktop's installation privilege. Display names
+(`name`, optional `name_en`) must be 1..160 UTF-8 bytes without ASCII controls.
 
 ## Declared capabilities
 
