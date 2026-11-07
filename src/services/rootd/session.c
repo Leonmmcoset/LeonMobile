@@ -146,6 +146,10 @@ int root_session(const struct root_options *o, int socket, int notice, struct uc
             execl("/bin/sh", "-sh", "-i", (char *)NULL);
         _exit(127);
     }
+    /* forkpty inherits the locked open file description. Release it explicitly
+     * before replying: the child's pre-exec setup must not make the next
+     * authenticated request spuriously fail with a busy policy. */
+    (void)flock(lock, LOCK_UN);
     close(lock);
     if (child < 0) {
         root_reply(socket, lm_failure("cannot create root PTY"), -1);
