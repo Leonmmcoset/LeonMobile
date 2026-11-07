@@ -1170,7 +1170,7 @@ def main():
                 guest.wait_lifecycle(None, retained, events={calculator_id: "background"})
                 time.sleep(.5)
                 qmp.click(400, 22)
-                time.sleep(.5)
+                qmp.wait_shade(artifacts / "settings-shortcut-ready.ppm", 700)
                 qmp.click(372, 628)  # Settings shortcut in compact shade
                 # Mapping a new process and populating its first font cache can
                 # take several seconds under software CPU emulation.

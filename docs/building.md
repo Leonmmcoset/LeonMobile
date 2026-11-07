@@ -8,7 +8,7 @@ On Debian/Ubuntu, install the cross-build prerequisites:
 
 ```sh
 sudo apt-get install build-essential bison flex gawk gettext texinfo libssl-dev \
-  libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils \
+  libncurses-dev python3 python3-pil rsync cpio unzip bc file wget curl xz-utils \
   qemu-system-arm qemu-utils e2fsprogs fdisk mtools dosfstools git
 ```
 

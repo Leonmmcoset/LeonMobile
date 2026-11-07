@@ -206,6 +206,7 @@ def unlock_pin(qmp, guest, path):
             x = round(56 + ((number - 1) % 3) * (480 - 112) / 3 + (480 - 136) / 6)
             y = round(406 + ((number - 1) // 3) * 82 + 33)
         qmp.click(x, y)
+    screenshot(qmp, path.with_name(path.stem + "-pin-filled.png"))
     qmp.click(359, 685)
     return wait_screen(qmp, path,
                        lambda frame: display_pixel(frame, 240, 210) == PRIMARY,
@@ -222,7 +223,7 @@ def setup_device_pin(qmp, guest):
                 lambda frame: display_pixel(frame, 240, 210) == PRIMARY,
                 "Unconfigured device did not allow initial session access")
     qmp.click(400, 22)
-    time.sleep(.4)
+    qmp.wait_shade(ARTIFACTS / "recovery-settings-shortcut-ready.ppm", 700)
     screenshot(qmp, ARTIFACTS / "setup-control-shade.png")
     qmp.click(372, 628)
     qmp.wait_frame(ARTIFACTS / "recovery-settings-home.ppm",

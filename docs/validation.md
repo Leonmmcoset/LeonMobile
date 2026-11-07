@@ -873,3 +873,63 @@ The native state-machine tests cover the three-failure threshold, but the
 does not test physical boot firmware, actual handset storage/power loss, secure
 boot, signatures, or rollback resistance. Recovery is an early text console
 and requires a matching host-supplied kernel/initramfs and verified local image.
+
+## UEFI and disk-resident boot (2026-11-07)
+
+The default QEMU chain now loads EDK II from flash and ARM64 GRUB, Linux and the
+initramfs from the disk's EFI partition. The launch commands contain no
+`-kernel`, `-initrd` or `-append`. The final native run passes 13 CTest checks
+and 119 Python tests, including legacy-disk admission, GPT rejection, complete
+data preservation during migration, invalid-repair refusal and bounded boot
+requests. The Root PTY parent now explicitly releases the inherited policy lock;
+the existing session-capacity and revocation checks pass on native and AArch64.
+
+`python3 scripts/test-disk-boot-qemu.py` passes real Esc/arrow/Enter selection
+of safe mode, a kernel reboot to normal mode with retained data, one-shot
+Recovery and return to normal, and migration of a two-partition disk without
+changing the original. Fault injection covers a missing kernel, a damaged
+initramfs, an invalid kernel with a matching hash list, missing menu
+configuration and a destroyed EFI filesystem. Independent USB Recovery boots
+after EFI damage; offline EFI repair preserves system/data hashes and the
+repaired disk reaches the desktop. The target also verifies EFI runtime/RTC,
+the expected kernel and an unprivileged serial console.
+
+The assembled local release records clean source commit
+`28f534500726c4c4a02ed71c0172d8b991f89b1a`, includes EDK II/GRUB source and license
+material plus the board patch, and passes its complete SHA256SUMS manifest.
+The general QEMU regression against that release passes Root session/kernel/
+module/service probes, all eight built-ins, control-panel input/focus, Settings
+and clean UI poweroff. The Settings shortcut fixtures now wait for the actual
+settled panel instead of assuming a fixed animation duration. Image-job host
+dependencies include Pillow for the new PNG evidence.
+
+The existing `test-recovery-qemu.py` regression also passes through UEFI and the
+independent USB medium: real Settings PIN setup and touch unlock, safe/normal
+reboots, missing-essential-file recovery, read-only fsck, cancelled restore,
+invalid-source refusal without system writes, Root-authenticated diagnostics,
+verified system restore and subsequent launch/render of the retained third-party
+app. Offline inspection confirms Root policy, device PIN, package database,
+application-private contents and home data survive. The standalone Recovery
+medium returns to the normal desktop and powers off cleanly.
+
+The release's actual `run.sh` entry point is separately booted on a disposable
+disk. Its recorded process command confirms that no host kernel/initramfs is
+loaded. First-run disk creation, a separate writable UEFI variable bank, EFI RTC,
+healthy desktop, actual unlock and clean shutdown all pass; evidence is in
+`build/qemu-release-launcher-test/` and `build/disk-boot-release-launcher.log`.
+An earlier Recovery attempt overlapped the native suite and failed an unlock;
+the final isolated run passes with the same authentication code and deadlines.
+These runs do not establish authentication latency under host contention.
+
+Evidence remains ignored under `build/qemu-disk-boot-test/`,
+`build/qemu-recovery-test/`, `build/qemu-test/` and
+`build/disk-boot-{native-final,qemu,recovery-qemu,release,release-qemu}.log`.
+Existing user disks are not used by these tests and remain unchanged. See
+[disk-boot.md](disk-boot.md) for explicit migration and boot-only repair.
+
+These results cover the QEMU developer graphics prototype. Secure Boot,
+signatures, anti-rollback and A/B updates remain disabled or unimplemented;
+SHA-256 detects damage without authenticating the boot media. A kernel stall
+before early init is outside the userspace boot-health monitor. Offline EFI
+repair is not atomic and must be repeated if interrupted. Physical phones,
+physical power-loss behavior and a hardware watchdog remain unverified.

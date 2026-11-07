@@ -36,7 +36,7 @@ jobs:
       - name: Install cross-build host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils e2fsprogs fdisk mtools dosfstools git
+          sudo apt-get install -y build-essential bison flex gawk gettext texinfo libssl-dev libncurses-dev python3 python3-pil rsync cpio unzip bc file wget curl xz-utils qemu-system-arm qemu-utils e2fsprogs fdisk mtools dosfstools git
       - uses: actions/cache@v4
         with:
           path: .cache/downloads
