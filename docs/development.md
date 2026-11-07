@@ -17,7 +17,7 @@ do not add unrelated component implementation directories to include paths.
 | `LEON_TOOLS` | `leonctl`, `lmpkg`, `lmsys` and non-setuid `leonsu` |
 | `LEON_GRAPHICS` | Master switch for graphical components |
 | `LEON_LMUI` | Build LMUI locally; when off, graphical clients use the installed SDK |
-| `LEON_APPS` | Eight independently linked built-ins |
+| `LEON_APPS` | Nine independently linked built-ins |
 | `LEON_SHELL` | Trusted mobile shell and independent input method |
 | `LEON_COMPOSITOR` | wlroots compositor |
 | `BUILD_TESTING` | Native component checks |

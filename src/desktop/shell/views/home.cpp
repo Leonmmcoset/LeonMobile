@@ -43,6 +43,7 @@ void Shell::paint_home(Canvas &c) {
                  : symbol == "clock"      ? "◷"
                  : symbol == "editor"     ? "✎"
                  : symbol == "images"     ? "▧"
+                 : symbol == "installer"  ? "↓"
                                           : "◈";
         c.text(symbol, {x + cell / 2 - 30, y, 60, 60}, 28, t.primary, true, 1);
         c.text(name, {x, y + 66, cell, 34}, 13, t.text, false, 1);

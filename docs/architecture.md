@@ -112,7 +112,7 @@ not add radio or brightness hardware support.
 | `lmui` | Shared LMUI runtime; public SDK in staging | Wayland, Cairo/Pango, xkbcommon |
 | `leon-desktop` | Compositor, mobile shell and input method | Installed LMUI SDK, wlroots, JSON |
 | `leon-pinyin` | Deterministically generated Unicode 17 pinyin candidates and license | Pinned Unihan archive, host Python |
-| `leon-apps` | Eight separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG, DejaVu Mono, ncurses terminfo |
+| `leon-apps` | Nine separate application ELFs and manifests | Installed LMUI SDK, JSON, libvterm, JPEG, DejaVu Mono, ncurses terminfo |
 | `leonmobile` | Product dependency selection; no executable payload | All four components |
 
 Each unit uses the shared pinned source/version and keeps its own source list,
@@ -160,7 +160,7 @@ System updates replace the whole system partition while QEMU is stopped or throu
 
 ## Session and trust boundaries
 
-The desktop session uses UID 1000. Built-ins have stable UIDs 11000–11007; installed apps receive persistent UIDs starting at 12000. App homes and runtime directories are mode 0700, supplementary groups are cleared, and applications run with `no_new_privs`. Applications do not inherit the supervisor's input descriptor. Installed programs and resources are read-only to application users.
+The desktop session uses UID 1000. Built-ins have stable UIDs 11000–11008; UID 11008 belongs to the system package installer. Installed apps receive persistent UIDs starting at 12000. App homes and runtime directories are mode 0700, supplementary groups are cleared, and applications run with `no_new_privs`. Applications do not inherit the supervisor's input descriptor. Installed programs and resources are read-only to application users.
 
 The service manager accepts state-changing commands only from UID 0. The application broker identifies callers with `SO_PEERCRED`; the trusted desktop can launch/install/remove apps and request power operations. The settings app can change the supported preferences. Other applications can read preferences. The independent notification daemon also checks `SO_PEERCRED`, accepts bounded notifications under the installed app's own identity, and restricts list access to root/desktop. The broker may relay legacy notification submissions as root with the original peer UID; ordinary clients cannot use that relay operation directly.
 

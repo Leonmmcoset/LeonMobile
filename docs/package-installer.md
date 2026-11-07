@@ -14,6 +14,20 @@ permissions. Packages in format 1 are unsigned: an integrity check does not
 authenticate their publisher. Confirmation grants no runtime permissions and
 does not enable Root. Normal portal and fresh Root authorization remain required.
 
+Open a `.lmpkg` in Files, or open **App installer → Choose package** and use
+the trusted system document picker. Review the source, version and permissions,
+then press **Install** or **Update**. **Cancel** discards the review without
+installing anything. After success, press **Done** and launch the application
+from the home screen. Updates preserve its identity and private data; an
+already running old version must be closed and reopened. Failed or damaged
+packages show an error and leave the active version unchanged. A broker
+restart or expired review requires a fresh review before confirmation.
+
+The installer copies the selected document asynchronously and releases its
+temporary document capability after the broker snapshots it. Files releases
+its offered package capability and interaction after the receiver acknowledges it,
+so repeated package opening does not consume the interaction quota.
+
 ## Broker transaction protocol
 
 `apps.sock` accepts these operations only from root or installer UID 11008;

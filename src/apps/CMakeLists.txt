@@ -1,5 +1,5 @@
 include(LeonApplication)
-foreach(application settings calculator gallery files editor terminal images clock)
+foreach(application settings calculator gallery files editor terminal images clock installer)
   add_subdirectory(${application})
 endforeach()
 if(BUILD_TESTING)

@@ -78,6 +78,11 @@ fail:
     return NULL;
 }
 int intent_matches(const lm_json *app, const lm_json *p) {
+    if (!strcmp(lm_string(lm_get(p, "mime"), ""), "application/vnd.leonmobile.package") &&
+        (!lm_boolean(lm_get(app, "builtin"), 0) ||
+         strcmp(lm_string(lm_get(app, "id"), ""), "org.leon.installer") ||
+         strcmp(lm_string(lm_get(p, "action"), ""), "open") || !lm_get(p, "document")))
+        return 0;
     const lm_json *handlers = lm_get(app, "handlers");
     for (size_t i = 0; i < lm_size(handlers); ++i) {
         const lm_json *h = lm_at(handlers, i);

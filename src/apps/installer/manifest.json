@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "id": "org.leon.installer",
+  "version": "1.0.0",
+  "arch": "aarch64",
+  "entry": "/usr/bin/leon-installer",
+  "name": "应用安装器",
+  "name_en": "App installer",
+  "lmui": 1,
+  "icon": "installer",
+  "lifecycle": 1,
+  "permissions": ["files.import"],
+  "handlers": [{"action": "open", "mime": "application/vnd.leonmobile.package"}]
+}

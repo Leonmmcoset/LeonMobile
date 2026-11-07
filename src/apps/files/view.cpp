@@ -1,12 +1,35 @@
 #include "application.hpp"
 #include <fstream>
+#include <algorithm>
+#include <cctype>
 #include <leon/platform.hpp>
+#include <leon/system.hpp>
 using namespace mobile;
 namespace leon::apps {
 FilesApplication::FilesApplication() : ApplicationWindow("org.leon.files", "文件", "Files") {
     directory.path = user_home();
 }
 void FilesApplication::text_input(const std::string &text) { edit(file_input, text); }
+void FilesApplication::on_tick() {
+    if (++transfer_ticks % 5 || transfers.empty()) return;
+    leon::platform::Client client;
+    for (auto i = transfers.begin(); i != transfers.end();) {
+        try {
+            auto result = client.interaction(i->first);
+            if (!(result.value("acknowledged", false) && result.value("focused", false)) &&
+                result.value("state", "") != "failed") { ++i; continue; }
+            if (result.value("state", "") == "failed") {
+                error = result.value("error", "Could not open package");
+                app.redraw();
+            }
+            try { client.revoke_document(i->second); } catch (...) {}
+            try { leon::system_request("intents", {{"op", "cancel"}, {"token", i->first}}); } catch (...) {}
+        } catch (...) {
+            try { client.revoke_document(i->second); } catch (...) {}
+        }
+        i = transfers.erase(i);
+    }
+}
 void FilesApplication::paint_content(Canvas &c, double bottom) {
     auto t = c.theme;
     double w = c.width;
@@ -36,16 +59,20 @@ void FilesApplication::paint_content(Canvas &c, double bottom) {
                            directory.path = p;
                            scroll = 0;
                        } else {
-                           perform([&] {
-                               auto relative = fs::relative(p, user_home()).string();
-                               auto extension = p.extension().string();
-                               auto mime = extension == ".png" ? "image/png" :
-                                   extension == ".jpg" || extension == ".jpeg" ? "image/jpeg" : "text/plain";
-                               leon::platform::Client platform;
-                               auto token = platform.offer_document(relative);
-                               try { platform.interact({{"action", "open"}, {"mime", mime}, {"document", token}}); }
-                               catch (...) { platform.revoke_document(token); throw; }
-                           });
+                           auto relative = fs::relative(p, user_home()).string();
+                           auto extension = p.extension().string();
+                           std::transform(extension.begin(), extension.end(), extension.begin(),
+                                          [](unsigned char ch) { return char(std::tolower(ch)); });
+                           auto mime = extension == ".lmpkg" ? "application/vnd.leonmobile.package" :
+                               extension == ".png" ? "image/png" :
+                               extension == ".jpg" || extension == ".jpeg" ? "image/jpeg" : "text/plain";
+                           leon::platform::Client platform;
+                           auto token = platform.offer_document(relative);
+                           try {
+                               auto interaction = platform.interact({{"action", "open"}, {"mime", mime}, {"document", token}});
+                               if (extension == ".lmpkg") transfers.emplace(interaction, token);
+                           }
+                           catch (...) { platform.revoke_document(token); throw; }
                        }
                    });
             button(c, hits, {w - 66, y, 46, 48}, "×", [&, p] { perform([&] { fs::remove(p); }); });

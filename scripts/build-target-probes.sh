@@ -44,6 +44,9 @@ done
 "$compiler" -std=c17 -Wall -Wextra -Werror -Os \
     "$repo/tests/target/applications.c" "$repo/tests/target/system_transport.c" \
     -o "$repo/build/applications-probe"
+"$compiler" -std=c17 -Wall -Wextra -Werror -Os \
+    "$repo/tests/target/installer.c" "$repo/tests/target/system_transport.c" \
+    -o "$repo/build/installer-probe"
 "$compiler" -std=c17 -D_GNU_SOURCE -Wall -Wextra -Werror -Os \
     -I"$repo/src/libraries/root-client" -c "$repo/src/libraries/root-client/wire.c" \
     -o "$repo/build/root-wire-probe.o"

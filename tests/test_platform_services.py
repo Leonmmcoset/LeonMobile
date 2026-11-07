@@ -118,6 +118,36 @@ class PlatformServices(unittest.TestCase):
             self.assertEqual(rpc(s, {"op": "status"})["generation"], generation + 1)
             self.assertTrue(rpc(s, {"op": "status"})["settings"]["dark"])
 
+    def test_package_opening_is_reserved_to_system_installer(self):
+        mime = "application/vnd.leonmobile.package"
+        manifest = dict(format=1, id="org.leon.installer", version="1.0.0", arch="aarch64",
+                        lmui=1, name="Installer", entry="/usr/bin/true",
+                        handlers=[dict(action="open", mime=mime)])
+        (self.builtin / "installer.json").write_text(json.dumps(manifest))
+        # Even another built-in with a broad selector cannot impersonate the
+        # installer. A third-party package with an exact selector cannot either.
+        editor = self.builtin / "editor.json"
+        app = json.loads(editor.read_text())
+        app["handlers"] = [dict(action="open", mime="application/*")]
+        editor.write_text(json.dumps(app))
+        local = self.root / "apps/org.example.fake/versions/1.0.0"
+        local.mkdir(parents=True)
+        (local / "manifest.json").write_text(json.dumps({**manifest, "id": "org.example.fake", "entry": "bin/fake"}))
+        (local / ".installation").write_text("a" * 32)
+        (local.parent.parent / "current").symlink_to("versions/1.0.0")
+        (self.root / "identities.json").write_text(json.dumps(dict(next=12001, apps={"org.example.fake": 12000})))
+        payload = dict(action="open", mime=mime, document="f" * 32)
+        with self.daemon("intentd") as (endpoint, _):
+            resolved = rpc(endpoint, dict(op="resolve", **payload), 11003)
+            self.assertEqual([a["id"] for a in resolved["candidates"]], ["org.leon.installer"])
+            for target in ("org.example.fake", "org.leon.editor"):
+                self.assertFalse(rpc(endpoint, dict(op="set_default", target=target, **payload), 11000)["ok"])
+            requested = rpc(endpoint, dict(op="request", **payload), 11003)
+            self.assertTrue(requested["ok"], requested)
+            self.assertEqual(requested["target"], "org.leon.installer")
+            self.assertFalse(rpc(endpoint, dict(op="choose", token=requested["token"], target="org.example.fake"), 1000)["ok"])
+            self.assertEqual(rpc(endpoint, dict(op="resolve", **{**payload, "action": "share"}), 11003)["candidates"], [])
+
     def test_settings_legacy_migration_and_storage_failure(self):
         (self.root / "settings.json").write_text(json.dumps({"dark": True, "volume": 25}))
         state = self.root / "settingsd.json"

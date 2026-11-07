@@ -192,7 +192,7 @@ contains both 440 Hz and 660 Hz in the same capture window; consuming PCM alone
 is insufficient. The privileged test helper is injected into a private image
 and is absent from the shipping root filesystem.
 
-`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, eight distinct ELF manifests, launch/process identity for every built-in, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; journal segments are in that disk's data partition under `/leon/logs/` (mounted as `/data/leon/logs` in the guest). Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
+`python3 scripts/test-qemu.py` boots an isolated disk copy with software-emulated ARM64. It verifies the non-root console, kernel version, nine distinct ELF manifests, launch/process identity for every built-in, portrait display, home-screen app launch, calculator input, persisted dark theme, actual PipeWire volume, DHCP/routing/DNS and clean compositor shutdown through the UI. It writes serial output, PPM display frames and network/audio status to `build/qemu-test`. On failure it saves `failed-disk.img`; journal segments are in that disk's data partition under `/leon/logs/` (mounted as `/data/leon/logs` in the guest). Use the built `output/host/sbin/debugfs` for newer ext4 features rather than older host tools.
 
 `python3 scripts/test-qemu.py --logging-only --timeout 180` independently exercises
 the production Settings diagnostics page, system-log access, detail/service/crash
@@ -206,6 +206,21 @@ Include the cross-compiled example to exercise package transfer, checksum valida
 ./scripts/build-example.sh
 python3 scripts/test-qemu.py --package build/hello/org.example.hello-1.0.0.lmpkg
 ```
+
+Exercise the graphical `.lmpkg` installer separately:
+
+```sh
+./scripts/build-target-probes.sh
+python3 scripts/test-installer-qemu.py
+```
+
+This uses a disposable EFI disk, opens packages through Files and the system
+picker, and checks explicit cancellation/confirmation, version/permission
+review, damaged packages, installed application launch, retained identity/data
+and a real reboot. Screenshots, reviews and serial evidence are written to
+`build/qemu-installer-test/`. The seeding/observation probe is injected only into
+the test disk; it is absent from the normal image. See
+[package-installer.md](package-installer.md) for the UI and broker protocol.
 
 Compile and include the target fault probes for the complete system-service,
 isolation, notification and input-method check:

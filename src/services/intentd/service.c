@@ -125,6 +125,22 @@ lm_json *intent_handle(struct lm_daemon *d, uid_t uid, const lm_json *r) {
         snprintf(p->source, sizeof(p->source), "%s", lm_string(lm_get(app, "id"), ""));
         snprintf(p->installation, sizeof(p->installation), "%s", lm_string(lm_get(app, "installation"), ""));
         lm_free(app);
+        if (!strcmp(lm_string(lm_get(payload, "mime"), ""), "application/vnd.leonmobile.package")) {
+            // Package opening has one system-owned receiver. Opening the
+            // review does not authorize installation or any declared capability.
+            lm_json *installer = lm_app_identity(d->options.root, d->options.builtin, 11008);
+            if (!installer || !intent_matches(installer, payload)) {
+                lm_free(installer);
+                intent_remove(d, p);
+                return lm_failure("system installer unavailable");
+            }
+            snprintf(p->target, sizeof(p->target), "%s", "org.leon.installer");
+            snprintf(p->target_instance, sizeof(p->target_instance), "%s",
+                     lm_string(lm_get(installer, "installation"), ""));
+            p->target_uid = 11008;
+            p->phase = 1;
+            lm_free(installer);
+        }
         return intent_description(d, p, 0);
     }
     const char *token = lm_string(lm_get(r, "token"), "");

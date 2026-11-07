@@ -1,6 +1,7 @@
 #pragma once
 #include "directory.hpp"
 #include <leon/mobile/application.hpp>
+#include <map>
 namespace leon::apps {
 class FilesApplication final : public mobile::ApplicationWindow {
   public:
@@ -9,6 +10,9 @@ class FilesApplication final : public mobile::ApplicationWindow {
   private:
     Directory directory;
     std::string file_input{"new.txt"};
+    std::map<std::string, std::string> transfers;
+    unsigned transfer_ticks{};
+    void on_tick() override;
     mobile::Json save_state() const override {
         return {{"path", directory.path.string()}, {"input", file_input}};
     }

@@ -20,7 +20,7 @@ for attempt in $(seq 1 100); do
     kill -0 "$weston_pid" 2>/dev/null || { cat "$runtime/weston.log"; exit 1; }
     sleep 0.05
 done
-for application in settings calculator gallery files editor terminal images clock; do
+for application in settings calculator gallery files editor terminal images clock installer; do
     HOME="$runtime/$application" LMUI_CAPTURE_FRAME="$repo/build/screenshots/$application.png" \
         LMUI_QUIT_AFTER_FRAME=1 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/leon-$application"
     test -s "$repo/build/screenshots/$application.png"
@@ -35,6 +35,6 @@ done
 LMUI_MOTION_EVIDENCE_DIR="$repo/build/screenshots" \
     timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/lmui-wayland-motion-test"
 LMUI_REDUCE_MOTION=1 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/lmui-wayland-motion-test"
-echo 'Wayland smoke: all eight apps, shell and both shade stages rendered successfully'
+echo 'Wayland smoke: all nine apps, shell and both shade stages rendered successfully'
 python3 "$repo/tests/check_wayland_lifecycle.py"
 timeout 15 "${LEON_TEST_BIN:-$repo/build/host}/bin/lmui-wayland-io-test"

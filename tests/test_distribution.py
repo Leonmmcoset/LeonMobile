@@ -29,7 +29,7 @@ class DistributionTests(unittest.TestCase):
             self.assertFalse(list(stage.rglob("*.pc")))
             self.assertFalse(list(stage.rglob("*Config.cmake")))
             manifests = list((stage / "usr/share/leon/apps").glob("*.json"))
-            self.assertEqual(len(manifests), 8)
+            self.assertEqual(len(manifests), 9)
             entries = set()
             for path in manifests:
                 manifest = json.loads(path.read_text())
@@ -38,7 +38,7 @@ class DistributionTests(unittest.TestCase):
                 self.assertTrue(os.access(entry, os.X_OK))
                 self.assertFalse(manifest.get("args"))
                 entries.add(entry)
-            self.assertEqual(len(entries), 8)
+            self.assertEqual(len(entries), 9)
             self.assertFalse((stage / "usr/bin/leon-app").exists())
             notificationd = stage / "usr/sbin/notificationd"
             self.assertEqual(notificationd.read_bytes()[:4], b"\x7fELF")

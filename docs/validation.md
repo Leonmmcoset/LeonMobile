@@ -933,3 +933,49 @@ SHA-256 detects damage without authenticating the boot media. A kernel stall
 before early init is outside the userspace boot-health monitor. Offline EFI
 repair is not atomic and must be repeated if interrupted. Physical phones,
 physical power-loss behavior and a hardware watchdog remain unverified.
+
+## Graphical package installation (2026-11-07)
+
+The system installer is the ninth independent built-in, with stable UID 11008.
+Thirteen native CTest checks and 127 Python integration checks pass, including
+review/confirmation authorization with real peer UIDs, immutable package
+snapshots, checksum/archive rejection, changed-installation detection,
+cancelable workers, protected built-ins and restart without automatic commit.
+The independent Weston smoke renders all nine applications, the shell and both
+shade stages, and passes motion, lifecycle and descriptor I/O checks. The four
+Buildroot components were cross-built for the pinned AArch64/musl target and
+the full EFI disk image was regenerated.
+
+`python3 scripts/test-installer-qemu.py` passes against that disk through real
+EFI boot. Actual pointer input opens `.lmpkg` from Files, checks package source,
+version, permissions and the unsigned-publisher notice, cancels without install,
+recovers from a discarded review, confirms installation and launches the
+installed ELF. A second package with uppercase `.LMPKG` upgrades 1.0.0 to 1.1.0
+and identifies its new network declaration without granting the permission.
+A damaged archive leaves the installed version unchanged. The trusted system
+picker then opens a shared package and updates it to 1.2.0. Package document
+capabilities are released after each import; the sequence exceeds the per-app
+four-interaction quota without leaking requests. A real kernel reboot retains
+the version and UID, discards the old transaction and launches/renders the
+updated app. After clean shutdown an independent ext4 read verifies the exact
+application-private witness data survived both updates and reboot.
+
+Target validation exposed repeated regular-expression compilation during
+identity checks. Reusing the same compiled patterns reduces a measured ARM64
+document delegation from 1121 ms to 81 ms, within the existing 350 ms internal
+RPC deadline, while retaining every manifest and peer-identity check.
+This measurement describes the local QEMU run, not a hardware latency guarantee.
+
+Evidence is ignored under `build/qemu-installer-test/`, including
+`install-review.png`, `update-review.png`, `invalid-package.png`,
+`system-picker.png`, `updated-app-after-reboot.png`, reviewed JSON, serial logs
+and `preserved-data.txt`. Native and image logs are under
+`build/installer-{native-final-validated,wayland-final,final-image}.log`.
+The privileged observation/seeding helper exists only in disposable test disks;
+it is absent from the default image and never confirms installation.
+
+Packages remain unsigned and the GUI accepts at most 16 MiB of compressed
+document data. Integrity validation does not establish publisher identity.
+Already running applications must be reopened to use their upgraded executable;
+old package versions remain on disk. These results cover the QEMU developer
+prototype, not physical phones or arbitrary power-loss certification.

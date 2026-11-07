@@ -191,6 +191,13 @@ Editor/Images also expose the new document picker. The editor's legacy Import
 copy remains available for generation-1 compatibility. LMUI's demo includes a
 60-second PCM test tone and text sharing, exercising real background playback.
 
+`application/vnd.leonmobile.package` with action `open` and a document is
+reserved for the built-in `org.leon.installer`. It routes directly to that
+system receiver's review page; third-party/wildcard handlers and defaults cannot
+redirect it. Opening a package never confirms installation. Files recognizes
+`.lmpkg` case-insensitively, and the installer also offers the system file picker.
+See [package-installer.md](package-installer.md).
+
 Settings → Network edits Ethernet enablement, renewal, DHCP/static IPv4 and DNS.
 Settings → Sound shows actual outputs and per-stream application volumes.
 Settings → System → Default apps clears saved associations; Document access
