@@ -55,6 +55,13 @@ CMake configuration; `leonmobile-rebuild` remains a convenience target for all
 four packages. After migrating an existing output tree to these packages,
 regenerate the reference defconfig once before building.
 
+The four local packages use separate `buildroot-build` CMake directories. After
+updating an older output tree that built these packages in their source
+directories, remove their generated build trees once (`leon-core-dirclean`,
+`lmui-dirclean`, `leon-desktop-dirclean`, `leon-apps-dirclean`) and run `make image`. This
+prevents source synchronization from replacing a generated build Makefile with
+the repository's native-development Makefile.
+
 Target installation uses the `Runtime` component. LMUI headers, its link-time
 library symlink, pkg-config file and CMake package belong to `Development` and
 are installed into Buildroot's staging sysroot. See [development.md](development.md)

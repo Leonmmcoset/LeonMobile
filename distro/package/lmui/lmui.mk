@@ -7,6 +7,7 @@
 LMUI_VERSION = $(LEON_SOURCE_VERSION)
 LMUI_SITE = $(LEON_SOURCE_SITE)
 LMUI_SITE_METHOD = local
+LMUI_SUPPORTS_IN_SOURCE_BUILD = NO
 LMUI_LICENSE = Apache-2.0
 LMUI_LICENSE_FILES = LICENSE
 LMUI_DEPENDENCIES = host-pkgconf host-wayland wayland wayland-protocols cairo pango libxkbcommon

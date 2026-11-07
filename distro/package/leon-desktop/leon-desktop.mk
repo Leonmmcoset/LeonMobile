@@ -7,6 +7,7 @@
 LEON_DESKTOP_VERSION = $(LEON_SOURCE_VERSION)
 LEON_DESKTOP_SITE = $(LEON_SOURCE_SITE)
 LEON_DESKTOP_SITE_METHOD = local
+LEON_DESKTOP_SUPPORTS_IN_SOURCE_BUILD = NO
 LEON_DESKTOP_LICENSE = Apache-2.0, CC0-1.0 (compositor foundation)
 LEON_DESKTOP_LICENSE_FILES = LICENSE third_party/tinywl-LICENSE protocols/input-method-unstable-v2.xml
 LEON_DESKTOP_DEPENDENCIES = host-pkgconf leon-core lmui wlroots json-for-modern-cpp leon-pinyin
