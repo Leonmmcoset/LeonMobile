@@ -5,8 +5,8 @@
 #include <sstream>
 namespace leon::detail {
 std::array<unsigned, 3> version(const std::string &s) {
-    require(std::regex_match(
-                s, std::regex("(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})")),
+    static const std::regex pattern("(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})");
+    require(std::regex_match(s, pattern),
             "version must be numeric major.minor.patch");
     std::array<unsigned, 3> v;
     char dot;
@@ -26,8 +26,9 @@ bool safe_path(const std::string &s) {
 namespace leon {
 using namespace detail;
 bool valid_id(const std::string &id) {
+    static const std::regex pattern("[a-z][a-z0-9]*(\\.[a-z][a-z0-9_-]*)+");
     return id.size() <= 96 &&
-           std::regex_match(id, std::regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9_-]*)+"));
+           std::regex_match(id, pattern);
 }
 void validate_manifest(const Json &m, bool builtin) {
     require(m.is_object() && m.value("format", 0) == 1, "unsupported application format");
@@ -83,6 +84,8 @@ void validate_manifest(const Json &m, bool builtin) {
             require(a.is_string(), "invalid argument");
     }
     if (m.contains("handlers")) {
+        static const std::regex mime_pattern("[a-z0-9][a-z0-9.+-]*/([a-z0-9][a-z0-9.+-]*|\\*)");
+        static const std::regex scheme_pattern("[a-z][a-z0-9+.-]{0,31}");
         require(m["handlers"].is_array() && m["handlers"].size() <= 16, "invalid handlers");
         std::set<std::string> seen;
         for (const auto &h : m["handlers"]) {
@@ -94,8 +97,7 @@ void validate_manifest(const Json &m, bool builtin) {
                     "handler requires mime or scheme");
             std::string value = h[mime ? "mime" : "scheme"];
             require(value.size() <= 96 &&
-                        std::regex_match(value, mime ? std::regex("[a-z0-9][a-z0-9.+-]*/([a-z0-9][a-z0-9.+-]*|\\*)")
-                                                    : std::regex("[a-z][a-z0-9+.-]{0,31}")),
+                        std::regex_match(value, mime ? mime_pattern : scheme_pattern),
                     "invalid handler selector");
             require(mime || (h["action"] == "open" && value != "file" && value != "data" &&
                              value != "javascript" && value != "shell"), "forbidden URI scheme");
