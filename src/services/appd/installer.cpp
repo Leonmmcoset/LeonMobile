@@ -6,7 +6,7 @@
 #include <csignal>
 #include <fcntl.h>
 #include <linux/memfd.h>
-#include <linux/openat2.h>
+#include "../common/linux_openat2.h"
 #include <openssl/rand.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
